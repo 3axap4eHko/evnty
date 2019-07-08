@@ -1,5 +1,5 @@
 {
-  "name": "evt.js",
+  "name": "evnty",
   "version": "0.0.1",
   "description": "0-Deps, simple, fast, for browser and node js anonymous event library",
   "main": "build/index.js",
