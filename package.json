@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/3axap4eHko/evt.js.git"
+    "url": "git+https://github.com/3axap4eHko/evnty.git"
   },
   "keywords": [
     "event",
@@ -22,9 +22,9 @@
   "author": "Ivan Zakharchanka",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/3axap4eHko/evt.js/issues"
+    "url": "https://github.com/3axap4eHko/evnty/issues"
   },
-  "homepage": "https://github.com/3axap4eHko/evt.js#readme",
+  "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
     "@babel/cli": "^7.5.0",
     "@babel/core": "^7.5.0",
