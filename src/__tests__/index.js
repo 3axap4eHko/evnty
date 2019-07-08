@@ -28,6 +28,15 @@ describe('EventManager test suite', function () {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('Should unsubscribe event', () => {
+    const event = new Event();
+    const listener = jest.fn();
+    const unsubscribe = event.on(listener);
+    unsubscribe();
+    event('test');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('Should listen once', () => {
     const event = new Event();
     const listener = jest.fn();

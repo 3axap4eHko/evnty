@@ -8,6 +8,17 @@
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
 
+## Interface
+
+```typescript
+interface Event {
+  on(listener: Function): Function
+  once(listener: Function): Function
+  off(listener: Function)
+  size: Number
+}
+```
+
 ## Usage
 
 ```js
@@ -21,17 +32,6 @@ const unsubscribe = event.on(value => {
 
 event('test');
 unsubscribe();
-```
-
-## Interface
-
-```js
-interface Event {
-  off(listener: Function)
-  on(listener: Function): Function
-  once(listener: Function): Function
-  size: Number
-}
 ```
 
 ## License
