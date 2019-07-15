@@ -11,11 +11,14 @@
 ## Interface
 
 ```typescript
+declare type Unsubscribe = () => void;
+declare type Listener = (...args: any[]) => void;
+
 interface Event {
-  on(listener: Function): Function
-  once(listener: Function): Function
-  off(listener: Function)
-  size: Number
+    off(listener: Listener): void;
+    on(listener: Listener): Unsubscribe;
+    once(listener: Function): Unsubscribe;
+    readonly size: Number;
 }
 ```
 

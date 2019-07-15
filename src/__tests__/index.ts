@@ -1,8 +1,20 @@
 import Event from '../index';
 
+
 describe('EventManager test suite', function () {
   it('Should be instantiable', () => {
     new Event();
+  });
+
+  it('Should call parent constructor', () => {
+    const EventOriginal = Object.getPrototypeOf(Event);
+    const EventMock = jest.fn();
+
+    Object.setPrototypeOf(Event, EventMock);
+    new Event();
+    expect(EventMock).toHaveBeenCalled();
+
+    Object.setPrototypeOf(Event, EventOriginal);
   });
 
   it('Should be callable', () => {

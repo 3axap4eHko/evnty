@@ -4,7 +4,7 @@
   "description": "0-Deps, simple, fast, for browser and node js anonymous event library",
   "main": "build/index.js",
   "scripts": {
-    "build": "NODE_ENV=production babel src --out-dir build --ignore **/__tests__,**/__mocks__,**/__fixtures__",
+    "build": "rm -rf build && NODE_ENV=production tsc -d --rootDir src/ --outDir build",
     "test": "COVERAGE=true jest"
   },
   "repository": {
@@ -26,13 +26,10 @@
   },
   "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
-    "@babel/cli": "^7.5.0",
-    "@babel/core": "^7.5.0",
-    "@babel/plugin-proposal-class-properties": "^7.5.0",
-    "@babel/plugin-proposal-private-methods": "^7.4.4",
-    "@babel/preset-env": "^7.5.0",
-    "babel-jest": "^24.8.0",
+    "@types/jest": "^24.0.15",
     "jest": "^24.8.0",
-    "lodash": "4.17.13"
+    "ts-jest": "^24.0.2",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
   }
 }
