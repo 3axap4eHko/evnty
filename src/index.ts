@@ -31,7 +31,7 @@ export default class Event extends FunctionExt {
     return () => this.off(listener);
   };
 
-  once(listener: Function): Unsubscribe {
+  once(listener: Listener): Unsubscribe {
     const oneTimeListener = (...args: any[]) => {
       this.off(oneTimeListener);
       listener(...args);
