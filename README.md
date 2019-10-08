@@ -13,27 +13,57 @@
 ```typescript
 declare type Unsubscribe = () => void;
 declare type Listener = (...args: any[]) => void;
+declare type Filter = (...args: any[]) => boolean;
 
-interface Event {
+declare class Event {
+    static merge(...events: Event[]): Event;
+
+    readonly size: Number;
+
+    has(listener: Listener): boolean;
     off(listener: Listener): void;
     on(listener: Listener): Unsubscribe;
-    once(listener: Function): Unsubscribe;
-    readonly size: Number;
+    once(listener: Listener): Unsubscribe;
+    clear(): void;
+    filter(filter: Filter): Event;
 }
 ```
 
 ## Usage
 
 ```js
-import Event from 'evnty';
+import event from 'evnty';
 
-const event = new Event();
+function handleClick({ button }) {
+  console.log('Clicked button is', button);
+}
+const clickEvent = event();
+const unsubscribe = clickEvent.on(handleClick);
 
-const unsubscribe = event.on(value => {
-  console.log('EVENT VALUE IS', value);
-});
+const keyPressEvent = event();
 
-event('test');
+function handleInput({ button, key }) {
+
+}
+
+const inputEvent = Event.merge(clickEvent, keyPressEvent);
+inputEvent.on(handleInput);
+
+function handleLeftClick() {
+  console.log('Left button is clicked');
+}
+const leftClickEvent = clickEvent.filter(({ button }) => button === 'left');
+leftClickEvent.on(handleLeftClick);
+
+
+clickEvent({ button: 'right' });
+clickEvent({ button: 'left' });
+clickEvent({ button: 'middle' });
+keyPressEvent({ key: 'A' });
+keyPressEvent({ key: 'B' });
+keyPressEvent({ key: 'C' });
+
+leftClickEvent.off(handleLeftClick);
 unsubscribe();
 ```
 
