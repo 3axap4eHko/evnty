@@ -81,7 +81,7 @@ describe('Anonymous Event test suite', function () {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('Should create filtered event', () => {
+  it('Should create filtered event', async () => {
     const listener = jest.fn();
     const filter = jest.fn().mockImplementation(name => name === 'two');
 
@@ -92,9 +92,9 @@ describe('Anonymous Event test suite', function () {
     filteredEvent.on(listener);
     expect(filteredEvent.size).toEqual(1);
 
-    event('one', 1);
-    event('two', 2);
-    event('three', 3);
+    await event('one', 1);
+    await event('two', 2);
+    await event('three', 3);
 
     expect(filter).toHaveBeenCalledTimes(3);
     expect(filter).toHaveBeenNthCalledWith(1, 'one', 1);
@@ -103,6 +103,60 @@ describe('Anonymous Event test suite', function () {
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith('two', 2);
+  });
+
+  it('Should create mapped event', async () => {
+    const listener = jest.fn();
+    const mapper = jest.fn().mockImplementation(value => value * 2);
+
+    const event = new Event();
+    const mappedEvent = event.map(mapper);
+    expect(event.size).toEqual(1);
+    await event(1);
+
+    mappedEvent.on(listener);
+    expect(mappedEvent.size).toEqual(1);
+
+    await event(1);
+    await event(2);
+    await event(3);
+
+    expect(mapper).toHaveBeenCalledTimes(3);
+    expect(mapper).toHaveBeenNthCalledWith(1, 1);
+    expect(mapper).toHaveBeenNthCalledWith(2, 2);
+    expect(mapper).toHaveBeenNthCalledWith(3, 3);
+
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(listener).toHaveBeenCalledWith(2);
+    expect(listener).toHaveBeenCalledWith(4);
+    expect(listener).toHaveBeenCalledWith(6);
+  });
+
+  it('Should create reduced event', async () => {
+    const listener = jest.fn();
+    const reducer = jest.fn().mockImplementation((result, value) => result + value);
+
+    const event = new Event();
+    const reducedEvent = event.reduce(reducer, 0);
+    expect(event.size).toEqual(1);
+    await event(1);
+
+    reducedEvent.on(listener);
+    expect(reducedEvent.size).toEqual(1);
+
+    await event(1);
+    await event(2);
+    await event(3);
+
+    expect(reducer).toHaveBeenCalledTimes(3);
+    expect(reducer).toHaveBeenNthCalledWith(1, 0, 1);
+    expect(reducer).toHaveBeenNthCalledWith(2, 0 + 1, 2);
+    expect(reducer).toHaveBeenNthCalledWith(3, 0 + 1 + 2, 3);
+
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(listener).toHaveBeenCalledWith(1);
+    expect(listener).toHaveBeenCalledWith(3);
+    expect(listener).toHaveBeenCalledWith(6);
   });
 
   it('Should merge multiple events', () => {

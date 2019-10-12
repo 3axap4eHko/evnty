@@ -13,19 +13,25 @@
 ```typescript
 declare type Unsubscribe = () => void;
 declare type Listener = (...args: any[]) => void;
+declare type Dispose = () => void;
 declare type Filter = (...args: any[]) => boolean;
+declare type Mapper = <T = any>(...args: any[]) => T;
+declare type Reducer = <T = any>(value: any, ...args: any[]) => T;
 
 declare class Event {
     static merge(...events: Event[]): Event;
 
     readonly size: Number;
 
+    constructor(dispose?: Dispose);
     has(listener: Listener): boolean;
     off(listener: Listener): void;
     on(listener: Listener): Unsubscribe;
     once(listener: Listener): Unsubscribe;
     clear(): void;
     filter(filter: Filter): Event;
+    map(mapper: Mapper): Event;
+    reduce(reducer: Reducer, init: any): Event;
 }
 ```
 
