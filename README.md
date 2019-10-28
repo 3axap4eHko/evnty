@@ -20,6 +20,7 @@ declare type Reducer = <T = any>(value: any, ...args: any[]) => T;
 
 declare class Event {
     static merge(...events: Event[]): Event;
+    static interval(interval: number): Event;
 
     readonly size: Number;
 
@@ -29,6 +30,7 @@ declare class Event {
     on(listener: Listener): Unsubscribe;
     once(listener: Listener): Unsubscribe;
     clear(): void;
+    toPromise(): Promise<any[]>;
     filter(filter: Filter): Event;
     map(mapper: Mapper): Event;
     reduce(reducer: Reducer, init: any): Event;
