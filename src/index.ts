@@ -3,8 +3,8 @@ type Listener = (...args: any[]) => void;
 type Listeners = Set<Listener>;
 type Dispose = () => void;
 type Filter = (...args: any[]) => boolean;
-type Mapper = <T = any>(...args: any[]) => T;
-type Reducer = <T = any>(value: any, ...args: any[]) => T;
+type Mapper<T = any[]> = (...args: any[]) => T;
+type Reducer<T = any[]> = (value: T, ...args: any[]) => T;
 
 class FunctionExt extends Function {
   constructor(func: Function) {
@@ -24,6 +24,14 @@ export class Event extends FunctionExt {
     return mergedEvent;
   }
 
+  static interval(interval: number) {
+    let timerId = 0;
+    let counter = 0;
+    const intervalEvent = new Event(() => clearInterval(timerId));
+    timerId = setInterval(() => intervalEvent(counter++), interval);
+    return intervalEvent;
+  }
+
   private listeners: Listeners;
   readonly dispose: Dispose;
 
@@ -31,7 +39,10 @@ export class Event extends FunctionExt {
     const listeners = new Set<Listener>();
     super(eventEmitter.bind(null, listeners));
     this.listeners = listeners;
-    this.dispose = dispose;
+    this.dispose = () => {
+      this.clear();
+      dispose && dispose();
+    };
   }
 
   get size(): Number {
@@ -63,6 +74,10 @@ export class Event extends FunctionExt {
     this.listeners.clear();
   }
 
+  toPromise(): Promise<any[]> {
+    return new Promise(resolve => this.once((...args) => resolve(args)));
+  }
+
   filter(filter: Filter) {
     const dispose = this.on(async (...args) => {
       if (filteredEvent.size > 0 && await filter(...args)) {
@@ -73,7 +88,7 @@ export class Event extends FunctionExt {
     return filteredEvent;
   }
 
-  map(mapper: Mapper) {
+  map<T>(mapper: Mapper<T>) {
     const dispose = this.on(async (...args) => {
       if (mappedEvent.size > 0) {
         const value = await mapper(...args);
@@ -84,8 +99,8 @@ export class Event extends FunctionExt {
     return mappedEvent;
   }
 
-  reduce(reducer: Reducer, init: any) {
-    let value: any = init;
+  reduce<T>(reducer: Reducer<T>, init: T) {
+    let value: T = init;
     const dispose = this.on(async (...args) => {
       if (reducedEvent.size > 0) {
         value = await reducer(value, ...args);

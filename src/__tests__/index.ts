@@ -81,6 +81,18 @@ describe('Anonymous Event test suite', function () {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('Should return event promise', async () => {
+    const listener = jest.fn();
+    const event = new Event();
+    event.on(listener);
+    expect(listener).not.toBeCalled();
+    const promise = event.toPromise();
+    event('test');
+    const result = await promise;
+    expect(result).toEqual(['test']);
+    expect(listener).toBeCalledWith('test');
+  });
+
   it('Should create filtered event', async () => {
     const listener = jest.fn();
     const filter = jest.fn().mockImplementation(name => name === 'two');
@@ -178,5 +190,19 @@ describe('Anonymous Event test suite', function () {
     expect(listener).toHaveBeenNthCalledWith(2, 2);
     expect(listener).toHaveBeenNthCalledWith(3, 3);
     expect(listener).toHaveBeenNthCalledWith(4, 123);
+  });
+
+  it('Should create interval events', async () => {
+    const listener = jest.fn();
+    const event = Event.interval(10);
+    event.on(listener);
+    await event.toPromise();
+    expect(listener).toBeCalledWith(0);
+    event.dispose();
+    const result = await Promise.race([
+      new Promise(resolve => setTimeout(resolve, 100, null)),
+      event.toPromise(),
+    ]);
+    expect(result).toEqual(null);
   });
 });
