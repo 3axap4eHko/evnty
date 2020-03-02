@@ -1,10 +1,30 @@
-type Unsubscribe = () => void;
-type Listener = (...args: any[]) => void;
-type Listeners = Set<Listener>;
-type Dispose = () => void;
-type Filter = (...args: any[]) => boolean;
-type Mapper<T = any[]> = (...args: any[]) => T;
-type Reducer<T = any[]> = (value: T, ...args: any[]) => T;
+export interface Unsubscribe {
+  (): void;
+}
+
+export interface Listener {
+  (...args: any[]): void;
+}
+
+export interface Dispose {
+  (): void
+}
+
+export interface Filter {
+  (...args: any[]): boolean
+}
+
+export interface Mapper<T = any[]> {
+  (...args: any[]): T;
+}
+
+export interface Reducer<T = any[]> {
+  (value: T, ...args: any[]): T
+}
+
+export interface Listeners extends Set<Listener> {
+
+}
 
 class FunctionExt extends Function {
   constructor(func: Function) {
