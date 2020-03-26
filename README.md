@@ -3,7 +3,8 @@
 0-Deps, simple, fast, for browser and node js anonymous event library
 
 [![Coverage Status][codecov-image]][codecov-url]
-[![Build Status][travis-image]][travis-url]
+[![Github Build Status][github-image]][github-url]
+[![Travis Build Status][travis-image]][travis-url]
 [![NPM version][npm-image]][npm-url]
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
@@ -82,6 +83,8 @@ Copyright (c) 2019 Ivan Zakharchanka
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200
 [npm-image]: https://img.shields.io/npm/v/evnty.svg?maxAge=43200
+[github-url]: https://github.com/3axap4eHko/evnty/actions
+[github-image]: https://github.com/3axap4eHko/evnty/workflows/Build%20Package/badge.svg?branch=master
 [travis-url]: https://travis-ci.org/3axap4eHko/evnty
 [travis-image]: https://travis-ci.org/3axap4eHko/evnty.svg?branch=master
 [codecov-url]: https://codecov.io/gh/3axap4eHko/evnty
