@@ -23,7 +23,6 @@ jobs:
           yarn --version
       - name: Install dependecies
         run: |
-          yarn global add codecov
           yarn
       - name: Run build process
         run: |
@@ -31,7 +30,6 @@ jobs:
       - name: Run testing
         run: |
           yarn test
-          codecov
         env:
           COVERAGE: 1
       - name: Upload test coverage
