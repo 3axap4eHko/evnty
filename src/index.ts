@@ -45,7 +45,7 @@ export class Event extends FunctionExt {
   }
 
   static interval(interval: number) {
-    let timerId = 0;
+    let timerId: any = 0;
     let counter = 0;
     const intervalEvent = new Event(() => clearInterval(timerId));
     timerId = setInterval(() => intervalEvent(counter++), interval);

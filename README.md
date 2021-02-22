@@ -4,7 +4,6 @@
 
 [![Coverage Status][codecov-image]][codecov-url]
 [![Github Build Status][github-image]][github-url]
-[![Travis Build Status][travis-image]][travis-url]
 [![NPM version][npm-image]][npm-url]
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
@@ -85,8 +84,6 @@ Copyright (c) 2019 Ivan Zakharchanka
 [npm-image]: https://img.shields.io/npm/v/evnty.svg?maxAge=43200
 [github-url]: https://github.com/3axap4eHko/evnty/actions
 [github-image]: https://github.com/3axap4eHko/evnty/workflows/Build%20Package/badge.svg?branch=master
-[travis-url]: https://travis-ci.org/3axap4eHko/evnty
-[travis-image]: https://travis-ci.org/3axap4eHko/evnty.svg?branch=master
 [codecov-url]: https://codecov.io/gh/3axap4eHko/evnty
 [codecov-image]: https://codecov.io/gh/3axap4eHko/evnty/branch/master/graph/badge.svg?maxAge=43200
 [snyk-url]: https://snyk.io/test/npm/evnty/latest
