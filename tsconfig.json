@@ -6,12 +6,18 @@
     "removeComments": true,
     "preserveConstEnums": true,
     "sourceMap": true,
+    "declaration": true,
     "lib": [
       "es2015.core",
       "es6",
       "dom"
-    ]
+    ],
+    "rootDir": "src",
+    "outDir": "build"
   },
+  "include": [
+    "src/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "src/**/__tests__",

@@ -77,7 +77,7 @@ unsubscribe();
 
 ## License
 License [The MIT License](http://opensource.org/licenses/MIT)
-Copyright (c) 2019 Ivan Zakharchanka
+Copyright (c) 2021 Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200

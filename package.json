@@ -5,7 +5,7 @@
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
-    "build": "rm -rf build && NODE_ENV=production tsc -d --rootDir src/ --outDir build",
+    "build": "rm -rf build && NODE_ENV=production tsc",
     "test": "jest",
     "test:cov": "COVERAGE=true jest"
   },
