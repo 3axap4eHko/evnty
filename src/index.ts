@@ -137,6 +137,6 @@ export class Event<T extends any[]> extends FunctionExt {
   }
 }
 
-export default function createEvent() {
-  return new Event();
+export default function createEvent<T extends any[]>() {
+  return new Event<T>();
 }
