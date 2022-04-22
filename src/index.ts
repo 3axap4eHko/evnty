@@ -27,7 +27,7 @@ export type Listeners<T extends any[]> = Set<Listener<T>>;
 class FunctionExt extends Function {
   constructor(func: Function) {
     super();
-    Object.setPrototypeOf(func, new.target.prototype);
+    return Object.setPrototypeOf(func, new.target.prototype);
   }
 }
 
