@@ -7,11 +7,11 @@ export interface Listener<T extends any[]> {
 }
 
 export interface Dispose {
-  (): void
+  (): void;
 }
 
 export interface Filter<T extends any[]> {
-  (...args: T): boolean
+  (...args: T): boolean;
 }
 
 export interface Mapper<T extends any[], R> {
@@ -19,7 +19,7 @@ export interface Mapper<T extends any[], R> {
 }
 
 export interface Reducer<T extends any[], R> {
-  (value: R, ...args: T): R
+  (value: R, ...args: T): R;
 }
 
 export type Listeners<T extends any[]> = Set<Listener<T>>;
@@ -32,10 +32,10 @@ class FunctionExt extends Function {
 }
 
 function eventEmitter<A extends any[]>(listeners: Listeners<A>, ...args: A) {
-  return Promise.all([...listeners].map(listener => listener(...args))).then(() => { });
+  return Promise.all([...listeners].map((listener) => listener(...args))).then(() => void 0);
 }
 
-export interface Event<T extends any[]>  {
+export interface Event<T extends any[]> {
   (...args: T): Promise<void> | void;
 }
 
@@ -44,7 +44,7 @@ type EventTypes<T extends Event<any>[]> = T extends Event<infer E>[] ? E : never
 export class Event<T extends any[]> extends FunctionExt {
   static merge<E extends Event<unknown[]>[], ET extends any[] = EventTypes<E>>(...events: E) {
     const mergedEvent = new Event<ET>();
-    events.forEach(event => event.on((...args: ET) => mergedEvent(...args)));
+    events.forEach((event) => event.on((...args: ET) => mergedEvent(...args)));
     return mergedEvent;
   }
 
@@ -100,12 +100,12 @@ export class Event<T extends any[]> extends FunctionExt {
   }
 
   toPromise(): Promise<T> {
-    return new Promise(resolve => this.once((...args) => resolve(args)));
+    return new Promise((resolve) => this.once((...args) => resolve(args)));
   }
 
   filter(filter: Filter<T>) {
     const dispose = this.on(async (...args) => {
-      if (filteredEvent.size > 0 && await filter(...args)) {
+      if (filteredEvent.size > 0 && (await filter(...args))) {
         filteredEvent(...args);
       }
     });
