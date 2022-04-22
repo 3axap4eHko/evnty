@@ -1,4 +1,4 @@
-import event, { Event } from '../index';
+import createEvent, { Event } from '../index';
 
 describe('Anonymous Event test suite', function () {
   it('Should be instantiable', () => {
@@ -6,7 +6,11 @@ describe('Anonymous Event test suite', function () {
   });
 
   it('Should be instantiable', () => {
-    expect(() => event()).not.toThrow();
+    expect(() => createEvent()).not.toThrow();
+  });
+
+  it('Should be instantiable', () => {
+    expect(() => createEvent()).not.toThrow();
   });
 
   it('Should call parent constructor', () => {

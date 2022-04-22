@@ -2,62 +2,67 @@ export interface Unsubscribe {
   (): void;
 }
 
-export interface Listener {
-  (...args: any[]): void;
+export interface Listener<T extends any[]> {
+  (...args: T): void;
 }
 
 export interface Dispose {
   (): void
 }
 
-export interface Filter {
-  (...args: any[]): boolean
+export interface Filter<T extends any[]> {
+  (...args: T): boolean
 }
 
-export interface Mapper<T = any[]> {
-  (...args: any[]): T;
+export interface Mapper<T extends any[], R> {
+  (...args: T): R;
 }
 
-export interface Reducer<T = any[]> {
-  (value: T, ...args: any[]): T
+export interface Reducer<T extends any[], R> {
+  (value: R, ...args: T): R
 }
 
-export interface Listeners extends Set<Listener> {
-
-}
+export type Listeners<T extends any[]> = Set<Listener<T>>;
 
 class FunctionExt extends Function {
   constructor(func: Function) {
     super();
-    return Object.setPrototypeOf(func, new.target.prototype);
+    Object.setPrototypeOf(func, new.target.prototype);
   }
 }
 
-function eventEmitter(listeners: Listeners, ...args: any[]) {
-  return Promise.all([...listeners].map(listener => listener(...args)));
+function eventEmitter<A extends any[]>(listeners: Listeners<A>, ...args: A) {
+  return Promise.all([...listeners].map(listener => listener(...args))).then(() => { });
 }
 
-export class Event extends FunctionExt {
-  static merge(...events: Event[]): Event {
-    const mergedEvent = new Event();
-    events.forEach(event => event.on((...args) => mergedEvent(...args)));
+export interface Event<T extends any[]>  {
+  (...args: T): Promise<void> | void;
+}
+
+type EventTypes<T extends Event<any>[]> = T extends Event<infer E>[] ? E : never;
+
+export class Event<T extends any[]> extends FunctionExt {
+  static merge<E extends Event<unknown[]>[], ET extends any[] = EventTypes<E>>(...events: E) {
+    const mergedEvent = new Event<ET>();
+    events.forEach(event => event.on((...args: ET) => mergedEvent(...args)));
     return mergedEvent;
   }
 
   static interval(interval: number) {
     let timerId: any = 0;
     let counter = 0;
-    const intervalEvent = new Event(() => clearInterval(timerId));
+    const intervalEvent = new Event<[number]>(() => clearInterval(timerId));
     timerId = setInterval(() => intervalEvent(counter++), interval);
     return intervalEvent;
   }
 
-  private listeners: Listeners;
+  private listeners: Listeners<T>;
   readonly dispose: Dispose;
 
   constructor(dispose?: Dispose) {
-    const listeners = new Set<Listener>();
-    super(eventEmitter.bind(null, listeners));
+    const listeners = new Set<Listener<T>>();
+    const fn: (...args: T) => Promise<void> = eventEmitter.bind(null, listeners);
+    super(fn);
     this.listeners = listeners;
     this.dispose = () => {
       this.clear();
@@ -65,40 +70,40 @@ export class Event extends FunctionExt {
     };
   }
 
-  get size(): Number {
+  get size(): number {
     return this.listeners.size;
   }
 
-  has(listener: Listener): boolean {
+  has(listener: Listener<T>): boolean {
     return this.listeners.has(listener);
   }
 
-  off(listener: Listener): void {
+  off(listener: Listener<T>): void {
     this.listeners.delete(listener);
-  };
+  }
 
-  on(listener: Listener): Unsubscribe {
+  on(listener: Listener<T>): Unsubscribe {
     this.listeners.add(listener);
     return () => this.off(listener);
-  };
+  }
 
-  once(listener: Listener): Unsubscribe {
-    const oneTimeListener = (...args: any[]) => {
+  once(listener: Listener<T>): Unsubscribe {
+    const oneTimeListener = (...args: T) => {
       this.off(oneTimeListener);
       listener(...args);
     };
     return this.on(oneTimeListener);
-  };
+  }
 
   clear() {
     this.listeners.clear();
   }
 
-  toPromise(): Promise<any[]> {
+  toPromise(): Promise<T> {
     return new Promise(resolve => this.once((...args) => resolve(args)));
   }
 
-  filter(filter: Filter) {
+  filter(filter: Filter<T>) {
     const dispose = this.on(async (...args) => {
       if (filteredEvent.size > 0 && await filter(...args)) {
         filteredEvent(...args);
@@ -108,7 +113,7 @@ export class Event extends FunctionExt {
     return filteredEvent;
   }
 
-  map<T>(mapper: Mapper<T>) {
+  map<R>(mapper: Mapper<T, R>) {
     const dispose = this.on(async (...args) => {
       if (mappedEvent.size > 0) {
         const value = await mapper(...args);
@@ -119,8 +124,8 @@ export class Event extends FunctionExt {
     return mappedEvent;
   }
 
-  reduce<T>(reducer: Reducer<T>, init: T) {
-    let value: T = init;
+  reduce<R>(reducer: Reducer<T, R>, init: R) {
+    let value = init;
     const dispose = this.on(async (...args) => {
       if (reducedEvent.size > 0) {
         value = await reducer(value, ...args);
@@ -132,6 +137,6 @@ export class Event extends FunctionExt {
   }
 }
 
-export default function event() {
+export default function createEvent() {
   return new Event();
 }
