@@ -46,13 +46,22 @@ describe('Anonymous Event test suite', function () {
     expect(listener).toHaveBeenCalledWith('test');
   });
 
-  it('Should remove event listener', () => {
+  it('Should remove existing event listener', () => {
     const event = new Event();
     const listener = jest.fn();
     event.on(listener);
     event.off(listener);
     event('test');
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('Should not remove other event listeners', () => {
+    const event = new Event();
+    const listener = jest.fn();
+    event.on(listener);
+    event.off(jest.fn());
+    event('test');
+    expect(listener).toHaveBeenCalled();
   });
 
   it('Should unsubscribe event', () => {
@@ -99,7 +108,7 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create filtered event', async () => {
     const listener = jest.fn();
-    const filter = jest.fn().mockImplementation(name => name === 'two');
+    const filter = jest.fn().mockImplementation((name) => name === 'two');
 
     const event = new Event();
     const filteredEvent = event.filter(filter);
@@ -123,7 +132,7 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create mapped event', async () => {
     const listener = jest.fn();
-    const mapper = jest.fn().mockImplementation(value => value * 2);
+    const mapper = jest.fn().mockImplementation((value) => value * 2);
 
     const event = new Event();
     const mappedEvent = event.map(mapper);
@@ -203,10 +212,18 @@ describe('Anonymous Event test suite', function () {
     await event.toPromise();
     expect(listener).toBeCalledWith(0);
     event.dispose();
-    const result = await Promise.race([
-      new Promise(resolve => setTimeout(resolve, 100, null)),
-      event.toPromise(),
-    ]);
+    const result = await Promise.race([new Promise((resolve) => setTimeout(resolve, 100, null)), event.toPromise()]);
+    expect(result).toEqual(null);
+  });
+
+  it('Should dismiss event', async () => {
+    const listener = jest.fn();
+    const event = Event.interval(10);
+    event.on(listener);
+    await event.toPromise();
+    expect(listener).toBeCalledWith(0);
+    event.dispose();
+    const result = await Promise.race([new Promise((resolve) => setTimeout(resolve, 100, null)), event.toPromise()]);
     expect(result).toEqual(null);
   });
 });

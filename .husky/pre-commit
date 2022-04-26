@@ -2,5 +2,5 @@
 . "$(dirname "$0")/_/husky.sh"
 
 yarn pretty-quick --staged
-yarn eslint .
+yarn eslint src
 

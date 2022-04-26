@@ -8,21 +8,10 @@
     "experimentalDecorators": true,
     "sourceMap": true,
     "declaration": true,
-    "lib": [
-      "es2015.core",
-      "es6",
-      "dom"
-    ],
+    "lib": ["es2015.core", "es6", "dom"],
     "rootDir": "src",
     "outDir": "build"
   },
-  "include": [
-    "src/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "src/**/__tests__",
-    "src/**/__fixtures__",
-    "src/**/__mocks__"
-  ]
+  "include": ["src/*.ts"],
+  "exclude": ["node_modules", "src/design.ts", "src/**/__tests__", "src/**/__fixtures__", "src/**/__mocks__"]
 }
