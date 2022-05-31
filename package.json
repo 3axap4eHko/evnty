@@ -1,6 +1,6 @@
 {
   "name": "evnty",
-  "version": "0.8.11",
+  "version": "0.8.12",
   "description": "0-Deps, simple, fast, for browser and node js anonymous event library",
   "main": "build/index.js",
   "types": "build/index.d.ts",
