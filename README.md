@@ -67,12 +67,15 @@ type Mapper = <T = any>(...args: any[]) => T;
 type Reducer = <T = any>(value: any, ...args: any[]) => T;
 
 class Event {
+  // Merges multiple events
   static merge(...events: Event[]): Event;
+  // Emits event by interval
   static interval(interval: number): Event;
 
   readonly size: Number;
 
   constructor(dispose?: Dispose);
+  lacks(listener: Listener): boolean;
   has(listener: Listener): boolean;
   off(listener: Listener): void;
   on(listener: Listener): Unsubscribe;
