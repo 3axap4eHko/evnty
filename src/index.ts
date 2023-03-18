@@ -41,13 +41,13 @@ export class Dismiss extends FunctionExt {
   constructor(dismiss: Unsubscribe) {
     super(dismiss);
   }
-  async while(process: () => MaybePromise<any>) {
+  async after(process: () => MaybePromise<any>) {
     await process();
     this();
   }
-  async after(count: number) {
+  afterTimes(count: number) {
     return () => {
-      if (!count--) {
+      if (!--count) {
         this();
       }
     };
@@ -112,14 +112,14 @@ export class Event<T extends any[]> extends FunctionExt {
     }
   }
 
-  on(listener: Listener<T>): Unsubscribe {
+  on(listener: Listener<T>): Dismiss {
     if (this.lacks(listener)) {
       this.listeners.push(listener);
     }
     return new Dismiss(() => this.off(listener));
   }
 
-  once(listener: Listener<T>): Unsubscribe {
+  once(listener: Listener<T>): Dismiss {
     const oneTimeListener = (...args: T) => {
       this.off(oneTimeListener);
       listener(...args);
@@ -168,6 +168,10 @@ export class Event<T extends any[]> extends FunctionExt {
     return reducedEvent;
   }
 }
+
+export const once = <T extends any[]>(event: Event<T>): Promise<T> => {
+  return new Promise((resolve) => event.once((...args) => resolve(args)));
+};
 
 export default function createEvent<T extends any[]>() {
   return new Event<T>();

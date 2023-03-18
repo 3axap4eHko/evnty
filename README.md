@@ -66,6 +66,11 @@ type Filter = (...args: any[]) => boolean;
 type Mapper = <T = any>(...args: any[]) => T;
 type Reducer = <T = any>(value: any, ...args: any[]) => T;
 
+class Dismiss {
+  async after(process: () => MaybePromise<any>): Promise<void>;
+  afterTimes(count: number): () => void;
+}
+
 class Event {
   // Merges multiple events
   static merge(...events: Event[]): Event;
@@ -78,8 +83,8 @@ class Event {
   lacks(listener: Listener): boolean;
   has(listener: Listener): boolean;
   off(listener: Listener): void;
-  on(listener: Listener): Unsubscribe;
-  once(listener: Listener): Unsubscribe;
+  on(listener: Listener): Dismiss;
+  once(listener: Listener): Dismiss;
   clear(): void;
   toPromise(): Promise<any[]>;
   filter(filter: Filter): Event;
@@ -92,42 +97,46 @@ class Event {
 ## Usage
 
 ```js
-import event from 'evnty';
+import event, { once } from 'evnty';
 
-function handleClick({ button }) {
-  console.log('Clicked button is', button);
-}
+const handleClick = ({ button }) => console.log('Clicked button is', button);
 const clickEvent = event();
-const unsubscribe = clickEvent.on(handleClick);
+const unsubscribeClick = clickEvent.on(handleClick);
 
 const keyPressEvent = event();
+const handleKeyPress = ({ key }) => console.log('Key pressed', key);
+const unsubscribeKeyPress = keyPressEvent.on(handleKeyPress);
 
-function handleInput({ button, key }) {}
-
+const handleInput = ({ button, key }) => {};
 const inputEvent = Event.merge(clickEvent, keyPressEvent);
 inputEvent.on(handleInput);
 
-function handleLeftClick() {
-  console.log('Left button is clicked');
-}
+const handleLeftClick = () => console.log('Left button is clicked');
 const leftClickEvent = clickEvent.filter(({ button }) => button === 'left');
 leftClickEvent.on(handleLeftClick);
+
+setTimeout(() => keyPressEvent, 100, 'Enter');
+await once(keyPressEvent);
+
+keyPressEvent({ key: 'W' });
+keyPressEvent({ key: 'A' });
+keyPressEvent({ key: 'S' });
+keyPressEvent({ key: 'D' });
 
 clickEvent({ button: 'right' });
 clickEvent({ button: 'left' });
 clickEvent({ button: 'middle' });
-keyPressEvent({ key: 'A' });
-keyPressEvent({ key: 'B' });
-keyPressEvent({ key: 'C' });
 
+unsubscribeClick();
+unsubscribeKeyPress.after(() => once(keyPressEvent));
 leftClickEvent.off(handleLeftClick);
-unsubscribe();
+keyPressEvent({ key: 'Esc' });
 ```
 
 ## License
 
 License [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0)
-Copyright (c) 2021-present Ivan Zakharchanka
+Copyright (c) 2023-present Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200

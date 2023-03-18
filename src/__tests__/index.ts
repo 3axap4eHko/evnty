@@ -1,4 +1,4 @@
-import createEvent, { Event } from '../index';
+import createEvent, { Event, once } from '../index';
 
 describe('Anonymous Event test suite', function () {
   it('Should be instantiable', () => {
@@ -216,14 +216,49 @@ describe('Anonymous Event test suite', function () {
     expect(result).toEqual(null);
   });
 
-  it('Should dismiss event', async () => {
+  it('Should dismiss event listener', async () => {
     const listener = jest.fn();
     const event = Event.interval(10);
     event.on(listener);
     await event.toPromise();
     expect(listener).toBeCalledWith(0);
     event.dispose();
-    const result = await Promise.race([new Promise((resolve) => setTimeout(resolve, 100, null)), event.toPromise()]);
-    expect(result).toEqual(null);
+    const result = await Promise.race([new Promise(process.nextTick).then(Boolean), event.toPromise()]);
+    expect(result).toEqual(true);
+  });
+
+  it('Should dismiss event after task finished', async () => {
+    const listener = jest.fn();
+    const event = new Event();
+    const dismiss = event.on(listener);
+    event();
+    expect(listener).toHaveBeenCalledTimes(1);
+    const nextTick = new Promise(process.nextTick);
+    dismiss.after(() => nextTick);
+    await nextTick;
+    event();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('Should dismiss event after certain events', async () => {
+    const listener = jest.fn();
+    const event = new Event();
+    const dismiss = event.on(listener);
+    const timesCallback = dismiss.afterTimes(2);
+    event();
+    timesCallback();
+    event();
+    timesCallback();
+    event();
+    timesCallback();
+    event();
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('Should await once event happend', async () => {
+    const event = new Event();
+    process.nextTick(event, 'test');
+    const result = await once(event);
+    expect(result).toContain('test');
   });
 });
