@@ -1,17 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es2015",
-    "module": "commonjs",
-    "noImplicitAny": true,
-    "removeComments": true,
-    "preserveConstEnums": true,
-    "experimentalDecorators": true,
-    "sourceMap": true,
-    "declaration": true,
-    "lib": ["es2015.core", "es6", "dom"],
+    "target": "ES5",
     "rootDir": "src",
     "outDir": "build"
   },
   "include": ["src/*.ts"],
-  "exclude": ["node_modules", "src/design.ts", "src/**/__tests__", "src/**/__fixtures__", "src/**/__mocks__"]
+  "exclude": ["node_modules", "src/**/__tests__", "src/**/__fixtures__", "src/**/__mocks__", "src/*.tmp.ts"]
 }

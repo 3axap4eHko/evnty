@@ -1,4 +1,4 @@
 build
 coverage
 node_modules
-src/design.ts
+src/*.tmp.ts

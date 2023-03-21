@@ -1,6 +1,6 @@
 # Evnty
 
-0-Deps, simple, fast, for browser and node js anonymous event library
+0-Deps, simple, fast, for browser and node js anonymous event library.
 
 [![Coverage Status][codecov-image]][codecov-url]
 [![Github Build Status][github-image]][github-url]
@@ -19,6 +19,7 @@
 
 ## Features
 
+- Supports ESM and CommonJS
 - Promises support
 - Full-featured typeScript support
 - Browser & Workers environment compatibility
