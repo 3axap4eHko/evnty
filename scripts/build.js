@@ -103,7 +103,7 @@ const compile = async (sourceFile, destinationFile, config) => {
 };
 
 (async () => {
-  const sourceFiles = await glob('**/*.ts', { ignore: ['**/__tests__/**/*.ts', '*.tmp.ts'], cwd: 'src' });
+  const sourceFiles = await glob('**/*.ts', { ignore: ['__tests__', '*.tmp.ts'], cwd: 'src' });
   for (const filename of sourceFiles) {
     const sourceFile = `src/${filename}`;
     const destinationFileCjs = `build/${Path.basename(filename, '.ts')}.cjs`;

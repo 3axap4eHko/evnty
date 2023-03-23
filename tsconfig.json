@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES5",
+    "target": "es2015",
+    "moduleResolution": "nodenext",
     "rootDir": "src",
     "outDir": "build"
   },
   "include": ["src/*.ts"],
-  "exclude": ["node_modules", "src/**/__tests__", "src/**/__fixtures__", "src/**/__mocks__", "src/*.tmp.ts"]
+  "exclude": ["node_modules", "__tests__", "**/*.tmp.ts"]
 }

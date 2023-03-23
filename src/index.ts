@@ -54,9 +54,9 @@ export class Dismiss extends FunctionExt {
   }
 }
 
-function eventEmitter<A extends any[]>(listeners: Listeners<A>, ...args: A) {
-  return Promise.all(listeners.map((listener) => listener(...args))).then(() => void 0);
-}
+const eventEmitter = async <A extends any[]>(listeners: () => Listeners<A>, ...args: A) => {
+  return Promise.allSettled(listeners().map((listener) => listener(...args)));
+};
 
 export interface Event<T extends any[]> {
   (...args: T): Promise<void> | void;
@@ -83,10 +83,9 @@ export class Event<T extends any[]> extends FunctionExt {
   readonly dispose: Dispose;
 
   constructor(dispose?: Dispose) {
-    const listeners: Listeners<T> = [];
-    const fn: (...args: T) => Promise<void> = eventEmitter.bind(null, listeners);
+    const fn: (...args: T) => Promise<void> = eventEmitter.bind(null, () => this.listeners);
     super(fn);
-    this.listeners = listeners;
+    this.listeners = [];
     this.dispose = () => {
       this.clear();
       dispose && dispose();
@@ -102,20 +101,15 @@ export class Event<T extends any[]> extends FunctionExt {
   }
 
   has(listener: Listener<T>): boolean {
-    return !this.lacks(listener);
+    return this.listeners.indexOf(listener) !== -1;
   }
 
   off(listener: Listener<T>): void {
-    const index = this.listeners.indexOf(listener);
-    if (index !== -1) {
-      this.listeners.splice(index, 1);
-    }
+    this.listeners = this.listeners.filter((l) => l !== listener);
   }
 
   on(listener: Listener<T>): Dismiss {
-    if (this.lacks(listener)) {
-      this.listeners.push(listener);
-    }
+    this.listeners.push(listener);
     return new Dismiss(() => this.off(listener));
   }
 
@@ -128,7 +122,7 @@ export class Event<T extends any[]> extends FunctionExt {
   }
 
   clear() {
-    this.listeners.splice(0);
+    this.listeners = [];
   }
 
   toPromise(): Promise<T> {
