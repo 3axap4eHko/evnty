@@ -1405,6 +1405,11 @@ color-name@~1.1.4:
   resolved "https://registry.yarnpkg.com/color-name/-/color-name-1.1.4.tgz#c2a09a87acbde69543de6f63fa3995c826c536a2"
   integrity sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==
 
+commander@^10.0.0:
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/commander/-/commander-10.0.0.tgz#71797971162cd3cf65f0b9d24eb28f8d303acdf1"
+  integrity sha512-zS5PnTI22FIRM6ylNW8G4Ap0IEOyk62fhLSD0+uHRT9McRCLGpkVNvao4bjimpK/GShynyQkFFxHhwMcETmduA==
+
 commander@^7.1.0:
   version "7.2.0"
   resolved "https://registry.yarnpkg.com/commander/-/commander-7.2.0.tgz#a36cb57d0b501ce108e4d20559a150a391d97ab7"
@@ -2309,6 +2314,16 @@ inherits@2, inherits@^2.0.3:
   version "2.0.4"
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.4.tgz#0fa2c64f932917c3433a0ded55363aae37416b7c"
   integrity sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
+
+inop@^0.0.8:
+  version "0.0.8"
+  resolved "https://registry.yarnpkg.com/inop/-/inop-0.0.8.tgz#ab21f5c78ac456bac5d7c8d87d5681e3eff28c65"
+  integrity sha512-y23ANvsx6xcmSAZ8DGG2l+SV9Z3inDk+NHk2Ep/hGqeAmTvkKu7Ql/SqCoOiStUm2FTjBiusTI/5X45pQu5nAw==
+  dependencies:
+    "@swc/cli" "^0.1.62"
+    "@swc/core" "^1.3.42"
+    commander "^10.0.0"
+    fast-glob "^3.2.12"
 
 internal-slot@^1.0.5:
   version "1.0.5"
