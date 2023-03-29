@@ -49,6 +49,7 @@ jobs:
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
         run: |
           yarn test
+          yarn test:build
 
       - name: Commit 🔒
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE

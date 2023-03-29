@@ -105,7 +105,11 @@ export class Event<T extends any[]> extends FunctionExt {
   }
 
   off(listener: Listener<T>): void {
-    this.listeners = this.listeners.filter((l) => l !== listener);
+    let index = this.listeners.indexOf(listener);
+    while (~index) {
+      this.listeners.splice(index, 1);
+      index = this.listeners.indexOf(listener);
+    }
   }
 
   on(listener: Listener<T>): Dismiss {

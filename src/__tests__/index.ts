@@ -55,6 +55,16 @@ describe('Anonymous Event test suite', function () {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('Should remove all existing event listeners', () => {
+    const event = new Event();
+    const listener = jest.fn();
+    event.on(listener);
+    event.on(listener);
+    event.off(listener);
+    event('test');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('Should not remove other event listeners', () => {
     const event = new Event();
     const listener = jest.fn();
