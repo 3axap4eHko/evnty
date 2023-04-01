@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [16.x, 18.x]
+        node-version: [18.x]
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
@@ -60,14 +60,14 @@ jobs:
           git commit -am "autoupdate"
           npm version patch
 
-      - name: Publish 📚
-        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-          npm publish
-
       - name: Push
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
         run: |
           git push
           git push --tags
+
+      - name: Publish 📚
+        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+          npm publish
