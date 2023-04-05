@@ -1,7 +1,7 @@
 {
   "name": "evnty",
   "description": "0-Deps, simple, fast, for browser and node js anonymous event library",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "type": "module",
   "main": "build/index.cjs",
   "module": "build/index.js",
