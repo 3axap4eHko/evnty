@@ -2312,10 +2312,10 @@ inherits@2, inherits@^2.0.3:
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.4.tgz#0fa2c64f932917c3433a0ded55363aae37416b7c"
   integrity sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
 
-inop@^0.1.1:
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/inop/-/inop-0.1.1.tgz#c514ab09a2ef5187f05795df69fe292b0e77f045"
-  integrity sha512-lFcbjVkFCjtv4Ms4C208Dp/H0iPd8gGQtPgozRl52ZumiwGGI43JAc96L3st7TWaKzxFxq2CwGepL4IZJx5wwA==
+inop@^0.2.2:
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/inop/-/inop-0.2.2.tgz#689c46c3755dd63a1b7d51f932e0195aad4e653a"
+  integrity sha512-jiWaAvuvjdNYED47jw1TN400EERzHn14Dk6pJtOlT6UwbebN/dHIjt+EkzenZMu47sHpoSdk841+L8e+jos8vg==
   dependencies:
     "@swc/cli" "^0.1.62"
     "@swc/core" "^1.3.42"
