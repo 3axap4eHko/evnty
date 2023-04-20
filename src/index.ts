@@ -4,7 +4,7 @@ export interface Unsubscribe {
   (): void;
 }
 
-export interface Listener<T extends any[]> {
+export interface Listener<T extends unknown[]> {
   (...args: T): void;
 }
 
@@ -12,19 +12,19 @@ export interface Dispose {
   (): void;
 }
 
-export interface Filter<T extends any[]> {
+export interface Filter<T extends unknown[]> {
   (...args: T): MaybePromise<boolean>;
 }
 
-export interface Mapper<T extends any[], R> {
+export interface Mapper<T extends unknown[], R> {
   (...args: T): R;
 }
 
-export interface Reducer<T extends any[], R> {
+export interface Reducer<T extends unknown[], R> {
   (value: R, ...args: T): R;
 }
 
-export type Listeners<T extends any[]> = Listener<T>[];
+export type Listeners<T extends unknown[]> = Listener<T>[];
 
 class FunctionExt extends Function {
   constructor(func: Function) {
@@ -41,7 +41,7 @@ export class Dismiss extends FunctionExt {
   constructor(dismiss: Unsubscribe) {
     super(dismiss);
   }
-  async after(process: () => MaybePromise<any>) {
+  async after(process: () => MaybePromise<unknown>) {
     await process();
     this();
   }
@@ -54,28 +54,29 @@ export class Dismiss extends FunctionExt {
   }
 }
 
-const eventEmitter = async <A extends any[]>(listeners: () => Listeners<A>, ...args: A) => {
-  return Promise.allSettled(listeners().map((listener) => listener(...args)));
+const eventEmitter = async <A extends unknown[]>(listeners: Listeners<A>, ...args: A) => {
+  return Promise.allSettled(listeners.map((listener) => listener(...args)));
 };
 
-export interface Event<T extends any[]> {
+export interface Event<T extends unknown[]> {
   (...args: T): Promise<void> | void;
 }
 
-type EventTypes<T extends Event<any>[]> = T extends Event<infer E>[] ? E : never;
-
-export class Event<T extends any[]> extends FunctionExt {
-  static merge<E extends Event<unknown[]>[], ET extends any[] = EventTypes<E>>(...events: E) {
-    const mergedEvent = new Event<ET>();
-    events.forEach((event) => event.on((...args: ET) => mergedEvent(...args)));
+export class Event<T extends unknown[]> extends FunctionExt {
+  static merge<T extends unknown[][]>(
+    ...events: {
+      [K in keyof T]: Event<T[K]>;
+    }
+  ) {
+    const mergedEvent = new Event<T[number]>();
+    events.forEach((event) => event.on(mergedEvent));
     return mergedEvent;
   }
 
   static interval(interval: number) {
-    let timerId: any = 0;
     let counter = 0;
     const intervalEvent = new Event<[number]>(() => clearInterval(timerId));
-    timerId = setInterval(() => intervalEvent(counter++), interval);
+    const timerId: NodeJS.Timer = setInterval(() => intervalEvent(counter++), interval);
     return intervalEvent;
   }
 
@@ -83,12 +84,14 @@ export class Event<T extends any[]> extends FunctionExt {
   readonly dispose: Dispose;
 
   constructor(dispose?: Dispose) {
-    const fn: (...args: T) => Promise<void> = eventEmitter.bind(null, () => this.listeners);
+    const listeners: Listeners<T> = [];
+    const fn = (...args: T) => eventEmitter(listeners, ...args);
+
     super(fn);
-    this.listeners = [];
+    this.listeners = listeners;
     this.dispose = () => {
       this.clear();
-      dispose && dispose();
+      dispose?.();
     };
   }
 
@@ -126,7 +129,7 @@ export class Event<T extends any[]> extends FunctionExt {
   }
 
   clear() {
-    this.listeners = [];
+    this.listeners.splice(0);
   }
 
   toPromise(): Promise<T> {

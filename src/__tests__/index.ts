@@ -197,22 +197,26 @@ describe('Anonymous Event test suite', function () {
   it('Should merge multiple events', () => {
     const listener = jest.fn();
 
-    const event1 = new Event();
-    const event2 = new Event();
-    const event3 = new Event();
+    const event1 = new Event<[string]>();
+    const event2 = new Event<[number]>();
+    const event3 = new Event<[boolean]>();
     const mergedEvent = Event.merge(event1, event2, event3);
     mergedEvent.on(listener);
 
-    event1(1);
-    event2(2);
-    event3(3);
-    mergedEvent(123);
+    event1('a');
+    event2(1);
+    event3(true);
+    mergedEvent('b');
+    mergedEvent(2);
+    mergedEvent(false);
 
-    expect(listener).toHaveBeenCalledTimes(4);
-    expect(listener).toHaveBeenNthCalledWith(1, 1);
-    expect(listener).toHaveBeenNthCalledWith(2, 2);
-    expect(listener).toHaveBeenNthCalledWith(3, 3);
-    expect(listener).toHaveBeenNthCalledWith(4, 123);
+    expect(listener).toHaveBeenCalledTimes(6);
+    expect(listener).toHaveBeenNthCalledWith(1, 'a');
+    expect(listener).toHaveBeenNthCalledWith(2, 1);
+    expect(listener).toHaveBeenNthCalledWith(3, true);
+    expect(listener).toHaveBeenNthCalledWith(4, 'b');
+    expect(listener).toHaveBeenNthCalledWith(5, 2);
+    expect(listener).toHaveBeenNthCalledWith(6, false);
   });
 
   it('Should create interval events', async () => {

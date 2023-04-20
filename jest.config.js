@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   verbose: true,
   collectCoverage: !!process.env.CI,
   collectCoverageFrom: ['src/**/*.ts'],
@@ -6,7 +6,7 @@ module.exports = {
   coveragePathIgnorePatterns: ['/coverage', '/node_modules/', '__tests__'],
   coverageDirectory: './coverage',
   transform: {
-    '^.+\\.ts$': '@swc/jest',
+    '\\.ts$': '@swc/jest',
   },
   testMatch: ['**/__tests__/**/*.ts'],
 };
