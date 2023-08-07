@@ -55,7 +55,7 @@ export class Dismiss extends FunctionExt {
 }
 
 const eventEmitter = async <A extends unknown[]>(listeners: Listeners<A>, ...args: A) => {
-  return Promise.allSettled(listeners.map((listener) => listener(...args)));
+  return Promise.all(listeners.map((listener) => listener(...args)));
 };
 
 export interface Event<T extends unknown[]> {
