@@ -1,6 +1,13 @@
 #!/bin/sh
+set -e
+
 . "$(dirname "$0")/_/husky.sh"
 
-yarn pretty-quick --staged
-yarn eslint src
+CHANGED_FILES=$(git diff --name-only --cached --diff-filter=ACMR)
+STAGED_CODE=$(echo "$CHANGED_FILES" | grep -E '\.(ts|js)$' || true)
 
+if [ -z "$STAGED_CODE" ]; then
+  echo "Skip code linitng"
+else
+  yarn eslint --fix $STAGED_CODE && git add $STAGED_CODE || exit 1
+fi

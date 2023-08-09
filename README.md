@@ -35,7 +35,7 @@
 
 | ![Chrome][chrome-image] | ![Firefox][firefox-image] | ![Safari][safari-image] | ![Opera][opera-image] | ![Edge][edge-image] |
 | ----------------------- | ------------------------- | ----------------------- | --------------------- | ------------------- |
-| Latest ✔                | Latest ✔                  | Latest ✔                | Latest ✔              | Latest ✔            |
+| Latest ✔               | Latest ✔                 | Latest ✔               | Latest ✔             | Latest ✔           |
 
 [chrome-image]: https://raw.github.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png?1
 [firefox-image]: https://raw.github.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png?1
