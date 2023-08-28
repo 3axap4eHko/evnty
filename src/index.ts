@@ -76,7 +76,7 @@ export class Event<T extends unknown[]> extends FunctionExt {
   static interval(interval: number) {
     let counter = 0;
     const intervalEvent = new Event<[number]>(() => clearInterval(timerId));
-    const timerId: NodeJS.Timer = setInterval(() => intervalEvent(counter++), interval);
+    const timerId: NodeJS.Timeout = setInterval(() => intervalEvent(counter++), interval);
     return intervalEvent;
   }
 

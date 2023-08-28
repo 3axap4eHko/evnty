@@ -2,10 +2,10 @@
   "compilerOptions": {
     "strict": true,
     "target": "esnext",
-    "module": "ESNext",
+    "module": "NodeNext",
     "declaration": true,
     "esModuleInterop": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "NodeNext",
     "lib": ["DOM", "ESNext"],
     "rootDir": "src",
     "outDir": "build"
