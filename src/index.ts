@@ -59,7 +59,7 @@ const eventEmitter = async <A extends unknown[], R>(listeners: Listeners<A, R>, 
 };
 
 export interface Event<T extends unknown[], R> {
-  (...args: T): Promise<R> | R;
+  (...args: T): Promise<R[]>;
 }
 
 type UnpackParameters<T> = T extends Event<infer P, unknown> ? P : never;
@@ -140,7 +140,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   filter(filter: Filter<T>) {
     const dispose = this.on(async (...args) => {
       if (filteredEvent.size > 0 && (await filter(...args))) {
-        return filteredEvent(...args);
+        await filteredEvent(...args);
       }
     });
     const filteredEvent = new Event<T, R>(dispose);
