@@ -59,7 +59,7 @@ const eventEmitter = async <A extends unknown[], R>(listeners: Listeners<A, R>, 
 };
 
 export interface Event<T extends unknown[], R> {
-  (...args: T): Promise<R[]>;
+  (...args: T): Promise<(R | undefined)[]>;
 }
 
 type UnpackParameters<T> = T extends Event<infer P, unknown> ? P : never;

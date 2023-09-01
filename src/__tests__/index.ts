@@ -281,8 +281,8 @@ describe('Anonymous Event test suite', function () {
     const event = new Event<[string], number | string>();
     event.on(() => 1);
     event.on(() => 'test');
-    event.on(() => 0);
-    const result: (number | string)[] = await event('test');
+    event.on(() => {});
+    const result = (await event('test')) satisfies (number | string | void)[];
     expect(result).toEqual([1, 'test', 0]);
   });
 });
