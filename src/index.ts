@@ -171,10 +171,10 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   }
 }
 
-export const once = <T extends unknown[], R>(event: Event<T, R>): Promise<T> => {
+export const once = <T extends unknown[], R = void>(event: Event<T, R>): Promise<T> => {
   return new Promise((resolve) => event.once((...args) => resolve(args)));
 };
 
-export default function createEvent<T extends unknown[], R>() {
+export default function createEvent<T extends unknown[], R = void>() {
   return new Event<T, R>();
 }

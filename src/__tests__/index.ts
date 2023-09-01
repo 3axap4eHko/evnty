@@ -6,11 +6,11 @@ describe('Anonymous Event test suite', function () {
   });
 
   it('Should be instantiable', () => {
-    expect(() => createEvent()).not.toThrow();
+    expect(() => createEvent<[number]>()).not.toThrow();
   });
 
   it('Should be instantiable', () => {
-    expect(() => createEvent()).not.toThrow();
+    expect(() => createEvent<[string], string>()).not.toThrow();
   });
 
   it('Should call parent constructor', () => {
