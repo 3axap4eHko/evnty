@@ -197,10 +197,11 @@ describe('Anonymous Event test suite', function () {
   it('Should merge multiple events', () => {
     const listener = jest.fn();
 
-    const event1 = new Event<[string]>();
-    const event2 = new Event<[number]>();
-    const event3 = new Event<[boolean]>();
+    const event1 = new Event<[string], number>();
+    const event2 = new Event<[number], boolean>();
+    const event3 = new Event<[boolean], string>();
     const mergedEvent = Event.merge(event1, event2, event3);
+
     mergedEvent.on(listener);
 
     event1('a');
@@ -274,5 +275,14 @@ describe('Anonymous Event test suite', function () {
     process.nextTick(event, 'test');
     const result = await once(event);
     expect(result).toContain('test');
+  });
+
+  it('Should return listeners values', async () => {
+    const event = new Event<[string], number | string>();
+    event.on(() => 1);
+    event.on(() => 'test');
+    event.on(() => 0);
+    const result = await event('test');
+    expect(result).toEqual([1, 'test', 0]);
   });
 });

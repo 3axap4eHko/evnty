@@ -6,7 +6,7 @@
     "declaration": true,
     "esModuleInterop": true,
     "moduleResolution": "NodeNext",
-    "lib": ["DOM", "ESNext"],
+    "lib": ["ESNext"],
     "rootDir": "src",
     "outDir": "build"
   },
