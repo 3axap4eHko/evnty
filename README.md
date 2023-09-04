@@ -137,7 +137,7 @@ keyPressEvent({ key: 'Esc' });
 ## License
 
 License [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0)
-Copyright (c) 2023-present Ivan Zakharchanka
+Copyright (c) 2021-present Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200
