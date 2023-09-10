@@ -36,6 +36,7 @@
     "flow",
     "event-driven"
   ],
+  "runkitExampleFilename": "src/__tests__/example.js",
   "funding": "https://github.com/sponsors/3axap4eHko",
   "author": {
     "name": "Ivan Zakharchanka",
