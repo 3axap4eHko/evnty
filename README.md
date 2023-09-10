@@ -11,7 +11,7 @@
 ## Table of Contents
 
 - [Features](#features)
-- [Browser Support](#browser-support)
+- [Platform Support](#platform-support)
 - [Installing](#installing)
 - [Examples](#examples)
 - [Roadmap](#roadmap)
@@ -33,15 +33,16 @@
 
 ## Browser Support
 
-| ![Chrome][chrome-image] | ![Firefox][firefox-image] | ![Safari][safari-image] | ![Opera][opera-image] | ![Edge][edge-image] |
-| ----------------------- | ------------------------- | ----------------------- | --------------------- | ------------------- |
-| Latest ✔               | Latest ✔                 | Latest ✔               | Latest ✔             | Latest ✔           |
+| ![NodeJS][node-image] | ![Chrome][chrome-image] | ![Firefox][firefox-image] | ![Safari][safari-image] | ![Opera][opera-image] | ![Edge][edge-image] |
+| ----------------------- | ----------------------- | ------------------------- | ----------------------- | --------------------- | ------------------- |
+| Latest ✔               | Latest ✔               | Latest ✔                 | Latest ✔               | Latest ✔             | Latest ✔           |
 
-[chrome-image]: https://raw.github.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png?1
-[firefox-image]: https://raw.github.com/alrra/browser-logos/master/src/firefox/firefox_48x48.png?1
-[safari-image]: https://raw.github.com/alrra/browser-logos/master/src/safari/safari_48x48.png?1
-[opera-image]: https://raw.github.com/alrra/browser-logos/master/src/opera/opera_48x48.png?1
-[edge-image]: https://raw.github.com/alrra/browser-logos/master/src/edge/edge_48x48.png?1
+[node-image]: https://raw.github.com/alrra/browser-logos/main/src/node.js/node.js_48x48.png?1
+[chrome-image]: https://raw.github.com/alrra/browser-logos/main/src/chrome/chrome_48x48.png?1
+[firefox-image]: https://raw.github.com/alrra/browser-logos/main/src/firefox/firefox_48x48.png?1
+[safari-image]: https://raw.github.com/alrra/browser-logos/main/src/safari/safari_48x48.png?1
+[opera-image]: https://raw.github.com/alrra/browser-logos/main/src/opera/opera_48x48.png?1
+[edge-image]: https://raw.github.com/alrra/browser-logos/main/src/edge/edge_48x48.png?1
 
 ## Installing
 
