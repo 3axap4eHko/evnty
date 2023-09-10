@@ -29,7 +29,6 @@
 
 - Namespaces/Wildcards
 - Times To Listen (TTL)
-- Subscribe/UnSubscribe
 
 ## Browser Support
 
@@ -124,4 +123,4 @@ Copyright (c) 2021-present Ivan Zakharchanka
 [codecov-url]: https://codecov.io/gh/3axap4eHko/evnty
 [codecov-image]: https://codecov.io/gh/3axap4eHko/evnty/branch/master/graph/badge.svg?maxAge=43200
 [snyk-url]: https://snyk.io/test/npm/evnty/latest
-[snyk-image]: https://img.shields.io/snyk/vulnerabilities/github/3axap4eHko/evnty.svg?maxAge=43200
+[snyk-image]: https://snyk.io/test/github/3axap4eHko/evnty/badge.svg?maxAge=43200
