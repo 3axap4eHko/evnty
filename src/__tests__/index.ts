@@ -1,6 +1,18 @@
-import createEvent, { Event, once } from '../index';
+import createEvent, { once, Event, Dismiss, FunctionExt, EventHandler } from '../index';
 
 describe('Anonymous Event test suite', function () {
+  test('FunctionExt extends from Function', () => {
+    expect(FunctionExt.prototype).toBeInstanceOf(Function);
+  });
+
+  test('Dismiss extends from FunctionExt', () => {
+    expect(Dismiss.prototype).toBeInstanceOf(FunctionExt);
+  });
+
+  test('Event extends from FunctionExt', () => {
+    expect(Event.prototype).toBeInstanceOf(FunctionExt);
+  });
+
   it('Should be instantiable', () => {
     expect(() => new Event()).not.toThrow();
   });
@@ -32,9 +44,11 @@ describe('Anonymous Event test suite', function () {
 
   it('Should check event existence', () => {
     const event = new Event();
-    const listener = jest.fn();
+    const listener: EventHandler<typeof event> = jest.fn();
     event.on(listener);
     expect(event.has(listener)).toEqual(true);
+    event.off(listener);
+    expect(event.lacks(listener)).toEqual(true);
   });
 
   it('Should add event listener', () => {
@@ -135,6 +149,29 @@ describe('Anonymous Event test suite', function () {
     expect(filter).toHaveBeenNthCalledWith(1, 'one', 1);
     expect(filter).toHaveBeenNthCalledWith(2, 'two', 2);
     expect(filter).toHaveBeenNthCalledWith(3, 'three', 3);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith('two', 2);
+  });
+
+  it('Should create one time filtered event', async () => {
+    const listener = jest.fn();
+    const filter = jest.fn().mockImplementation((name) => name === 'two');
+
+    const event = new Event();
+    const filteredEvent = event.first(filter);
+    expect(event.size).toEqual(1);
+
+    filteredEvent.on(listener);
+    expect(filteredEvent.size).toEqual(1);
+
+    await event('one', 1);
+    await event('two', 2);
+    await event('two', 2);
+
+    expect(filter).toHaveBeenCalledTimes(2);
+    expect(filter).toHaveBeenNthCalledWith(1, 'one', 1);
+    expect(filter).toHaveBeenNthCalledWith(2, 'two', 2);
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith('two', 2);

@@ -57,67 +57,38 @@ Using npm:
 npm install evnty
 ```
 
-## Interface
-
-```typescript
-type Unsubscribe = () => void;
-type Listener = (...args: any[]) => void;
-type Dispose = () => void;
-type Filter = (...args: any[]) => boolean;
-type Mapper = <T = any>(...args: any[]) => T;
-type Reducer = <T = any>(value: any, ...args: any[]) => T;
-
-class Dismiss {
-  async after(process: () => MaybePromise<any>): Promise<void>;
-  afterTimes(count: number): () => void;
-}
-
-class Event {
-  // Merges multiple events
-  static merge(...events: Event[]): Event;
-  // Emits event by interval
-  static interval(interval: number): Event;
-
-  readonly size: Number;
-
-  constructor(dispose?: Dispose);
-  lacks(listener: Listener): boolean;
-  has(listener: Listener): boolean;
-  off(listener: Listener): void;
-  on(listener: Listener): Dismiss;
-  once(listener: Listener): Dismiss;
-  clear(): void;
-  toPromise(): Promise<any[]>;
-  filter(filter: Filter): Event;
-  map(mapper: Mapper): Event;
-  reduce(reducer: Reducer, init: any): Event;
-  dispose(): Dispose;
-}
-```
-
-## Usage
+## Examples
 
 ```js
-import event, { once } from 'evnty';
+import createEvent, { Event, once } from 'evnty';
 
-const handleClick = ({ button }) => console.log('Clicked button is', button);
-const clickEvent = event();
+// Creates a click event
+type Click = { button: string };
+const clickEvent = createEvent<[Click]>();
+const handleClick = ({ button }: Click) => console.log('Clicked button is', button);
 const unsubscribeClick = clickEvent.on(handleClick);
 
-const keyPressEvent = event();
-const handleKeyPress = ({ key }) => console.log('Key pressed', key);
+// Creates a key press event
+type KeyPress = { key: string };
+const keyPressEvent = createEvent<[KeyPress]>();
+const handleKeyPress = ({ key }: KeyPress) => console.log('Key pressed', key);
 const unsubscribeKeyPress = keyPressEvent.on(handleKeyPress);
 
-const handleInput = ({ button, key }) => {};
+// Merges click and key press events into input event
+type Input = Click | KeyPress;
+const handleInput = (input: Input) => console.log('Input', input);;
 const inputEvent = Event.merge(clickEvent, keyPressEvent);
 inputEvent.on(handleInput);
 
+// Filters a click event to only include left-click events.
 const handleLeftClick = () => console.log('Left button is clicked');
 const leftClickEvent = clickEvent.filter(({ button }) => button === 'left');
 leftClickEvent.on(handleLeftClick);
 
-setTimeout(() => keyPressEvent, 100, 'Enter');
-await once(keyPressEvent);
+// Will press Enter after one second
+setTimeout(keyPressEvent, 1000, { key: 'Enter' });
+// Waits once the first Enter key press event occurs
+await once(keyPressEvent.first(({ key }) => key === 'Enter'));
 
 keyPressEvent({ key: 'W' });
 keyPressEvent({ key: 'A' });
@@ -128,9 +99,14 @@ clickEvent({ button: 'right' });
 clickEvent({ button: 'left' });
 clickEvent({ button: 'middle' });
 
+// Unsubscribe click listener
 unsubscribeClick();
-unsubscribeKeyPress.after(() => once(keyPressEvent));
+// It does not log anything because of click listener is unsubscribed
 leftClickEvent.off(handleLeftClick);
+
+// Unsubscribe key press listener once first Esc key press occur
+unsubscribeKeyPress.after(() => once(keyPressEvent.first(({ key }) => key === 'Esc')));
+// Press Esc to unsubscribe key press listener
 keyPressEvent({ key: 'Esc' });
 ```
 

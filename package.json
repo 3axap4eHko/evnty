@@ -32,7 +32,9 @@
     "events",
     "emit",
     "emitter",
-    "anonymous"
+    "anonymous",
+    "flow",
+    "event-driven"
   ],
   "funding": "https://github.com/sponsors/3axap4eHko",
   "author": {
