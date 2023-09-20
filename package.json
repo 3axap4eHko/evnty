@@ -7,8 +7,10 @@
   "main": "build/index.cjs",
   "module": "build/index.js",
   "exports": {
-    "require": "./build/index.cjs",
-    "import": "./build/index.js"
+    ".": {
+      "require": "./build/index.cjs",
+      "import": "./build/index.js"
+    }
   },
   "files": [
     "build",
@@ -16,7 +18,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "rm -rf build && inop src build -p -i __tests__ -i *.tmp.ts && tsc --declaration --emitDeclarationOnly",
+    "build": "rm -rf build && inop src build -i __tests__ -i *.tmp.ts && tsc --declaration --emitDeclarationOnly",
     "test": "jest",
     "test:build": "node src/__tests__/index.cjs && node src/__tests__/index.mjs",
     "lint": "eslint src",
