@@ -322,4 +322,15 @@ describe('Anonymous Event test suite', function () {
     const result = (await event('test')) satisfies (number | string | void)[];
     expect(result).toEqual([1, 'test', undefined]);
   });
+
+  it('Should debounce events', async () => {
+    const listener = jest.fn();
+    const event = new Event<[string], number | string>();
+    const debouncedEvent = event.debounce(10);
+    debouncedEvent.on(listener);
+    event('test1');
+    event('test2');
+    await debouncedEvent.toPromise();
+    expect(listener).toBeCalledTimes(1);
+  });
 });

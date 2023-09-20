@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "esnext",
+    "target": "ESNext",
     "module": "NodeNext",
     "declaration": true,
     "esModuleInterop": true,
@@ -10,6 +10,12 @@
     "rootDir": "src",
     "outDir": "build"
   },
-  "include": ["src/*.ts"],
-  "exclude": ["node_modules", "__tests__", "**/*.tmp.ts"]
+  "include": [
+    "src/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "__tests__",
+    "**/*.tmp.ts"
+  ]
 }

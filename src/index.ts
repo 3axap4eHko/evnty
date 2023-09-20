@@ -47,6 +47,9 @@ export interface Task {
   (): MaybePromise<unknown>;
 }
 
+/**
+ * @internal
+ */
 export class Dismiss extends FunctionExt {
   constructor(callback: Unsubscribe) {
     super(callback);
@@ -84,16 +87,16 @@ type UnpackAllReturn<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: 
 
 /**
  * A class representing an anonymous event that can be listened to or triggered.
- * @example
- * // Create a click event.
- * const clickEvent = new Event<[x: number, y: number], void>();
  *
- * @template T - The tuple of arguments that the event takes.
- * @template R - The return type of the event.
+ * @typeParam T - The tuple of arguments that the event takes.
+ * @typeParam R - The return type of the event.
  */
 export class Event<T extends unknown[], R = void> extends FunctionExt {
   /**
    * Merges multiple events into a single event.
+   * @example
+   * const inputEvent = Event.merge(mouseEvent, keyboardEvent);
+   *
    * @param events - The events to merge.
    * @returns The merged event.
    */
@@ -105,13 +108,17 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
 
   /**
    * Creates an event that triggers at a specified interval.
+   * @example
+   * const tickEvent = Event.interval(1000);
+   * tickEvent.on((tickNumber) => console.log(tickNumber));
+   *
    * @param interval - The interval at which to trigger the event.
    * @returns The interval event.
    */
   static interval(interval: number) {
     let counter = 0;
     const intervalEvent = new Event<[number], void>(() => clearInterval(timerId));
-    const timerId: NodeJS.Timeout = setInterval(() => intervalEvent(counter++), interval);
+    const timerId: ReturnType<typeof setInterval> = setInterval(() => intervalEvent(counter++), interval);
     return intervalEvent;
   }
 
@@ -127,7 +134,12 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
 
   /**
    * Creates a new event.
-   * @param dispose - A function to dispose of the event and its listeners.
+   * @example
+   * // Create a click event.
+   * const clickEvent = new Event<[x: number, y: number], void>();
+   * clickEvent.on((x, y) => console.log(`Clicked at ${x}, ${y}`));
+   *
+   * @param dispose - A function to call on the event disposal.
    */
   constructor(dispose?: Dispose) {
     const listeners: Listeners<T, R> = [];
@@ -209,17 +221,20 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   }
 
   /**
-   * Converts the event to a promise that resolves with the event arguments.
-   * @returns A promise that resolves with the event arguments.
+   * Returns a Promise that resolves with the first emitted by the event arguments.
+   * @returns A Promise that resolves with the first emitted by the event.
    */
   toPromise(): Promise<T> {
     return new Promise((resolve) => this.once((...args) => resolve(args)));
   }
 
   /**
-   * Creates a new event that only triggers if the filter function returns `true`.
-   * @param filter - The filter function.
-   * @returns The filtered event.
+   * Returns a new event that only triggers when the provided filter function returns `true`.
+   * @example
+   * const spacePressEvent = keyboardEvent.filter((key) => key === 'Space');
+   *
+   * @param filter The filter function to apply to the event.
+   * @returns A new event that only triggers when the provided filter function returns `true`.
    */
   filter(filter: Filter<T>) {
     const dispose = this.on(async (...args) => {
@@ -232,9 +247,13 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   }
 
   /**
-   * Creates a new event that only triggers once if the filter function returns `true`.
+   * Returns a new event that will only be triggered once the provided filter function returns `true`.
+   * @example
+   * const escPressEvent = keyboardEvent.first((key) => key === 'Esc');
+   * await escPressEvent.toPromise();
+   *
    * @param filter - The filter function.
-   * @returns The filtered event.
+   * @returns A new event that will only be triggered once the provided filter function returns `true`.
    */
   first(filter: Filter<T>) {
     const dispose = this.on(async (...args) => {
@@ -248,9 +267,12 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   }
 
   /**
-   * Creates a new event that maps the event arguments to a new value.
-   * @param mapper - The mapper function.
-   * @returns The mapped event.
+   * Returns a new event that maps the values of this event using the provided mapper function.
+   * @example
+   * const keyPressEvent = keyboardEvent.map((key) => key.toUpperCase()); // ['a'] -> ['A']
+   *
+   * @param mapper A function that maps the values of this event to a new value.
+   * @returns A new event that emits the mapped values.
    */
   map<M, MR = unknown>(mapper: Mapper<T, M>) {
     const dispose = this.on(async (...args) => {
@@ -264,10 +286,19 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   }
 
   /**
-   * Creates a new event that reduces the event arguments to a single value.
-   * @param reducer - The reducer function.
-   * @param init - The initial value for the reducer.
-   * @returns The reduced event.
+   * Returns a new event that reduces the emitted values using the provided reducer function.
+   * @example
+   * const sumEvent = numberEvent.reduce((a, b) => a + b, 0);
+   * sumEvent.on((sum) => console.log(sum)); // 1, 3, 6
+   * sumEvent(1);
+   * sumEvent(2);
+   * sumEvent(3);
+   *
+   * @typeParam A The type of the accumulator value.
+   * @typeParam AR The type of the reduced value.
+   * @param {Reducer<T, A>} reducer The reducer function that reduces the emitted values.
+   * @param {A} init The initial value of the accumulator.
+   * @returns {Event<[A], AR>} A new event that reduces the emitted values using the provided reducer function.
    */
   reduce<A, AR = unknown>(reducer: Reducer<T, A>, init: A) {
     let value = init;
@@ -280,10 +311,37 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
     const reducedEvent = new Event<[A], AR>(dispose);
     return reducedEvent;
   }
+
+  /**
+   * Returns a new debounced event that will not fire until a certain amount of time has passed
+   * since the last time it was triggered.
+   * @example
+   * const debouncedEvent = textInputEvent.debounce(100);
+   * debouncedEvent.on((str) => console.log(str)); // 'test'
+   * event('t');
+   * event('te');
+   * event('tes');
+   * event('test');
+   *
+   * @param interval - The amount of time to wait before firing the debounced event, in milliseconds.
+   * @returns A new debounced event.
+   */
+  debounce(interval: number) {
+    let timer: ReturnType<typeof setTimeout>;
+    const dispose = this.on((...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => debouncedEvent(...args), interval);
+    });
+    const debouncedEvent = new Event<T, R>(dispose);
+    return debouncedEvent;
+  }
 }
 
 /**
  * Returns a promise that resolves with the arguments passed to the first invocation of the given event.
+ * @example
+ * const [x, y] = await once(mouseEvent);
+ *
  * @param event The event to listen for.
  * @returns A promise that resolves with the arguments passed to the first invocation of the given event.
  */
@@ -292,10 +350,16 @@ export const once = <T extends unknown[], R = void>(event: Event<T, R>): Promise
 };
 
 /**
- * Creates a new instance of the Event class.
- * @returns {Event<T, R>} A new instance of the Event class.
- * @template T The type of the arguments passed to the event.
- * @template R The return type of the event.
+ * Creates a new event instance.
+ *
+ * @typeParam T - An array of argument types that the event will accept.
+ * @typeParam R - The return type of the event handler function.
+ * @returns A new instance of the `Event` class.
+ *
+ * @example
+ * const myEvent = createEvent<[string], number>();
+ * myEvent.on((str: string) => str.length);
+ * await myEvent('hello'); // [5]
  */
 export const createEvent = <T extends unknown[], R = void>(): Event<T, R> => {
   return new Event<T, R>();
@@ -306,8 +370,8 @@ export default createEvent;
 /**
  * A type helper that extracts the event listener type
  *
- * @template E - The event object type.
- * @template T - The event type extracted from the event object.
- * @template R - The result type returned by the event handler function.
+ * @typeParam E - The event object type.
+ * @typeParam T - The event type extracted from the event object.
+ * @typeParam R - The result type returned by the event handler function.
  */
 export type EventHandler<E> = E extends Event<infer T, infer R> ? Listener<T, R> : never;
