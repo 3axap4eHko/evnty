@@ -55,12 +55,12 @@ export class Dismiss extends FunctionExt {
     super(callback);
   }
 
-  async after(task: Task) {
+  async after(task: Task): Promise<void> {
     await task();
     this();
   }
 
-  afterTimes(count: number) {
+  afterTimes(count: number): () => void {
     return () => {
       if (!--count) {
         this();
@@ -100,7 +100,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param events - The events to merge.
    * @returns The merged event.
    */
-  static merge<Events extends Event<any[], any>[]>(...events: Events) {
+  static merge<Events extends Event<any[], any>[]>(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>> {
     const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>();
     events.forEach((event) => event.on(mergedEvent));
     return mergedEvent;
@@ -115,7 +115,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param interval - The interval at which to trigger the event.
    * @returns The interval event.
    */
-  static interval(interval: number) {
+  static interval(interval: number): Event<[number], void> {
     let counter = 0;
     const intervalEvent = new Event<[number], void>(() => clearInterval(timerId));
     const timerId: ReturnType<typeof setInterval> = setInterval(() => intervalEvent(counter++), interval);
@@ -216,7 +216,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
   /**
    * Removes all listeners from the event.
    */
-  clear() {
+  clear(): void {
     this.listeners.splice(0);
   }
 
@@ -236,7 +236,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param filter The filter function to apply to the event.
    * @returns A new event that only triggers when the provided filter function returns `true`.
    */
-  filter<F extends T>(filter: Filter<T>) {
+  filter<F extends T>(filter: Filter<T>): Event<F, R> {
     const dispose = this.on(async (...args: T) => {
       if (filteredEvent.size > 0 && (await filter(...args))) {
         await filteredEvent(...(args as F));
@@ -255,7 +255,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param filter - The filter function.
    * @returns A new event that will only be triggered once the provided filter function returns `true`.
    */
-  first<F extends T>(filter: Filter<T>) {
+  first<F extends T>(filter: Filter<T>): Event<F, R> {
     const dispose = this.on(async (...args: T) => {
       if (filteredEvent.size > 0 && (await filter(...args))) {
         dispose();
@@ -274,7 +274,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param mapper A function that maps the values of this event to a new value.
    * @returns A new event that emits the mapped values.
    */
-  map<M, MR = unknown>(mapper: Mapper<T, M>) {
+  map<M, MR = unknown>(mapper: Mapper<T, M>): Event<[M], MR> {
     const dispose = this.on(async (...args) => {
       if (mappedEvent.size > 0) {
         const value = await mapper(...args);
@@ -294,13 +294,13 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * sumEvent(2);
    * sumEvent(3);
    *
-   * @typeParam A The type of the accumulator value.
+   * @typeParam A The type of the accumulated value.
    * @typeParam AR The type of the reduced value.
-   * @param {Reducer<T, A>} reducer The reducer function that reduces the emitted values.
-   * @param {A} init The initial value of the accumulator.
-   * @returns {Event<[A], AR>} A new event that reduces the emitted values using the provided reducer function.
+   * @param {Reducer<T, A>} reducer The reducer function that accumulates the values emitted by this `Event`.
+   * @param {A} init The initial value of the accumulated value.
+   * @returns {Event<[A], AR>} A new `Event` that emits the reduced value.
    */
-  reduce<A, AR = unknown>(reducer: Reducer<T, A>, init: A) {
+  reduce<A, AR = unknown>(reducer: Reducer<T, A>, init: A): Event<[A], AR> {
     let value = init;
     const dispose = this.on(async (...args) => {
       if (reducedEvent.size > 0) {
@@ -326,7 +326,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param interval - The amount of time to wait before firing the debounced event, in milliseconds.
    * @returns A new debounced event.
    */
-  debounce(interval: number) {
+  debounce(interval: number): Event<T, R> {
     let timer: ReturnType<typeof setTimeout>;
     const dispose = this.on((...args) => {
       clearTimeout(timer);

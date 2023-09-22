@@ -7,10 +7,8 @@
   "main": "build/index.cjs",
   "module": "build/index.js",
   "exports": {
-    ".": {
-      "require": "./build/index.cjs",
-      "import": "./build/index.js"
-    }
+    "require": "./build/index.cjs",
+    "import": "./build/index.js"
   },
   "files": [
     "build",
