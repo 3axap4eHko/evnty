@@ -132,10 +132,10 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create filtered event', async () => {
     const listener = jest.fn();
-    const filter = jest.fn().mockImplementation((name) => name === 'two');
+    const filter = jest.fn((name) => name === 'two');
 
-    const event = new Event();
-    const filteredEvent = event.filter(filter);
+    const event = new Event<[string, number]>();
+    const filteredEvent = event.filter<['two', number]>(filter);
     expect(event.size).toEqual(1);
 
     filteredEvent.on(listener);
@@ -156,7 +156,7 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create one time filtered event', async () => {
     const listener = jest.fn();
-    const filter = jest.fn().mockImplementation((name) => name === 'two');
+    const filter = jest.fn((name) => name === 'two');
 
     const event = new Event();
     const filteredEvent = event.first(filter);
@@ -179,7 +179,7 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create mapped event', async () => {
     const listener = jest.fn();
-    const mapper = jest.fn().mockImplementation((value) => value * 2);
+    const mapper = jest.fn((value) => value * 2);
 
     const event = new Event();
     const mappedEvent = event.map(mapper);
@@ -206,7 +206,7 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create reduced event', async () => {
     const listener = jest.fn();
-    const reducer = jest.fn().mockImplementation((result, value) => result + value);
+    const reducer = jest.fn((result, value) => result + value);
 
     const event = new Event();
     const reducedEvent = event.reduce(reducer, 0);

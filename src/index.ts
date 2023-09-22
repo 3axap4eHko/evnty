@@ -16,15 +16,15 @@ export interface Filter<T extends unknown[]> {
   (...args: T): MaybePromise<boolean>;
 }
 
-export interface Mapper<T extends unknown[], R = unknown> {
-  (...args: T): R;
+export interface Mapper<T extends unknown[], R> {
+  (...args: T): MaybePromise<R>;
 }
 
-export interface Reducer<T extends unknown[], R = unknown> {
-  (value: R, ...args: T): R;
+export interface Reducer<T extends unknown[], R> {
+  (value: R, ...args: T): MaybePromise<R>;
 }
 
-export type Listeners<T extends unknown[], R = unknown> = Listener<T, R>[];
+export type Listeners<T extends unknown[], R> = Listener<T, R>[];
 
 /**
  * An abstract class that extends the built-in Function class. It allows instances of the class
@@ -77,13 +77,13 @@ export interface Event<T extends unknown[], R> {
   (...args: T): Promise<(R | undefined)[]>;
 }
 
-type UnpackParameters<T> = T extends Event<infer P, unknown> ? P : never;
+export type EventParameters<T> = T extends Event<infer P, unknown> ? P : never;
 
-type UnpackReturn<T> = T extends Event<unknown[], infer R> ? R : never;
+export type EventResult<T> = T extends Event<unknown[], infer R> ? R : never;
 
-type UnpackAllParameters<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: UnpackParameters<T[K]> }[number];
+export type AllEventsParameters<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: EventParameters<T[K]> }[number];
 
-type UnpackAllReturn<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: UnpackReturn<T[K]> }[number];
+export type AllEventsResults<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: EventResult<T[K]> }[number];
 
 /**
  * A class representing an anonymous event that can be listened to or triggered.
@@ -101,7 +101,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @returns The merged event.
    */
   static merge<Events extends Event<any[], any>[]>(...events: Events) {
-    const mergedEvent = new Event<UnpackAllParameters<Events>, UnpackAllReturn<Events>>();
+    const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>();
     events.forEach((event) => event.on(mergedEvent));
     return mergedEvent;
   }
@@ -236,13 +236,13 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param filter The filter function to apply to the event.
    * @returns A new event that only triggers when the provided filter function returns `true`.
    */
-  filter(filter: Filter<T>) {
-    const dispose = this.on(async (...args) => {
+  filter<F extends T>(filter: Filter<T>) {
+    const dispose = this.on(async (...args: T) => {
       if (filteredEvent.size > 0 && (await filter(...args))) {
-        await filteredEvent(...args);
+        await filteredEvent(...(args as F));
       }
     });
-    const filteredEvent = new Event<T, R>(dispose);
+    const filteredEvent = new Event<F, R>(dispose);
     return filteredEvent;
   }
 
@@ -255,14 +255,14 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param filter - The filter function.
    * @returns A new event that will only be triggered once the provided filter function returns `true`.
    */
-  first(filter: Filter<T>) {
-    const dispose = this.on(async (...args) => {
+  first<F extends T>(filter: Filter<T>) {
+    const dispose = this.on(async (...args: T) => {
       if (filteredEvent.size > 0 && (await filter(...args))) {
         dispose();
-        await filteredEvent(...args);
+        await filteredEvent(...(args as F));
       }
     });
-    const filteredEvent = new Event<T, R>(dispose);
+    const filteredEvent = new Event<F, R>(dispose);
     return filteredEvent;
   }
 
@@ -370,8 +370,29 @@ export default createEvent;
 /**
  * A type helper that extracts the event listener type
  *
- * @typeParam E - The event object type.
- * @typeParam T - The event type extracted from the event object.
- * @typeParam R - The result type returned by the event handler function.
+ * @typeParam E - The event type.
  */
 export type EventHandler<E> = E extends Event<infer T, infer R> ? Listener<T, R> : never;
+
+/**
+ * A type helper that extracts the event filter type
+ *
+ * @typeParam E The event type to filter.
+ */
+export type EventFilter<E> = Filter<EventParameters<E>>;
+
+/**
+ * A type helper that extracts the event mapper type
+ *
+ * @typeParam E The event type to map.
+ * @typeParam M The new type to map `E` to.
+ */
+export type EventMapper<E, M> = Mapper<EventParameters<E>, M>;
+
+/**
+ * A type helper that extracts the event mapper type
+ *
+ * @typeParam E The type of event to reduce.
+ * @typeParam M The type of reduced event.
+ */
+export type EventReducer<E, R> = Reducer<EventParameters<E>, R>;
