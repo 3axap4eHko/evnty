@@ -19,13 +19,17 @@
       "extends": ["plugin:@typescript-eslint/eslint-recommended", "plugin:@typescript-eslint/recommended"],
       "parser": "@typescript-eslint/parser",
       "plugins": ["@typescript-eslint", "prettier"],
+      "parserOptions": {
+        "project": "./tsconfig.json"
+      },
       "rules": {
         "prettier/prettier": "error",
-        "@typescript-eslint/no-unused-vars": 2,
         "@typescript-eslint/no-explicit-any": 0,
-        "@typescript-eslint/ban-types": 0,
+        "@typescript-eslint/no-floating-promises": 1,
+        "@typescript-eslint/no-unused-vars": 2,
         "@typescript-eslint/no-unsafe-declaration-merging": 0,
-        "@typescript-eslint/ban-ts-comment": 1
+        "@typescript-eslint/ban-ts-comment": 1,
+        "@typescript-eslint/ban-types": 0
       }
     }
   ]

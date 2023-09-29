@@ -6,16 +6,16 @@
     "declaration": true,
     "esModuleInterop": true,
     "moduleResolution": "NodeNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "rootDir": "src",
     "outDir": "build"
   },
   "include": [
-    "src/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
+    "**/__tests__",
     "node_modules",
-    "__tests__",
     "**/*.tmp.ts"
   ]
 }
