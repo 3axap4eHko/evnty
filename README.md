@@ -21,7 +21,7 @@
   - [reduce](#reduce)
   - [debounce](#debounce)
   - [merge](#merge)
-  - [interval](#interval)
+  - [createInterval](#createInterval)
 - [Examples](#examples)
 - [Migration](#migration)
 - [License](#license)
@@ -47,7 +47,7 @@ The proposed library introduces a robust `Event` abstraction that encapsulates e
 - Browser & Workers environment compatibility
 - Performance eventemitter3/eventemitter2/event-emitter/events/native node/native browser
 
-## Browser Support
+## Platform Support
 
 | ![NodeJS][node-image] | ![Chrome][chrome-image] | ![Firefox][firefox-image] | ![Safari][safari-image] | ![Opera][opera-image] | ![Edge][edge-image] |
 | --------------------- | ----------------------- | ------------------------- | ----------------------- | --------------------- | ------------------- |
@@ -87,7 +87,7 @@ npm install evnty
 Creates a new event instance.
 
 ```ts
-import createEvent, { Event } from 'evnty';
+import { createEvent, Event } from 'evnty';
 
 type ClickEvent = { x: number; y: number; button: number };
 const clickEvent = createEvent<ClickEvent>();
@@ -156,15 +156,19 @@ const searchEvent = changeEvent.debounce(500);
 Merges multiple events into a single event.
 
 ```ts
+import { merge } from 'evnty';
+
 const inputEvent = merge(clickEvent, keyPressEvent);
 ```
 
-### interval
+### createInterval
 
 Creates an event that triggers at a specified interval.
 
 ```ts
-const everySecondEvent = interval(1000);
+import { createInterval } from 'evnty';
+
+const everySecondEvent = createInterval(1000);
 ```
 
 ## Examples
@@ -226,6 +230,7 @@ keyPressEvent({ key: 'Esc' });
 ## Migration
 
 ### From v1 to v2
+
 A breaking change has been made: events no longer accept a list of arguments. Now, each event accepts a single argument, so simply wrap your arguments in an object. This decision was taken to leverage the benefits of predicate type guards.
 
 ## License
