@@ -4,27 +4,42 @@ export interface Unsubscribe {
   (): void;
 }
 
-export interface Listener<T extends unknown[], R = unknown> {
-  (...args: T): MaybePromise<R | void>;
+export interface Listener<T, R = unknown> {
+  (event: T): MaybePromise<R | void>;
 }
 
 export interface Dispose {
   (): void;
 }
 
-export interface Filter<T extends unknown[]> {
-  (...args: T): MaybePromise<boolean>;
+export interface Result<T, E> {
+  ok: boolean;
+  result: T | E;
 }
 
-export interface Mapper<T extends unknown[], R> {
-  (...args: T): MaybePromise<R>;
+export interface Resolver<T, P> {
+  (event: T): Promise<P>;
 }
 
-export interface Reducer<T extends unknown[], R> {
-  (value: R, ...args: T): MaybePromise<R>;
+export interface FilterFunction<T> {
+  (event: T): MaybePromise<boolean>;
 }
 
-export type Listeners<T extends unknown[], R> = Listener<T, R>[];
+export interface Predicate<T, P extends T> {
+  (event: T): event is P;
+}
+
+export type Filter<T, P extends T> = Predicate<T, P> | FilterFunction<T>;
+
+export interface Mapper<T, R> {
+  (event: T): MaybePromise<R>;
+}
+
+export interface Reducer<T, R> {
+  (result: R, event: T): MaybePromise<R>;
+}
+
+export type Listeners<T, R> = Listener<T, R>[];
 
 /**
  * An abstract class that extends the built-in Function class. It allows instances of the class
@@ -57,33 +72,33 @@ export class Dismiss extends FunctionExt {
 
   async after(task: Task): Promise<void> {
     await task();
-    this();
+    await this();
   }
 
-  afterTimes(count: number): () => void {
-    return () => {
+  afterTimes(count: number): () => Promise<void> {
+    return async () => {
       if (!--count) {
-        this();
+        await this();
       }
     };
   }
 }
 
-const eventEmitter = async <A extends unknown[], R>(listeners: Listeners<A, R>, ...args: A) => {
-  return Promise.all(listeners.map((listener) => listener(...args)));
-};
+const eventEmitter = <A, R>(listeners: Listeners<A, R>, event: A): Promise<(void | R)[]> => Promise.all(listeners.map((listener) => listener(event)));
 
-export interface Event<T extends unknown[], R> {
-  (...args: T): Promise<(R | undefined)[]>;
+type EventType<T> = T extends undefined ? void : T;
+
+export interface Event<T = unknown, R = void> {
+  (event?: EventType<T>): Promise<(R | undefined)[]>;
 }
 
 export type EventParameters<T> = T extends Event<infer P, unknown> ? P : never;
 
-export type EventResult<T> = T extends Event<unknown[], infer R> ? R : never;
+export type EventResult<T> = T extends Event<unknown, infer R> ? R : never;
 
-export type AllEventsParameters<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: EventParameters<T[K]> }[number];
+export type AllEventsParameters<T extends Event<unknown, unknown>[]> = { [K in keyof T]: EventParameters<T[K]> }[number];
 
-export type AllEventsResults<T extends Event<unknown[], unknown>[]> = { [K in keyof T]: EventResult<T[K]> }[number];
+export type AllEventsResults<T extends Event<unknown, unknown>[]> = { [K in keyof T]: EventResult<T[K]> }[number];
 
 /**
  * A class representing an anonymous event that can be listened to or triggered.
@@ -91,37 +106,7 @@ export type AllEventsResults<T extends Event<unknown[], unknown>[]> = { [K in ke
  * @typeParam T - The tuple of arguments that the event takes.
  * @typeParam R - The return type of the event.
  */
-export class Event<T extends unknown[], R = void> extends FunctionExt {
-  /**
-   * Merges multiple events into a single event.
-   * @example
-   * const inputEvent = Event.merge(mouseEvent, keyboardEvent);
-   *
-   * @param events - The events to merge.
-   * @returns The merged event.
-   */
-  static merge<Events extends Event<any[], any>[]>(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>> {
-    const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>();
-    events.forEach((event) => event.on(mergedEvent));
-    return mergedEvent;
-  }
-
-  /**
-   * Creates an event that triggers at a specified interval.
-   * @example
-   * const tickEvent = Event.interval(1000);
-   * tickEvent.on((tickNumber) => console.log(tickNumber));
-   *
-   * @param interval - The interval at which to trigger the event.
-   * @returns The interval event.
-   */
-  static interval(interval: number): Event<[number], void> {
-    let counter = 0;
-    const intervalEvent = new Event<[number], void>(() => clearInterval(timerId));
-    const timerId: ReturnType<typeof setInterval> = setInterval(() => intervalEvent(counter++), interval);
-    return intervalEvent;
-  }
-
+export class Event<T, R> extends FunctionExt {
   /**
    * The array of listeners for the event.
    */
@@ -143,7 +128,7 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    */
   constructor(dispose?: Dispose) {
     const listeners: Listeners<T, R> = [];
-    const fn = (...args: T) => eventEmitter(listeners, ...args);
+    const fn = (event: T) => eventEmitter(listeners, event);
 
     super(fn);
     this.listeners = listeners;
@@ -206,9 +191,9 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @returns An object that can be used to remove the listener.
    */
   once(listener: Listener<T, R>): Dismiss {
-    const oneTimeListener = (...args: T) => {
+    const oneTimeListener = (event: T) => {
       this.off(oneTimeListener);
-      return listener(...args);
+      return listener(event);
     };
     return this.on(oneTimeListener);
   }
@@ -224,8 +209,8 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * Returns a Promise that resolves with the first emitted by the event arguments.
    * @returns A Promise that resolves with the first emitted by the event.
    */
-  toPromise(): Promise<T> {
-    return new Promise((resolve) => this.once((...args) => resolve(args)));
+  onceAsync(): Promise<T> {
+    return new Promise((resolve) => this.once((event) => resolve(event)));
   }
 
   /**
@@ -236,13 +221,15 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param filter The filter function to apply to the event.
    * @returns A new event that only triggers when the provided filter function returns `true`.
    */
-  filter<F extends T>(filter: Filter<T>): Event<F, R> {
-    const dispose = this.on(async (...args: T) => {
-      if (filteredEvent.size > 0 && (await filter(...args))) {
-        await filteredEvent(...(args as F));
+  filter<P extends T>(predicate: Predicate<T, P>): Event<P, R>;
+  filter<P extends T>(filter: FilterFunction<T>): Event<P, R>;
+  filter<P extends T>(filter: Filter<T, P>): Event<P, R> {
+    const dispose = this.on(async (event: T) => {
+      if (filteredEvent.size > 0 && (await filter(event))) {
+        await filteredEvent(event as EventType<P>);
       }
     });
-    const filteredEvent = new Event<F, R>(dispose);
+    const filteredEvent = new Event<P, R>(dispose);
     return filteredEvent;
   }
 
@@ -255,14 +242,16 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param filter - The filter function.
    * @returns A new event that will only be triggered once the provided filter function returns `true`.
    */
-  first<F extends T>(filter: Filter<T>): Event<F, R> {
-    const dispose = this.on(async (...args: T) => {
-      if (filteredEvent.size > 0 && (await filter(...args))) {
-        dispose();
-        await filteredEvent(...(args as F));
+  first<P extends T>(predicate: Predicate<T, P>): Event<P, R>;
+  first<P extends T>(filter: FilterFunction<T>): Event<P, R>;
+  first<P extends T>(filter: Filter<T, P>): Event<P, R> {
+    const dispose = this.on(async (event: T) => {
+      if (filteredEvent.size > 0 && (await filter(event))) {
+        await dispose();
+        await filteredEvent(event as EventType<P>);
       }
     });
-    const filteredEvent = new Event<F, R>(dispose);
+    const filteredEvent = new Event<P, R>(dispose);
     return filteredEvent;
   }
 
@@ -274,14 +263,14 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param mapper A function that maps the values of this event to a new value.
    * @returns A new event that emits the mapped values.
    */
-  map<M, MR = unknown>(mapper: Mapper<T, M>): Event<[M], MR> {
-    const dispose = this.on(async (...args) => {
+  map<M, MR = R>(mapper: Mapper<T, M>): Event<M, MR> {
+    const dispose = this.on(async (event) => {
       if (mappedEvent.size > 0) {
-        const value = await mapper(...args);
-        mappedEvent(value);
+        const value = await mapper(event);
+        await mappedEvent(value as EventType<M>);
       }
     });
-    const mappedEvent = new Event<[M], MR>(dispose);
+    const mappedEvent = new Event<M, MR>(dispose);
     return mappedEvent;
   }
 
@@ -300,15 +289,15 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    * @param {A} init The initial value of the accumulated value.
    * @returns {Event<[A], AR>} A new `Event` that emits the reduced value.
    */
-  reduce<A, AR = unknown>(reducer: Reducer<T, A>, init: A): Event<[A], AR> {
+  reduce<A, AR = R>(reducer: Reducer<T, A>, init: A): Event<A, AR> {
     let value = init;
-    const dispose = this.on(async (...args) => {
+    const dispose = this.on(async (event) => {
       if (reducedEvent.size > 0) {
-        value = await reducer(value, ...args);
-        reducedEvent(value);
+        value = await reducer(value, event);
+        await reducedEvent(value as EventType<A>);
       }
     });
-    const reducedEvent = new Event<[A], AR>(dispose);
+    const reducedEvent = new Event<A, AR>(dispose);
     return reducedEvent;
   }
 
@@ -328,9 +317,9 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
    */
   debounce(interval: number): Event<T, R> {
     let timer: ReturnType<typeof setTimeout>;
-    const dispose = this.on((...args) => {
+    const dispose = this.on((event) => {
       clearTimeout(timer);
-      timer = setTimeout(() => debouncedEvent(...args), interval);
+      timer = setTimeout(() => debouncedEvent(event as EventType<T>), interval);
     });
     const debouncedEvent = new Event<T, R>(dispose);
     return debouncedEvent;
@@ -338,15 +327,33 @@ export class Event<T extends unknown[], R = void> extends FunctionExt {
 }
 
 /**
- * Returns a promise that resolves with the arguments passed to the first invocation of the given event.
+ * Merges multiple events into a single event.
  * @example
- * const [x, y] = await once(mouseEvent);
+ * const inputEvent = Event.merge(mouseEvent, keyboardEvent);
  *
- * @param event The event to listen for.
- * @returns A promise that resolves with the arguments passed to the first invocation of the given event.
+ * @param events - The events to merge.
+ * @returns The merged event.
  */
-export const once = <T extends unknown[], R = void>(event: Event<T, R>): Promise<T> => {
-  return new Promise((resolve) => event.once((...args) => resolve(args)));
+export const merge = <Events extends Event<any, any>[]>(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>> => {
+  const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>();
+  events.forEach((event) => event.on(mergedEvent));
+  return mergedEvent;
+};
+
+/**
+ * Creates an event that triggers at a specified interval.
+ * @example
+ * const tickEvent = Event.interval(1000);
+ * tickEvent.on((tickNumber) => console.log(tickNumber));
+ *
+ * @param interval - The interval at which to trigger the event.
+ * @returns The interval event.
+ */
+export const createInterval = <R = void>(interval: number): Event<number, R> => {
+  let counter = 0;
+  const intervalEvent = new Event<number, R>(() => clearInterval(timerId));
+  const timerId: ReturnType<typeof setInterval> = setInterval(() => intervalEvent(counter++), interval);
+  return intervalEvent;
 };
 
 /**
@@ -361,9 +368,7 @@ export const once = <T extends unknown[], R = void>(event: Event<T, R>): Promise
  * myEvent.on((str: string) => str.length);
  * await myEvent('hello'); // [5]
  */
-export const createEvent = <T extends unknown[], R = void>(): Event<T, R> => {
-  return new Event<T, R>();
-};
+export const createEvent = <T, R = void>(): Event<T, R> => new Event<T, R>();
 
 export default createEvent;
 
@@ -379,7 +384,14 @@ export type EventHandler<E> = E extends Event<infer T, infer R> ? Listener<T, R>
  *
  * @typeParam E The event type to filter.
  */
-export type EventFilter<E> = Filter<EventParameters<E>>;
+export type EventFilter<E> = FilterFunction<EventParameters<E>>;
+
+/**
+ * A type helper that extracts the event predicate type
+ *
+ * @typeParam E The event type to predicate.
+ */
+export type EventPredicate<E, P extends EventParameters<E>> = Predicate<EventParameters<E>, P>;
 
 /**
  * A type helper that extracts the event mapper type

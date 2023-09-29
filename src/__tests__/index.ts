@@ -1,6 +1,6 @@
-import createEvent, { once, Event, Dismiss, FunctionExt, EventHandler } from '../index';
+import createEvent, { merge, createInterval, Event, Dismiss, FunctionExt, EventHandler, FilterFunction, Predicate } from '../index';
 
-describe('Anonymous Event test suite', function () {
+describe('Anonymous Event test suite', () => {
   test('FunctionExt extends from Function', () => {
     expect(FunctionExt.prototype).toBeInstanceOf(Function);
   });
@@ -51,62 +51,62 @@ describe('Anonymous Event test suite', function () {
     expect(event.lacks(listener)).toEqual(true);
   });
 
-  it('Should add event listener', () => {
+  it('Should add event listener', async () => {
     const event = new Event();
     const listener = jest.fn();
     event.on(listener);
-    event('test');
+    await event('test');
     expect(event.size).toEqual(1);
     expect(listener).toHaveBeenCalledWith('test');
   });
 
-  it('Should remove existing event listener', () => {
+  it('Should remove existing event listener', async () => {
     const event = new Event();
     const listener = jest.fn();
     event.on(listener);
     event.off(listener);
-    event('test');
+    await event('test');
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('Should remove all existing event listeners', () => {
+  it('Should remove all existing event listeners', async () => {
     const event = new Event();
     const listener = jest.fn();
     event.on(listener);
     event.on(listener);
     event.off(listener);
-    event('test');
+    await event('test');
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('Should not remove other event listeners', () => {
+  it('Should not remove other event listeners', async () => {
     const event = new Event();
     const listener = jest.fn();
     event.on(listener);
     event.off(jest.fn());
-    event('test');
+    await event('test');
     expect(listener).toHaveBeenCalled();
   });
 
-  it('Should unsubscribe event', () => {
+  it('Should unsubscribe event', async () => {
     const event = new Event();
     const listener = jest.fn();
     const unsubscribe = event.on(listener);
     unsubscribe();
-    event('test');
+    await event('test');
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('Should add one time event listener', () => {
+  it('Should add one time event listener', async () => {
     const event = new Event();
     const listener = jest.fn();
     event.once(listener);
-    event('test');
-    event('test');
+    await event('test');
+    await event('test');
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('Should clear all events', () => {
+  it('Should clear all events', async () => {
     const event = new Event();
     const listener = jest.fn();
     event.on(listener);
@@ -114,7 +114,7 @@ describe('Anonymous Event test suite', function () {
     event.clear();
     expect(event.size).toEqual(0);
 
-    event('test');
+    await event('test');
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -123,58 +123,112 @@ describe('Anonymous Event test suite', function () {
     const event = new Event();
     event.on(listener);
     expect(listener).not.toBeCalled();
-    const promise = event.toPromise();
-    event('test');
+    const promise = event.onceAsync();
+    await event('test');
     const result = await promise;
-    expect(result).toEqual(['test']);
+    expect(result).toEqual('test');
     expect(listener).toBeCalledWith('test');
   });
 
-  it('Should create filtered event', async () => {
+  it('Should create predicated and filtered events', async () => {
     const listener = jest.fn();
-    const filter = jest.fn((name) => name === 'two');
 
-    const event = new Event<[string, number]>();
-    const filteredEvent = event.filter<['two', number]>(filter);
+    type ClickEvent = { x: number; y: number; button: number };
+    type LeftClickEvent = ClickEvent & { button: 1 };
+
+    const clickEvent = createEvent<ClickEvent>();
+    const leftClickPredicate: Predicate<ClickEvent, LeftClickEvent> = (mouseClickEvent): mouseClickEvent is LeftClickEvent => mouseClickEvent.button === 1;
+    const leftClickPredicatedEvent = clickEvent.filter(leftClickPredicate);
+    leftClickPredicatedEvent.on(listener);
+    leftClickPredicatedEvent({ x: 1, y: 1, button: 1 });
+
+    const leftClickFiltered: FilterFunction<ClickEvent> = ({ button }) => button === 1;
+    const leftClickFilteredEvent = clickEvent.filter<LeftClickEvent>(leftClickFiltered);
+    leftClickFilteredEvent.on(listener);
+    leftClickFilteredEvent({ x: 1, y: 1, button: 1 });
+
+    await clickEvent({ x: 1, y: 1, button: 1 });
+    await clickEvent({ x: 1, y: 1, button: 2 });
+
+    expect(listener).toHaveBeenCalledTimes(4);
+    expect(listener).not.toHaveBeenCalledWith({ x: 1, y: 1, button: 2 });
+  });
+
+  it('Should create predicated event', async () => {
+    type TestEvent = { name: string; value: number };
+    const listener = jest.fn();
+
+    const predicate = (event: TestEvent): event is TestEvent & { name: 'two' } => event.name === 'two';
+    const predicateMock = jest.fn(predicate);
+    const event = new Event<TestEvent>();
+    const predicatedEvent = event.filter(predicateMock as unknown as typeof predicate);
+    expect(event.size).toEqual(1);
+
+    predicatedEvent.on(listener);
+    expect(predicatedEvent.size).toEqual(1);
+
+    await event({ name: 'one', value: 1 });
+    await event({ name: 'two', value: 2 });
+    await event({ name: 'three', value: 3 });
+
+    expect(predicateMock).toHaveBeenCalledTimes(3);
+    expect(predicateMock).toHaveBeenNthCalledWith(1, { name: 'one', value: 1 });
+    expect(predicateMock).toHaveBeenNthCalledWith(2, { name: 'two', value: 2 });
+    expect(predicateMock).toHaveBeenNthCalledWith(3, { name: 'three', value: 3 });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith({ name: 'two', value: 2 });
+  });
+
+  it('Should create filtered event', async () => {
+    type TestEvent = { name: string; value: number };
+    const listener = jest.fn();
+    const filter = (event: TestEvent) => event.name === 'two';
+    const filterMock = jest.fn(filter);
+    const event = new Event<TestEvent>();
+    const filteredEvent = event.filter(filterMock as unknown as typeof filter);
     expect(event.size).toEqual(1);
 
     filteredEvent.on(listener);
     expect(filteredEvent.size).toEqual(1);
 
-    await event('one', 1);
-    await event('two', 2);
-    await event('three', 3);
+    await event({ name: 'one', value: 1 });
+    await event({ name: 'two', value: 2 });
+    await event({ name: 'three', value: 3 });
 
-    expect(filter).toHaveBeenCalledTimes(3);
-    expect(filter).toHaveBeenNthCalledWith(1, 'one', 1);
-    expect(filter).toHaveBeenNthCalledWith(2, 'two', 2);
-    expect(filter).toHaveBeenNthCalledWith(3, 'three', 3);
+    expect(filterMock).toHaveBeenCalledTimes(3);
+    expect(filterMock).toHaveBeenNthCalledWith(1, { name: 'one', value: 1 });
+    expect(filterMock).toHaveBeenNthCalledWith(2, { name: 'two', value: 2 });
+    expect(filterMock).toHaveBeenNthCalledWith(3, { name: 'three', value: 3 });
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith('two', 2);
+    expect(listener).toHaveBeenCalledWith({ name: 'two', value: 2 });
   });
 
   it('Should create one time filtered event', async () => {
-    const listener = jest.fn();
-    const filter = jest.fn((name) => name === 'two');
+    type TestEvent = { name: string; value: number };
 
-    const event = new Event();
-    const filteredEvent = event.first(filter);
+    const predicate = (event: TestEvent): event is TestEvent & { name: 'two' } => event.name === 'two';
+    const predicateMock = jest.fn(predicate);
+    const listener = jest.fn();
+
+    const event = new Event<TestEvent>();
+    const filteredEvent = event.first(predicateMock as unknown as typeof predicate);
     expect(event.size).toEqual(1);
 
     filteredEvent.on(listener);
     expect(filteredEvent.size).toEqual(1);
 
-    await event('one', 1);
-    await event('two', 2);
-    await event('two', 2);
-
-    expect(filter).toHaveBeenCalledTimes(2);
-    expect(filter).toHaveBeenNthCalledWith(1, 'one', 1);
-    expect(filter).toHaveBeenNthCalledWith(2, 'two', 2);
+    await event({ name: 'one', value: 1 });
+    await event({ name: 'two', value: 2 });
+    await event({ name: 'three', value: 3 });
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith('two', 2);
+    expect(listener).toHaveBeenCalledWith({ name: 'two', value: 2 });
+
+    expect(predicateMock).toHaveBeenCalledTimes(2);
+    expect(predicateMock).toHaveBeenNthCalledWith(1, { name: 'one', value: 1 });
+    expect(predicateMock).toHaveBeenNthCalledWith(2, { name: 'two', value: 2 });
   });
 
   it('Should create mapped event', async () => {
@@ -231,22 +285,22 @@ describe('Anonymous Event test suite', function () {
     expect(listener).toHaveBeenCalledWith(6);
   });
 
-  it('Should merge multiple events', () => {
+  it('Should merge multiple events', async () => {
     const listener = jest.fn();
 
-    const event1 = new Event<[string], number>();
-    const event2 = new Event<[number], boolean>();
-    const event3 = new Event<[boolean], string>();
-    const mergedEvent = Event.merge(event1, event2, event3);
+    const event1 = new Event<string, number>();
+    const event2 = new Event<number, boolean>();
+    const event3 = new Event<boolean, string>();
+    const mergedEvent = merge(event1, event2, event3);
 
     mergedEvent.on(listener);
 
-    event1('a');
-    event2(1);
-    event3(true);
-    mergedEvent('b');
-    mergedEvent(2);
-    mergedEvent(false);
+    await event1('a');
+    await event2(1);
+    await event3(true);
+    await mergedEvent('b');
+    await mergedEvent(2);
+    await mergedEvent(false);
 
     expect(listener).toHaveBeenCalledTimes(6);
     expect(listener).toHaveBeenNthCalledWith(1, 'a');
@@ -259,23 +313,23 @@ describe('Anonymous Event test suite', function () {
 
   it('Should create interval events', async () => {
     const listener = jest.fn();
-    const event = Event.interval(10);
+    const event = createInterval(10);
     event.on(listener);
-    await event.toPromise();
+    await event.onceAsync();
     expect(listener).toBeCalledWith(0);
     event.dispose();
-    const result = await Promise.race([new Promise((resolve) => setTimeout(resolve, 100, null)), event.toPromise()]);
+    const result = await Promise.race([new Promise((resolve) => setTimeout(resolve, 100, null)), event.onceAsync()]);
     expect(result).toEqual(null);
   });
 
   it('Should dismiss event listener', async () => {
     const listener = jest.fn();
-    const event = Event.interval(10);
+    const event = createInterval(10);
     event.on(listener);
-    await event.toPromise();
+    await event.onceAsync();
     expect(listener).toBeCalledWith(0);
     event.dispose();
-    const result = await Promise.race([new Promise(process.nextTick).then(Boolean), event.toPromise()]);
+    const result = await Promise.race([new Promise(process.nextTick).then(Boolean), event.onceAsync()]);
     expect(result).toEqual(true);
   });
 
@@ -283,12 +337,12 @@ describe('Anonymous Event test suite', function () {
     const listener = jest.fn();
     const event = new Event();
     const dismiss = event.on(listener);
-    event();
+    await event();
     expect(listener).toHaveBeenCalledTimes(1);
     const nextTick = new Promise(process.nextTick);
     dismiss.after(() => nextTick);
     await nextTick;
-    event();
+    await event();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
@@ -297,25 +351,18 @@ describe('Anonymous Event test suite', function () {
     const event = new Event();
     const dismiss = event.on(listener);
     const timesCallback = dismiss.afterTimes(2);
-    event();
-    timesCallback();
-    event();
-    timesCallback();
-    event();
-    timesCallback();
-    event();
+    await event();
+    await timesCallback();
+    await event();
+    await timesCallback();
+    await event();
+    await timesCallback();
+    await event();
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it('Should await once event happend', async () => {
-    const event = new Event();
-    process.nextTick(event, 'test');
-    const result = await once(event);
-    expect(result).toContain('test');
-  });
-
   it('Should return listeners values', async () => {
-    const event = new Event<[string], number | string>();
+    const event = new Event<string, number | string>();
     event.on(() => 1);
     event.on(() => 'test');
     event.on(() => {});
@@ -325,12 +372,12 @@ describe('Anonymous Event test suite', function () {
 
   it('Should debounce events', async () => {
     const listener = jest.fn();
-    const event = new Event<[string], number | string>();
+    const event = new Event<string, number | string>();
     const debouncedEvent = event.debounce(10);
     debouncedEvent.on(listener);
-    event('test1');
-    event('test2');
-    await debouncedEvent.toPromise();
+    await event('test1');
+    await event('test2');
+    await debouncedEvent.onceAsync();
     expect(listener).toBeCalledTimes(1);
   });
 });

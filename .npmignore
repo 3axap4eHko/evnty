@@ -1,8 +1,8 @@
-/.*
-/coverage
-/src/__tests__
-/src/__mocks__
-/jest.*
-/*.log*
-/tsconfig.json
+.*
+coverage
+src/__tests__
+src/__mocks__
+jest.*
+*.log*
+tsconfig.json
 

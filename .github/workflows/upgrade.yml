@@ -25,31 +25,31 @@ jobs:
         id: env
         run: |
           node --version
-          yarn --version
+          pnpm --version
 
       - name: Install 🔧
         run: |
-          yarn install --frozen-lockfile
+          pnpm install --frozen-lockfile
 
       - name: Upgrade 🌠
         id: updates
         run: |
-          PENDING=$(yarn outdated --json|tail -1|jq '.data.body'|jq length)
+          PENDING=$(pnpm outdated --json|jq keys|jq length)
           echo "::set-output name=PENDING::$PENDING"
-          yarn upgrade
-          DONE=$(yarn outdated --json|tail -1|jq '.data.body'|jq length)
+          pnpm up --latest
+          DONE=$(pnpm outdated --json|jq keys|jq length)
           echo "::set-output name=DONE::$DONE"
 
       - name: Build 🧱
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
         run: |
-          yarn build
+          pnpm build
 
       - name: Test 🧪
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
         run: |
-          yarn test
-          yarn test:build
+          pnpm test
+          pnpm test:build
 
       - name: Commit 🔒
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
@@ -58,7 +58,7 @@ jobs:
           git config --global user.name "Ivan Zakharchanka"
           git add --all
           git commit -am "autoupdate"
-          npm version patch
+          pnpm version patch
 
       - name: Push
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
@@ -70,4 +70,4 @@ jobs:
         if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-          npm publish
+          pnpm publish

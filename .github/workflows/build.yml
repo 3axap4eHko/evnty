@@ -22,20 +22,20 @@ jobs:
         id: env
         run: |
           node --version
-          yarn --version
+          pnpm --version
 
-      - name: Install dependecies
+      - name: Install dependencies
         run: |
-          yarn install --frozen-lockfile
+          pnpm i --frozen-lockfile
 
       - name: Run build process
         run: |
-          yarn build
+          pnpm build
 
       - name: Run testing
         run: |
-          yarn test
-          yarn test:build
+          pnpm test
+          pnpm test:build
         env:
           COVERAGE: 1
 
