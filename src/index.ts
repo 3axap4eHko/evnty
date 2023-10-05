@@ -1,24 +1,16 @@
 export type MaybePromise<T> = Promise<T> | PromiseLike<T> | T;
 
-export interface Unsubscribe {
-  (): void;
+export interface Callback<R = void> {
+  (): MaybePromise<R>;
 }
 
 export interface Listener<T, R = unknown> {
   (event: T): MaybePromise<R | void>;
 }
 
-export interface Dispose {
-  (): void;
-}
-
 export interface Result<T, E> {
   ok: boolean;
   result: T | E;
-}
-
-export interface Resolver<T, P> {
-  (event: T): Promise<P>;
 }
 
 export interface FilterFunction<T> {
@@ -55,32 +47,37 @@ export abstract class FunctionExt extends Function {
 }
 
 export interface Dismiss {
-  (): Promise<void> | void;
-}
-
-export interface Task {
-  (): MaybePromise<unknown>;
+  (): MaybePromise<void>;
 }
 
 /**
  * @internal
  */
 export class Dismiss extends FunctionExt {
-  constructor(callback: Unsubscribe) {
+  constructor(callback: Callback) {
     super(callback);
   }
 
-  async after(task: Task): Promise<void> {
-    await task();
-    await this();
+  pre(callback: Callback): Dismiss {
+    return new Dismiss(async () => {
+      await callback();
+      await this();
+    });
   }
 
-  afterTimes(count: number): () => Promise<void> {
-    return async () => {
+  post(callback: Callback): Dismiss {
+    return new Dismiss(async () => {
+      await this();
+      await callback();
+    });
+  }
+
+  countdown(count: number): Dismiss {
+    return new Dismiss(async () => {
       if (!--count) {
         await this();
       }
-    };
+    });
   }
 }
 
@@ -115,7 +112,7 @@ export class Event<T, R> extends FunctionExt {
   /**
    * A function that disposes of the event and its listeners.
    */
-  readonly dispose: Dispose;
+  readonly dispose: Callback;
 
   /**
    * Creates a new event.
@@ -126,15 +123,15 @@ export class Event<T, R> extends FunctionExt {
    *
    * @param dispose - A function to call on the event disposal.
    */
-  constructor(dispose?: Dispose) {
+  constructor(dispose?: Callback) {
     const listeners: Listeners<T, R> = [];
     const fn = (event: T) => eventEmitter(listeners, event);
 
     super(fn);
     this.listeners = listeners;
-    this.dispose = () => {
+    this.dispose = async () => {
       this.clear();
-      dispose?.();
+      await dispose?.();
     };
   }
 
@@ -199,18 +196,18 @@ export class Event<T, R> extends FunctionExt {
   }
 
   /**
-   * Removes all listeners from the event.
-   */
-  clear(): void {
-    this.listeners.splice(0);
-  }
-
-  /**
    * Returns a Promise that resolves with the first emitted by the event arguments.
    * @returns A Promise that resolves with the first emitted by the event.
    */
   onceAsync(): Promise<T> {
     return new Promise((resolve) => this.once((event) => resolve(event)));
+  }
+
+  /**
+   * Removes all listeners from the event.
+   */
+  clear(): void {
+    this.listeners.splice(0);
   }
 
   /**
@@ -253,6 +250,20 @@ export class Event<T, R> extends FunctionExt {
     });
     const filteredEvent = new Event<P, R>(dispose);
     return filteredEvent;
+  }
+
+  /**
+   * Returns a new promise that will be resolved once the provided filter function returns `true`.
+   * @example
+   * const escPressEvent = await keyboardEvent.firstAsync((key) => key === 'Esc');
+   *
+   * @param filter - The filter function.
+   * @returns A new promise that will be resolved once the provided filter function returns `true`.
+   */
+  firstAsync<P extends T>(predicate: Predicate<T, P>): Promise<P>;
+  firstAsync<P extends T>(filter: FilterFunction<T>): Promise<P>;
+  firstAsync<P extends T>(filter: Filter<T, P>): Promise<P> {
+    return this.first<P>(filter).onceAsync();
   }
 
   /**
