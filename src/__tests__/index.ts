@@ -210,11 +210,13 @@ describe('Anonymous Event test suite', () => {
 
     const predicate = (event: TestEvent): event is TestEvent & { name: 'two' } => event.name === 'two';
     const predicateMock = jest.fn(predicate);
+    const predicateAsyncMock = jest.fn(predicate);
     const listener = jest.fn();
 
     const event = new Event<TestEvent>();
     const filteredEvent = event.first(predicateMock as unknown as typeof predicate);
-    expect(event.size).toEqual(1);
+    const filteredAsync = event.firstAsync(predicateAsyncMock as unknown as typeof predicate);
+    expect(event.size).toEqual(2);
 
     filteredEvent.on(listener);
     expect(filteredEvent.size).toEqual(1);
@@ -229,6 +231,12 @@ describe('Anonymous Event test suite', () => {
     expect(predicateMock).toHaveBeenCalledTimes(2);
     expect(predicateMock).toHaveBeenNthCalledWith(1, { name: 'one', value: 1 });
     expect(predicateMock).toHaveBeenNthCalledWith(2, { name: 'two', value: 2 });
+
+    expect(predicateAsyncMock).toHaveBeenCalledTimes(2);
+    expect(predicateAsyncMock).toHaveBeenNthCalledWith(1, { name: 'one', value: 1 });
+    expect(predicateAsyncMock).toHaveBeenNthCalledWith(2, { name: 'two', value: 2 });
+
+    await expect(filteredAsync).resolves.toEqual({ name: 'two', value: 2 });
   });
 
   it('Should create mapped event', async () => {
@@ -333,24 +341,37 @@ describe('Anonymous Event test suite', () => {
     expect(result).toEqual(true);
   });
 
-  it('Should dismiss event after task finished', async () => {
+  it('Should dismiss event pre finished', async () => {
     const listener = jest.fn();
     const event = new Event();
     const dismiss = event.on(listener);
     await event();
     expect(listener).toHaveBeenCalledTimes(1);
-    const nextTick = new Promise(process.nextTick);
-    dismiss.after(() => nextTick);
+    const nextTick = new Promise<void>(process.nextTick);
+    await dismiss.pre(() => nextTick)();
     await nextTick;
     await event();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('Should dismiss event after certain events', async () => {
+  it('Should dismiss event post finished', async () => {
     const listener = jest.fn();
     const event = new Event();
     const dismiss = event.on(listener);
-    const timesCallback = dismiss.afterTimes(2);
+    await event();
+    expect(listener).toHaveBeenCalledTimes(1);
+    const nextTick = new Promise<void>(process.nextTick);
+    await dismiss.post(() => nextTick)();
+    await nextTick;
+    await event();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('Should dismiss event countdown', async () => {
+    const listener = jest.fn();
+    const event = new Event();
+    const dismiss = event.on(listener);
+    const timesCallback = dismiss.countdown(2);
     await event();
     await timesCallback();
     await event();
