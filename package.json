@@ -57,10 +57,10 @@
   "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
     "@swc/jest": "^0.2.29",
-    "@types/jest": "^29.5.6",
+    "@types/jest": "^29.5.7",
     "@types/node": "^20.8.9",
-    "@typescript-eslint/eslint-plugin": "^6.9.0",
-    "@typescript-eslint/parser": "^6.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.9.1",
+    "@typescript-eslint/parser": "^6.9.1",
     "eslint": "^8.52.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.0.0",
