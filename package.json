@@ -56,7 +56,7 @@
   },
   "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
-    "@swc/jest": "^0.2.29",
+    "@swc/jest": "^0.2.30",
     "@types/jest": "^29.5.11",
     "@types/node": "^20.11.5",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
