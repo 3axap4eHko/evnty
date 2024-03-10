@@ -8,71 +8,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x]
     steps:
-      - name: Checkout 🛎️
-        uses: actions/checkout@v3
-
-      - name: Use Node.js ${{ matrix.node-version }} 🟢
-        uses: actions/setup-node@v3
+      - name: Run CI/CD Pipeline
+        uses: zource-dev/action@v1
         with:
-          node-version: ${{ matrix.node-version }}
-          registry-url: https://registry.npmjs.org/
-
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-          run_install: false
-
-      - name: Setup ENV ⚙️
-        id: env
-        run: |
-          node --version
-          pnpm --version
-
-      - name: Install 🔧
-        run: |
-          pnpm install --frozen-lockfile
-
-      - name: Upgrade 🌠
-        id: updates
-        run: |
-          PENDING=$(pnpm outdated --json|jq keys|jq length)
-          echo "::set-output name=PENDING::$PENDING"
-          pnpm up --latest
-          DONE=$(pnpm outdated --json|jq keys|jq length)
-          echo "::set-output name=DONE::$DONE"
-
-      - name: Build 🧱
-        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
-        run: |
-          pnpm build
-
-      - name: Test 🧪
-        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
-        run: |
-          pnpm test
-          pnpm test:build
-
-      - name: Commit 🔒
-        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
-        run: |
-          git config --global user.email "3axap4eHko@github.com"
-          git config --global user.name "Ivan Zakharchanka"
-          git add --all
-          git commit -am "autoupdate"
-          pnpm version patch
-
-      - name: Push
-        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
-        run: |
-          git push
-          git push --tags
-
-      - name: Publish 📚
-        if: steps.updates.outputs.PENDING != steps.updates.outputs.DONE
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-          pnpm publish
+          node_version: '20.x'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          autoupdate: minor
+          username: Ivan Zakharchanka
+          email: 3axap4eHko@github.com
+          npm_token: ${{ secrets.NPM_TOKEN }}
+          codecov_token: ${{ secrets.CODECOV_TOKEN }}
+          test: |
+            pnpm test
+            pnpm test:build
