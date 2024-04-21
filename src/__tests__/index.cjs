@@ -1,7 +1,7 @@
 const { strict: assert } = require('node:assert');
-const { Dismiss, Event, default: defaultCreateEvent, createEvent, createInterval, merge } = require('../../build/index.cjs');
+const { Unsubscribe, Event, default: defaultCreateEvent, createEvent, createInterval, merge } = require('../../build/index.cjs');
 
-assert(typeof Dismiss === 'function');
+assert(typeof Unsubscribe === 'function');
 assert(typeof Event === 'function');
 assert(typeof defaultCreateEvent === 'function');
 assert(typeof createEvent === 'function');

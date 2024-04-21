@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
-import defaultCreateEvent, { Dismiss, Event, createEvent, createInterval, merge } from '../../build/index.js';
+import defaultCreateEvent, { Unsubscribe, Event, createEvent, createInterval, merge } from '../../build/index.js';
 
-assert(typeof Dismiss === 'function');
+assert(typeof Unsubscribe === 'function');
 assert(typeof Event === 'function');
 assert(typeof defaultCreateEvent === 'function');
 assert(typeof createEvent === 'function');
