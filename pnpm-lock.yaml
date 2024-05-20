@@ -45,8 +45,8 @@ devDependencies:
     specifier: ^9.0.11
     version: 9.0.11
   inop:
-    specifier: ^0.6.12
-    version: 0.6.12
+    specifier: ^0.6.13
+    version: 0.6.13
   jest:
     specifier: ^29.7.0
     version: 29.7.0(@types/node@20.12.12)
@@ -2489,8 +2489,8 @@ packages:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
     dev: true
 
-  /commander@12.0.0:
-    resolution: {integrity: sha512-MwVNWlYjDTtOjX5PiD7o5pK0UrFU/OYgcJfjjK4RaHZETNtjJqrZa9Y9ds88+A+f+d5lv+561eZ+yCKoS3gbAA==}
+  /commander@12.1.0:
+    resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
     engines: {node: '>=18'}
     dev: true
 
@@ -3566,13 +3566,13 @@ packages:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
     dev: true
 
-  /inop@0.6.12:
-    resolution: {integrity: sha512-t+k8xPrxGklWC1ByQR6PYNAitwSZdbqCk5FrkXUoqAtDE37IE51XNvXbh6v4nyyt4hWz14m/1u+BbroKoXSuPQ==}
+  /inop@0.6.13:
+    resolution: {integrity: sha512-62L2Zw6u/jLAG84wiGt1IUaqkk3hgoVXQXczAmo9rBQIog+LDmub091bXNAMEK1Ujlt52P/5FBIdMAlwlO77EQ==}
     engines: {node: '>=16'}
     hasBin: true
     dependencies:
       '@swc/core': 1.5.7
-      commander: 12.0.0
+      commander: 12.1.0
       fast-glob: 3.3.2
     transitivePeerDependencies:
       - '@swc/helpers'
