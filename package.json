@@ -61,7 +61,7 @@
   "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
     "@vuepress/bundler-vite": "2.0.0-rc.12",
-    "@vuepress/theme-default": "2.0.0-rc.32",
+    "@vuepress/theme-default": "2.0.0-rc.33",
     "vue": "^3.4.27",
     "vuepress": "2.0.0-rc.12",
     "@swc/jest": "^0.2.36",
