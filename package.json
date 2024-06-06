@@ -61,12 +61,12 @@
   "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
     "@vuepress/bundler-vite": "2.0.0-rc.13",
-    "@vuepress/theme-default": "2.0.0-rc.34",
+    "@vuepress/theme-default": "2.0.0-rc.35",
     "vue": "^3.4.27",
     "vuepress": "2.0.0-rc.13",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.12",
-    "@types/node": "^20.14.1",
+    "@types/node": "^20.14.2",
     "@typescript-eslint/eslint-plugin": "^7.12.0",
     "@typescript-eslint/parser": "^7.12.0",
     "eslint": "^8.57.0",
@@ -77,7 +77,7 @@
     "husky": "^9.0.11",
     "inop": "^0.6.17",
     "jest": "^29.7.0",
-    "prettier": "^3.3.0",
+    "prettier": "^3.3.1",
     "typescript": "^5.4.5"
   }
 }
