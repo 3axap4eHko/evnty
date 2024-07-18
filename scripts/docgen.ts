@@ -222,7 +222,7 @@ visitor.visitProgram(ast);
 const contents: string[] = [];
 const docs: string[] = [];
 
-const normalize = (name: string) => name.replace(/\s+/g, '-').replace(/[^\w+-]/g, '').toLowerCase();
+const normalize = (name: string) => name.replace(/[\s-]+/g, '-').replace(/[^\w-]+/g, '').toLowerCase();
 
 visitor.docs.push(visitor.docs.shift()!);
 

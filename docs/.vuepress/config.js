@@ -14,4 +14,10 @@ export default defineUserConfig({
   }),
 
   bundler: viteBundler(),
+
+  markdown: {
+    anchor: {
+      slugify: (s) => s.replace(/[\s-]+/g, '-').replace(/[^\w-]+/g, '').toLowerCase(),
+    },
+  },
 });
