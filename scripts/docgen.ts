@@ -38,6 +38,7 @@ class ASTVisitor {
       ?.filter(comment => comment.range[0] >= this.lastNode.range[1] && comment.range[1] <= node.range[0])
       .map(comment => comment.value
         .replace(/( +\*|\*\n)/g, '')
+        .replace(/(\@\w+)\s+(\{[^\}]+\})/g, '$1 `$2`')
         .replace(/( *\@\w+)/g, '-$1')
       ) ?? [];
   }
@@ -231,7 +232,7 @@ for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes
   const padding = ` `.repeat(level * 2);
   const namespace = normalize(doc.name);
   if (level !== 0) {
-    contents.push(`- [${doc.name}](#${namespace})`);
+    contents.push(`- [\`${doc.name}\`](#${namespace})`);
     docs.push(
       `${header} \`${doc.name}\``,
       '',
@@ -244,7 +245,7 @@ for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes
     if (members.every(member => member.docs.every(doc => !doc.includes('@internal')))) {
       for (const member of members) {
         let title = `${name}(${member.args.join(', ')})${member.returnType}`;
-        contents.push(`${padding}- [${title}](#${normalize(title)})`);
+        contents.push(`${padding}- [\`${title}\`](#${normalize(title)})`);
         docs.push(`${header}# \`${title}\``);
       }
       for (const member of members) {
