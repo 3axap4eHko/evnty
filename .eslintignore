@@ -1,6 +1,0 @@
-docs
-build
-coverage
-node_modules
-src/*.tmp.ts
-src/__tests__/*

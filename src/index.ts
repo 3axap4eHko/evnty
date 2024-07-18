@@ -34,6 +34,7 @@ export interface Expander<T, R> {
  * Removes a listener from the provided array of listeners. It searches for the listener and removes all instances of it from the array.
  * This method ensures that the listener is fully unregistered, preventing any residual calls to a potentially deprecated handler.
  *
+ * @internal
  * @param {Listener<T, R>[]} listeners - The array of listeners from which to remove the listener.
  * @param {Listener<T, R>} listener - The listener function to remove from the list of listeners.
  * @returns {boolean} - Returns `true` if the listener was found and removed, `false` otherwise.
@@ -41,11 +42,12 @@ export interface Expander<T, R> {
  * @template T - The type of the event that listeners are associated with.
  * @template R - The type of the return value that listeners are expected to return.
  *
- * @example
+ * ```typescript
  * // Assuming an array of listeners for click events
  * const listeners = [onClickHandler1, onClickHandler2];
  * const wasRemoved = removeListener(listeners, onClickHandler1);
  * console.log(wasRemoved); // Output: true
+ * ```
  */
 export const removeListener = <T, R>(listeners: Listener<T, R>[], listener: Listener<T, R>): boolean => {
   let index = listeners.indexOf(listener);
@@ -58,12 +60,27 @@ export const removeListener = <T, R>(listeners: Listener<T, R>[], listener: List
 };
 
 /**
+ * @internal
+ * @param timeout
+ * @param signal
+ * @returns
+ */
+export const setTimeoutAsync = (timeout: number, signal?: AbortSignal) =>
+  new Promise<boolean>((resolve) => {
+    const timerId = setTimeout(resolve, timeout, true);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timerId);
+      resolve(false);
+    });
+  });
+
+/**
  * An abstract class that extends the built-in Function class. It allows instances of the class
- * to be called as functions. When an instance of FunctionExt is called as a function, it will
+ * to be called as functions. When an instance of Callable is called as a function, it will
  * call the function passed to its constructor with the same arguments.
  * @internal
  */
-export abstract class FunctionExt extends Function {
+export abstract class Callable extends Function {
   constructor(func: Function) {
     super();
     return Object.setPrototypeOf(func, new.target.prototype);
@@ -77,7 +94,7 @@ export interface Unsubscribe {
 /**
  * @internal
  */
-export class Unsubscribe extends FunctionExt {
+export class Unsubscribe extends Callable {
   constructor(callback: Callback) {
     super(callback);
   }
@@ -105,67 +122,28 @@ export class Unsubscribe extends FunctionExt {
   }
 }
 
+export interface Queue<T> {
+  pop(): MaybePromise<T>;
+  stop(): MaybePromise<void>;
+}
+
 export interface Event<T = any, R = any> {
   (event: T): Promise<(void | Awaited<R>)[]>;
 }
 
 /**
- * Represents a pair of events handling both successful outcomes and errors.
- * This interface is used to manage asynchronous operations where events can either
- * result in a successful output or an error.
- *
- * The `value` event is triggered when the operation succeeds and emits a result.
- * The `error` event is triggered when the operation encounters an error, allowing
- * error handling mechanisms to process or log the error accordingly.
- *
- * @template T The type of data emitted by the successful outcome of the event.
- * @template R The type of data (if any) emitted by the error event.
- * @template E The type of error information emitted by the error event, usually an Error object or string.
- *
- * @example
- * // Assume an asynchronous function that fetches user data
- * function fetchUserData(): ResultEvents<UserData, Error> {
- *   const success = new Event<UserData>();
- *   const failure = new Event<Error>();
- *
- *   fetch('/api/user')
- *     .then(response => response.json())
- *     .then(data => success(data))
- *     .catch(error => failure(error));
- *
- *   return { value: success, error: failure };
- * }
- *
- * const userDataEvent = fetchUserData();
- * userDataEvent.value.on(data => console.log('User data received:', data));
- * userDataEvent.error.on(error => console.error('An error occurred:', error));
- */
-export interface ResultEvents<T, R, E = unknown> {
-  value: Event<T, R>; // Event triggered on a successful result.
-  error: Event<E, void>; // Event triggered on an error occurrence.
-}
-
-export interface Queue<T> {
-  pop(): MaybePromise<T | undefined>;
-  stop(): MaybePromise<void>;
-}
-
-/**
  * A class representing an anonymous event that can be listened to or triggered.
  *
- * @typeParam T - The tuple of arguments that the event takes.
- * @typeParam R - The return type of the event.
+ * @template T - The event type.
+ * @template R - The return type of the event.
  */
-export class Event<T, R> extends FunctionExt {
+export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLike<T> {
   /**
    * The array of listeners for the event.
    */
   private listeners: Listener<T, R>[];
-  /**
-   * The array of listeners for the event.
-   */
-  private addSpies: Array<(listener: Listener<T, R> | void) => void> = [];
-  private removeSpies: Array<(listener: Listener<T, R> | void) => void> = [];
+
+  private spies: Array<(listener: Listener<T, R> | void) => void> = [];
 
   /**
    * A function that disposes of the event and its listeners.
@@ -174,12 +152,14 @@ export class Event<T, R> extends FunctionExt {
 
   /**
    * Creates a new event.
-   * @example
+   *
+   * @param dispose - A function to call on the event disposal.
+   *
+   * ```typescript
    * // Create a click event.
    * const clickEvent = new Event<[x: number, y: number], void>();
    * clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
-   *
-   * @param dispose - A function to call on the event disposal.
+   * ```
    */
   constructor(dispose?: Callback) {
     const listeners: Listener<T, R>[] = [];
@@ -188,66 +168,81 @@ export class Event<T, R> extends FunctionExt {
     this.listeners = listeners;
 
     this.dispose = async () => {
-      this.clear();
+      void this.clear();
+      await this._error?.dispose();
       await dispose?.();
     };
   }
 
+  private _error?: Event<unknown>;
+
+  /**
+   * Error event that emits errors.
+   *
+   * @returns {Event<unknown>} The error event.
+   */
+  get error(): Event<unknown> {
+    return (this._error ??= new Event<unknown>());
+  }
+
   /**
    * The number of listeners for the event.
+   *
+   * @readonly
+   * @type {number}
    */
   get size(): number {
     return this.listeners.length;
   }
 
   /**
-   * Checks if a specific listener is not registered for the event.
-   * This method is typically used to verify whether an event listener has not been added to prevent duplicate registrations.
+   * Checks if the given listener is NOT registered for this event.
+   *
    * @param listener - The listener function to check against the registered listeners.
    * @returns `true` if the listener is not already registered; otherwise, `false`.
    *
-   * @example
+   * ```typescript
    * // Check if a listener is not already added
    * if (event.lacks(myListener)) {
    *   event.on(myListener);
    * }
-   *
+   * ```
    */
   lacks(listener: Listener<T, R>): boolean {
     return this.listeners.indexOf(listener) === -1;
   }
 
   /**
-   * Checks if a specific listener is registered for the event.
-   * This method is used to confirm the presence of a listener in the event's registration list.
+   * Checks if the given listener is registered for this event.
    *
-   * @param listener - The listener function to verify.
+   * @param listener - The listener function to check.
    * @returns `true` if the listener is currently registered; otherwise, `false`.
    *
-   * @example
+   * ```typescript
    * // Verify if a listener is registered
    * if (event.has(myListener)) {
    *   console.log('Listener is already registered');
    * }
+   * ```
    */
   has(listener: Listener<T, R>): boolean {
     return this.listeners.indexOf(listener) !== -1;
   }
 
   /**
-   * Removes a listener from the event's registration list.
-   * This method is used when the listener is no longer needed, helping to prevent memory leaks and unnecessary executions.
+   * Removes a specific listener from this event.
    *
    * @param listener - The listener to remove.
    * @returns The event instance, allowing for method chaining.
    *
-   * @example
+   * ```typescript
    * // Remove a listener
    * event.off(myListener);
+   * ```
    */
   off(listener: Listener<T, R>): this {
-    if (removeListener(this.listeners, listener)) {
-      this.removeSpies.forEach((spy) => spy(listener));
+    if (removeListener(this.listeners, listener) && this.spies.length) {
+      [...this.spies].forEach((spy) => spy(listener));
     }
     return this;
   }
@@ -259,19 +254,17 @@ export class Event<T, R> extends FunctionExt {
    * @param listener - The function to call when the event occurs.
    * @returns An object that can be used to unsubscribe the listener, ensuring easy cleanup.
    *
-   * @example
+   * ```typescript
    * // Add a listener to an event
    * const unsubscribe = event.on((data) => {
    *   console.log('Event data:', data);
    * });
+   * ```
    */
   on(listener: Listener<T, R>): Unsubscribe {
     this.listeners.push(listener);
-    if (this.addSpies.length > 0) {
-      this.addSpies.forEach((spy) => spy(listener));
-    }
     return new Unsubscribe(() => {
-      this.off(listener);
+      void this.off(listener);
     });
   }
 
@@ -281,34 +274,20 @@ export class Event<T, R> extends FunctionExt {
    *
    * @param listener - The listener to trigger once.
    * @returns An object that can be used to remove the listener if the event has not yet occurred.
-   * @example
+   *
+   * ```typescript
    * // Register a one-time listener
    * const onceUnsubscribe = event.once((data) => {
    *   console.log('Received data once:', data);
    * });
+   * ```
    */
   once(listener: Listener<T, R>): Unsubscribe {
     const oneTimeListener = (event: T) => {
-      this.off(oneTimeListener);
+      void this.off(oneTimeListener);
       return listener(event);
     };
     return this.on(oneTimeListener);
-  }
-
-  /**
-   * Returns a Promise that resolves with the first event argument emitted.
-   * This method is useful for scenarios where you need to wait for the first occurrence
-   * of an event and then perform actions based on the event data.
-   *
-   * @returns {Promise<T>} A Promise that resolves with the first event argument emitted.
-   * @example
-   * const clickEvent = new Event<[number, number]>();
-   * clickEvent.onceAsync().then(([x, y]) => {
-   *   console.log(`First click at (${x}, ${y})`);
-   * });
-   */
-  onceAsync(): Promise<T> {
-    return new Promise<T>((resolve) => this.once((event) => resolve(event)));
   }
 
   /**
@@ -316,79 +295,229 @@ export class Event<T, R> extends FunctionExt {
    * cleanly dispose of all event handlers to prevent memory leaks or unwanted triggerings after certain conditions.
    *
    * @returns {this} The instance of the event, allowing for method chaining.
-   * @example
+   *
+   * ```typescript
    * const myEvent = new Event();
    * myEvent.on(data => console.log(data));
    * myEvent.clear(); // Clears all listeners
+   * ```
    */
   clear(): this {
     this.listeners.splice(0);
-    this.removeSpies.forEach((spy) => spy());
+    if (this.spies.length) {
+      [...this.spies].forEach((spy) => spy());
+    }
     return this;
+  }
+
+  /**
+   * Enables the `Event` to be used in a Promise chain, resolving with the first emitted value.
+   *
+   * @template TResult1 - The type of the fulfilled value returned by `onfulfilled` (defaults to the event's type).
+   * @template TResult2 - The type of the rejected value returned by `onrejected` (defaults to `never`).
+   * @param onfulfilled - A function called when the event emits its first value.
+   * @param onrejected - A function called if an error occurs before the event emits.
+   * @returns A Promise that resolves with the result of `onfulfilled` or `onrejected`.
+   *
+   * ```typescript
+   * const clickEvent = new Event<[number, number]>();
+   * await clickEvent;
+   * ```
+   */
+  then<TResult1 = T, TResult2 = never>(
+    onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
+  ): Promise<TResult1 | TResult2> {
+    const promise = new Promise<T>((resolve) => this.once(resolve));
+
+    return promise.then(onfulfilled, onrejected);
+  }
+
+  /**
+   * A promise that resolves with the first emitted value from this event.
+   *
+   * @returns {Promise<T>} The promise value.
+   */
+  get promise(): Promise<T> {
+    return this.then((v) => v);
+  }
+
+  /**
+   * Makes this event iterable using `for await...of` loops.
+   *
+   * @returns An async iterator that yields values as they are emitted by this event.
+   *
+   * ```typescript
+   * // Assuming an event that emits numbers
+   * const numberEvent = new Event<number>();
+   * (async () => {
+   *   for await (const num of numberEvent) {
+   *     console.log('Number:', num);
+   *   }
+   * })();
+   * await numberEvent(1);
+   * await numberEvent(2);
+   * await numberEvent(3);
+   * ```
+   */
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    const queue: T[] = [];
+    const doneEvent = new Event<boolean>();
+    const emitEvent = async (value: T) => {
+      queue.push(value);
+      await doneEvent(false);
+    };
+    const unsubscribe = this.on(emitEvent).pre(async () => {
+      removeListener(this.spies, spy);
+      queue.splice(0);
+      await doneEvent.dispose();
+    });
+
+    const spy: (typeof this.spies)[number] = (target = emitEvent) => {
+      if (target === emitEvent) {
+        void doneEvent(true);
+        void unsubscribe();
+      }
+    };
+
+    this.spies.push(spy);
+    return {
+      async next() {
+        if (queue.length) {
+          return { value: queue.shift()!, done: false };
+        }
+        if (!(await doneEvent)) {
+          return { value: queue.shift()!, done: false };
+        }
+        return { value: undefined, done: true };
+      },
+      async return(value: unknown) {
+        await unsubscribe();
+        return { done: true, value };
+      },
+    };
+  }
+
+  /**
+   * Transforms the event's values using a generator function, creating a new `Event` that emits the transformed values.
+   *
+   * @template PT - The type of values emitted by the transformed `Event`.
+   * @template PR - The return type of the listeners of the transformed `Event`.
+   * @param generator - A function that takes the original event's value and returns a generator (sync or async) that yields the transformed values.
+   * @returns A new `Event` instance that emits the transformed values.
+   *
+   * ```typescript
+   * const numbersEvent = new Event<number>();
+   * const evenNumbersEvent = numbersEvent.pipe(function*(value) {
+   *    if (value % 2 === 0) {
+   *      yield value;
+   *    }
+   * });
+   * evenNumbersEvent.on((evenNumber) => console.log(evenNumber));
+   * await numbersEvent(1);
+   * await numbersEvent(2);
+   * await numbersEvent(3);
+   * ```
+   */
+  pipe<PT, R>(generator: (event: T) => AsyncGenerator<PT, void, unknown> | Generator<PT, void, unknown>): Event<PT, R> {
+    const emitEvent = async (value: T) => {
+      try {
+        for await (const generatedValue of generator(value)) {
+          await result(generatedValue).catch((e) => result.error(e));
+        }
+      } catch (e) {
+        await result.error(e);
+      }
+    };
+
+    const unsubscribe = this.on(emitEvent).pre(() => {
+      removeListener(this.spies, spy);
+    });
+
+    const spy: (typeof this.spies)[number] = (target = emitEvent) => {
+      if (target === emitEvent) {
+        void unsubscribe();
+      }
+    };
+    this.spies.push(spy);
+
+    const result = new Event<PT, R>(unsubscribe);
+    return result;
+  }
+
+  /**
+   * Creates an async generator that yields values as they are emitted by this event.
+   *
+   * @template PT - The type of values yielded by the async generator.
+   * @param generator - An optional function that takes the original event's value and returns a generator (sync or async)
+   *                  that yields values to include in the async generator.
+   * @returns An async generator that yields values from this event as they occur.
+   *
+   * ```typescript
+   * const numbersEvent = new Event<number>();
+   * const evenNumbersEvent = numbersEvent.pipe(function*(value) {
+   *    if (value % 2 === 0) {
+   *      yield value;
+   *    }
+   * });
+   * evenNumbersEvent.on((evenNumber) => console.log(evenNumber));
+   * await numbersEvent(1);
+   * await numbersEvent(2);
+   * await numbersEvent(3);
+   * ```
+   */
+  async *generator<PT>(generator: (event: T) => AsyncGenerator<PT, void, unknown> | Generator<PT, void, unknown>): AsyncGenerator<Awaited<PT>, void, unknown> {
+    for await (const value of this.pipe(generator)) {
+      yield value;
+    }
   }
 
   /**
    * Filters events, creating a new event that only triggers when the provided filter function returns `true`.
    * This method can be used to selectively process events that meet certain criteria.
    *
-   * @param {Filter<T, P>} filter The filter function or predicate to apply to each event.
+   * @param {Filter<T, P>} predicate The filter function or predicate to apply to each event.
    * @returns {Event<P, R>} A new event that only triggers for filtered events.
-   * @example
+   *
+   * ```typescript
    * const keyPressedEvent = new Event<string>();
    * const enterPressedEvent = keyPressedEvent.filter(key => key === 'Enter');
    * enterPressedEvent.on(() => console.log('Enter key was pressed.'));
+   * ```
    */
   filter<P extends T>(predicate: Predicate<T, P>): Event<P, R>;
   filter<P extends T>(filter: FilterFunction<T>): Event<P, R>;
   filter<P extends T>(filter: Filter<T, P>): Event<P, R> {
-    const unsubscribe = this.on(async (event: T) => {
-      if (filteredEvent.size > 0 && (await filter(event))) {
-        await filteredEvent(event as P);
+    return this.pipe<P, R>(async function* (value: T) {
+      if (await filter(value)) {
+        yield value as P;
       }
     });
-    const filteredEvent = new Event<P, R>(unsubscribe);
-    return filteredEvent;
   }
 
   /**
    * Creates a new event that will only be triggered once when the provided filter function returns `true`.
    * This method is useful for handling one-time conditions in a stream of events.
    *
-   * @param {Filter<T, P>} filter - The filter function or predicate.
+   * @param {Filter<T, P>} predicate - The filter function or predicate.
    * @returns {Event<P, R>} A new event that will be triggered only once when the filter condition is met.
-   * @example
+   *
+   * ```typescript
    * const sizeChangeEvent = new Event<number>();
    * const sizeReachedEvent = sizeChangeEvent.first(size => size > 1024);
    * sizeReachedEvent.on(() => console.log('Size threshold exceeded.'));
+   * ```
    */
   first<P extends T>(predicate: Predicate<T, P>): Event<P, R>;
   first<P extends T>(filter: FilterFunction<T>): Event<P, R>;
   first<P extends T>(filter: Filter<T, P>): Event<P, R> {
-    const unsubscribe = this.on(async (event: T) => {
-      if (filteredEvent.size > 0 && (await filter(event))) {
-        await unsubscribe();
-        await filteredEvent(event as P);
+    const filteredEvent = this.pipe<P, R>(async function* (value: T) {
+      if (await filter(value)) {
+        yield value as P;
+        await filteredEvent.dispose();
       }
     });
-    const filteredEvent = new Event<P, R>(unsubscribe);
     return filteredEvent;
-  }
-
-  /**
-   * Returns a Promise that resolves once an event occurs that meets the filter criteria.
-   * This method is particularly useful for handling asynchronous flows where you need to wait for a specific condition.
-   *
-   * @param {Filter<T, P>} filter - The filter function or predicate.
-   * @returns {Promise<P>} A Promise that resolves once the filter condition is met.
-   * @example
-   * const mouseEvent = new Event<{x: number, y: number}>();
-   * const clickAtPosition = mouseEvent.firstAsync(pos => pos.x > 200 && pos.y > 200);
-   * clickAtPosition.then(pos => console.log(`Clicked at (${pos.x}, ${pos.y})`));
-   */
-  firstAsync<P extends T>(predicate: Predicate<T, P>): Promise<P>;
-  firstAsync<P extends T>(filter: FilterFunction<T>): Promise<P>;
-  firstAsync<P extends T>(filter: Filter<T, P>): Promise<P> {
-    return this.first<P>(filter).onceAsync();
   }
 
   /**
@@ -401,25 +530,18 @@ export class Event<T, R> extends FunctionExt {
    * @param {Mapper<T, M>} mapper A function that takes the original event data and returns the transformed data.
    * @returns {Event<M, MR>} A new `Event` instance that emits the mapped values.
    *
-   * @example
+   * ```typescript
    * // Assuming an event that emits numbers, create a new event that emits their squares.
    * const numberEvent = new Event<number>();
    * const squaredEvent = numberEvent.map(num => num * num);
    * squaredEvent.on(squared => console.log('Squared number:', squared));
    * await numberEvent(5); // Logs: "Squared number: 25"
-   *
-   * @param mapper A function that maps the values of this event to a new value.
-   * @returns A new event that emits the mapped values.
+   * ```
    */
-  map<M, MR = R>(mapper: Mapper<T, M>): Event<M, MR> {
-    const unsubscribe = this.on(async (event) => {
-      if (mappedEvent.size > 0) {
-        const value = await mapper(event);
-        await mappedEvent(value);
-      }
+  map<M, MR = R>(mapper: Mapper<T, M>): Event<Awaited<M>, MR> {
+    return this.pipe(async function* (value) {
+      yield await mapper(value);
     });
-    const mappedEvent = new Event<M, MR>(unsubscribe);
-    return mappedEvent;
   }
 
   /**
@@ -427,30 +549,34 @@ export class Event<T, R> extends FunctionExt {
    * function takes the accumulated value and the latest emitted event data, then returns a new accumulated value. This
    * new value is then emitted by the returned `Event` instance. This is particularly useful for accumulating state over time.
    *
-   * @example
-   * const sumEvent = numberEvent.reduce((a, b) => a + b, 0);
-   * sumEvent.on((sum) => console.log(sum)); // 1, 3, 6
-   * await sumEvent(1);
-   * await sumEvent(2);
-   * await sumEvent(3);
-   *
    * @template A The type of the accumulator value.
    * @template AR The type of data emitted by the reduced event, usually the same as `A`.
    * @param {Reducer<T, A>} reducer A function that takes the current accumulated value and the new event data, returning the new accumulated value.
    * @param {A} init The initial value of the accumulator.
    * @returns {Event<A, AR>} A new `Event` instance that emits the reduced value.
    *
+   * ```typescript
+   * const sumEvent = numberEvent.reduce((a, b) => a + b, 0);
+   * sumEvent.on((sum) => console.log(sum)); // 1, 3, 6
+   * await sumEvent(1);
+   * await sumEvent(2);
+   * await sumEvent(3);
+   * ```
    */
-  reduce<A, AR = R>(reducer: Reducer<T, A>, init: A): Event<A, AR> {
-    let value = init;
-    const unsubscribe = this.on(async (event) => {
-      if (reducedEvent.size > 0) {
-        value = await reducer(value, event);
-        await reducedEvent(value);
+  reduce<A, AR = R>(reducer: Reducer<T, A>, init?: A): Event<Awaited<A>, AR>;
+  reduce<A, AR = R>(reducer: Reducer<T, A>, ...init: unknown[]): Event<Awaited<A>, AR> {
+    let hasInit = init.length === 1;
+    let result = init[0] as A | undefined;
+
+    return this.pipe(async function* (value) {
+      if (hasInit) {
+        result = await reducer(result!, value);
+        yield result;
+      } else {
+        result = value as unknown as A;
+        hasInit = true;
       }
     });
-    const reducedEvent = new Event<A, AR>(unsubscribe);
-    return reducedEvent;
   }
 
   /**
@@ -464,24 +590,21 @@ export class Event<T, R> extends FunctionExt {
    * @param {Expander<T, ET[]>} expander - A function that takes the original event data and returns an array of new data elements.
    * @returns {Event<ET, ER>} - A new `Event` instance that emits each value from the array returned by the expander function.
    *
-   * @example
+   * ```typescript
    * // Assuming an event that emits a sentence, create a new event that emits each word from the sentence separately.
    * const sentenceEvent = new Event<string>();
    * const wordEvent = sentenceEvent.expand(sentence => sentence.split(' '));
    * wordEvent.on(word => console.log('Word:', word));
    * await sentenceEvent('Hello world'); // Logs: "Word: Hello", "Word: world"
+   * ```
    */
-  expand<ET, ER>(expander: Expander<T, ET[]>): Event<ET, ER> {
-    const unsubscribe = this.on(async (event) => {
-      if (expandedEvent.size > 0) {
-        const values = await expander(event);
-        for (const value of values) {
-          await expandedEvent(value);
-        }
+  expand<ET, ER>(expander: Expander<T, ET[]>): Event<Awaited<ET>, ER> {
+    return this.pipe(async function* (value) {
+      const values = await expander(value);
+      for (const value of values) {
+        yield value;
       }
     });
-    const expandedEvent = new Event<ET, ER>(unsubscribe);
-    return expandedEvent;
   }
 
   /**
@@ -489,10 +612,16 @@ export class Event<T, R> extends FunctionExt {
    * captured from the original event each time the conductor event is triggered. This method is useful for synchronizing
    * events, where the emission of one event controls the timing of another.
    *
-   * @example
-   * const rightClickPositionEvent = mouseMoveEvent.orchestrate(mouseRightClickEvent);
+   * @template T The type of data emitted by the original event.
+   * @template R The type of data emitted by the orchestrated event, usually the same as `T`.
+   * @param {Event<unknown, unknown>} conductor An event that signals when the orchestrated event should emit.
+   * @returns {Event<T, R>} An orchestrated event that emits values based on the conductor's trigger.
    *
-   * @example
+   * ```typescript
+   * const rightClickPositionEvent = mouseMoveEvent.orchestrate(mouseRightClickEvent);
+   * ```
+   *
+   * ```typescript
    * // An event that emits whenever a "tick" event occurs.
    * const tickEvent = new Event<void>();
    * const dataEvent = new Event<string>();
@@ -501,12 +630,7 @@ export class Event<T, R> extends FunctionExt {
    * await dataEvent('Hello');
    * await dataEvent('World!');
    * await tickEvent(); // Logs: "Data on tick: World!"
-   *
-   * @template T The type of data emitted by the original event.
-   * @template R The type of data emitted by the orchestrated event, usually the same as `T`.
-   * @param {Event<unknown, unknown>} conductor An event that signals when the orchestrated event should emit.
-   * @returns {Event<T, R>} An orchestrated event that emits values based on the conductor's trigger.
-   *
+   * ```
    */
   orchestrate(conductor: Event<any, any>): Event<T, R> {
     let initialized = false;
@@ -531,29 +655,68 @@ export class Event<T, R> extends FunctionExt {
    * at which a function is executed. Common use cases include handling rapid user inputs, window resizing,
    * or scroll events.
    *
-   * @example
+   * @param {number} interval - The amount of time to wait (in milliseconds) before firing the debounced event.
+   * @returns {Event<T, R>} An event of debounced events.
+   *
+   * ```typescript
    * const debouncedEvent = textInputEvent.debounce(100);
    * debouncedEvent.on((str) => console.log(str)); // only 'text' is emitted
    * await event('t');
    * await event('te');
    * await event('tex');
    * await event('text');
-   *
-   * @param {number} interval - The amount of time to wait (in milliseconds) before firing the debounced event.
-   * @returns {ResultEvents<T, R, unknown>} An object containing two events: `value` for the debounced successful
-   * outputs and `error` for catching errors during the debounce handling.
+   * ```
    */
-  debounce(interval: number): ResultEvents<T, R, unknown> {
-    let timer: ReturnType<typeof setTimeout>;
-    const unsubscribe = this.on((event) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        value(event).catch(error);
-      }, interval);
+  debounce(interval: number): Event<Awaited<T>, unknown> {
+    let controller = new AbortController();
+
+    return this.pipe(async function* (value) {
+      controller.abort();
+      controller = new AbortController();
+      const complete = await setTimeoutAsync(interval, controller.signal);
+      if (complete) {
+        yield value;
+      }
     });
-    const value = new Event<T, R>(unsubscribe);
-    const error = new Event<unknown, void>();
-    return { value, error };
+  }
+
+  /**
+   * Creates a throttled event that emits values at most once per specified interval.
+   *
+   * This is useful for controlling the rate of event emissions, especially for high-frequency events.
+   * The throttled event will immediately emit the first value, and then only emit subsequent values
+   * if the specified interval has passed since the last emission.
+   *
+   * @param interval - The time interval (in milliseconds) between allowed emissions.
+   * @returns A new Event that emits throttled values.
+   *
+   * ```typescript
+   * const scrollEvent = new Event();
+   * const throttledScroll = scrollEvent.throttle(100); // Emit at most every 100ms
+   * throttledScroll.on(() => console.log("Throttled scroll event"));
+   * ```
+   */
+  throttle(interval: number): Event<Awaited<T>, unknown> {
+    let timeout = 0;
+    let pendingValue: T;
+    let hasPendingValue = false;
+
+    return this.pipe(async function* (value) {
+      const now = Date.now();
+      if (timeout <= now) {
+        timeout = now + interval;
+        yield value;
+      } else {
+        pendingValue = value;
+        if (!hasPendingValue) {
+          hasPendingValue = true;
+          await setTimeoutAsync(timeout - now);
+          timeout = now + interval;
+          hasPendingValue = false;
+          yield pendingValue;
+        }
+      }
+    });
   }
 
   /**
@@ -561,98 +724,36 @@ export class Event<T, R> extends FunctionExt {
    * time intervals or when the batch reaches a predefined size. This method is useful for grouping
    * a high volume of events into manageable chunks, such as logging or processing data in bulk.
    *
-   * @example
-   * // Batch messages for bulk processing every 1 second or when 10 messages are collected
-   * const messageEvent = createEvent<string, void>();
-   * const batchedMessageEvent = messageEvent.batch(1000, 10);
-   * batchedMessageEvent.value.on((messages) => console.log('Batched Messages:', messages));
-   *
    * @param {number} interval - The time in milliseconds between batch emissions.
    * @param {number} [size] - Optional. The maximum size of each batch. If specified, triggers a batch emission
    * once the batch reaches this size, regardless of the interval.
-   * @returns {ResultEvents<T[], R, unknown>} An object containing two events: `value` for the batched results
-   * and `error` for errors that may occur during batching.
+   * @returns {Event<T[], R>} An event of the batched results.
+   *
+   * ```typescript
+   * // Batch messages for bulk processing every 1 second or when 10 messages are collected
+   * const messageEvent = createEvent<string, void>();
+   * const batchedMessageEvent = messageEvent.batch(1000, 10);
+   * batchedMessageEvent.on((messages) => console.log('Batched Messages:', messages));
+   * ```
    */
-  batch(interval: number, size?: number): ResultEvents<T[], R, unknown> {
-    let timer: ReturnType<typeof setTimeout>;
+  batch(interval: number, size?: number): Event<T[], R> {
+    let controller = new AbortController();
     const batch: T[] = [];
 
-    const emitBatch = () => {
-      if (batch.length !== 0) {
-        clearTimeout(timer);
-        value(batch.splice(0)).catch(error);
-      }
-    };
-
-    const unsubscribe = this.on((event) => {
-      if (batch.length === 0) {
-        timer = setTimeout(emitBatch, interval);
-      }
-
-      batch.push(event);
+    return this.pipe(async function* (value) {
+      batch.push(value);
       if (size !== undefined && batch.length >= size) {
-        emitBatch();
+        controller.abort();
+        yield batch.splice(0);
+      }
+      if (batch.length === 1) {
+        controller = new AbortController();
+        const complete = await setTimeoutAsync(interval, controller.signal);
+        if (complete) {
+          yield batch.splice(0);
+        }
       }
     });
-    const value = new Event<T[], R>(unsubscribe);
-    const error = new Event<unknown, void>();
-    return { value, error };
-  }
-
-  /**
-   * Transforms an event into an AsyncIterable that yields values as they are emitted by the event. This allows for the consumption
-   * of event data using async iteration mechanisms. The iterator generated will yield all emitted values until the event
-   * signals it should no longer be active.
-   *
-   * @returns {AsyncIterable<T>} An async iterable that yields values emitted by the event.
-   * @example
-   * // Assuming an event that emits numbers
-   * const numberEvent = new Event<number>();
-   * const numberIterable = numberEvent.generator();
-   * (async () => {
-   *   for await (const num of numberIterable) {
-   *     console.log('Number:', num);
-   *   }
-   * })();
-   * await numberEvent(1);
-   * await numberEvent(2);
-   * await numberEvent(3);
-   */
-  generator(): AsyncIterable<T> {
-    const queue: T[] = [];
-    const valueEvent = new Event<boolean>();
-    const emitEvent = async (value: T) => {
-      queue.push(value);
-      await valueEvent(false);
-    };
-    const unsubscribe = this.on(emitEvent).pre(() => {
-      removeListener(this.removeSpies, spy);
-    });
-
-    const spy: (typeof this.removeSpies)[number] = (target = emitEvent) => {
-      if (target === emitEvent) {
-        valueEvent(true);
-        unsubscribe();
-      }
-    };
-    this.removeSpies.push(spy);
-
-    return {
-      [Symbol.asyncIterator]() {
-        return {
-          async next() {
-            if (queue.length) {
-              return Promise.resolve({ value: queue.shift()!, done: false });
-            }
-            const result = await valueEvent.onceAsync();
-            if (!result) {
-              return Promise.resolve({ value: queue.shift()!, done: false });
-            }
-            return Promise.resolve({ value: undefined, done: true });
-          },
-        };
-      },
-    };
   }
 
   /**
@@ -660,16 +761,18 @@ export class Event<T, R> extends FunctionExt {
    * from the queue, ensuring that elements are handled one at a time. This method is ideal for scenarios where order and sequential processing are critical.
    *
    * @returns {Queue<T>} An object representing the queue. The 'pop' method retrieves the next element from the queue, while 'stop' halts further processing.
-   * @example
+   *
+   * ```typescript
    * // Queueing tasks for sequential execution
    * const taskEvent = new Event<string>();
    * const taskQueue = taskEvent.queue();
-   * await taskEvent('Task 1');
-   * await taskEvent('Task 2');
    * (async () => {
    *   console.log('Processing:', await taskQueue.pop()); // Processing: Task 1
    *   console.log('Processing:', await taskQueue.pop()); // Processing: Task 2
    * })();
+   * await taskEvent('Task 1');
+   * await taskEvent('Task 2');
+   * ```
    */
   queue(): Queue<T> {
     const queue: T[] = [];
@@ -682,9 +785,9 @@ export class Event<T, R> extends FunctionExt {
     return {
       async pop() {
         if (!queue.length) {
-          await valueEvent.onceAsync();
+          await valueEvent;
         }
-        return queue.shift();
+        return queue.shift()!;
       },
       async stop() {
         await unsubscribe();
@@ -712,12 +815,13 @@ export type AllEventsResults<T extends Event<any, any>[]> = { [K in keyof T]: Ev
  * @returns {Event<AllEventsParameters<Events>, AllEventsResults<Events>>} - Returns a new `Event` instance
  *           that triggers with the parameters and results of any of the merged input events.
  *
- * @example
+ * ```typescript
  * // Merging mouse and keyboard events into a single event
  * const mouseEvent = createEvent<MouseEvent>();
  * const keyboardEvent = createEvent<KeyboardEvent>();
  * const inputEvent = merge(mouseEvent, keyboardEvent);
  * inputEvent.on(event => console.log('Input event:', event));
+ * ```
  */
 export const merge = <Events extends Event<any, any>[]>(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>> => {
   const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>();
@@ -736,10 +840,11 @@ export const merge = <Events extends Event<any, any>[]>(...events: Events): Even
  * @returns {Event<number, R>} - An `Event` instance that triggers at the specified interval,
  *           emitting an incrementing counter value.
  *
- * @example
+ * ```typescript
  * // Creating an interval event that logs a message every second
  * const tickEvent = createInterval(1000);
  * tickEvent.on(tickNumber => console.log('Tick:', tickNumber));
+ * ```
  */
 export const createInterval = <R = void>(interval: number): Event<number, R> => {
   let counter = 0;
@@ -756,13 +861,14 @@ export const createInterval = <R = void>(interval: number): Event<number, R> => 
  * @typeParam R - The return type of the event handler function, which is emitted after processing the event data.
  * @returns {Event<T, R>} - A new instance of the `Event` class, ready to have listeners added to it.
  *
- * @example
+ * ```typescript
  * // Create a new event that accepts a string and returns the string length
  * const myEvent = createEvent<string, number>();
  * myEvent.on((str: string) => str.length);
  * myEvent('hello').then(results => console.log(results)); // Logs: [5]
+ * ```
  */
-export const createEvent = <T, R = void>(): Event<T, R> => new Event<T, R>();
+export const createEvent = <T = unknown, R = unknown>(): Event<T, R> => new Event<T, R>();
 
 export default createEvent;
 
