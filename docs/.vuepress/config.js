@@ -6,11 +6,15 @@ export default defineUserConfig({
   lang: 'en-US',
   base: '/evnty/',
   title: 'Evnty',
-  description: '0-Deps, simple, fast, for browser and node js reactive anonymous event library',
+  description: '0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.',
 
   theme: defaultTheme({
     colorMode: 'dark',
     colorModeSwitch: false,
+    navbar: [
+      { text: 'Home', link: '/' },
+      { text: 'GitHub', link: 'https://github.com/3axap4ehko/evnty' }
+    ],
   }),
 
   bundler: viteBundler(),

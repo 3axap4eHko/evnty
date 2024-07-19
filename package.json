@@ -67,8 +67,8 @@
     "@typescript-eslint/eslint-plugin": "^7.16.1",
     "@typescript-eslint/parser": "^7.16.1",
     "@typescript-eslint/typescript-estree": "^7.16.1",
-    "@vuepress/bundler-vite": "2.0.0-rc.13",
-    "@vuepress/theme-default": "2.0.0-rc.35",
+    "@vuepress/bundler-vite": "2.0.0-rc.14",
+    "@vuepress/theme-default": "2.0.0-rc.38",
     "eslint": "^9.7.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
@@ -82,7 +82,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.5.3",
     "vue": "^3.4.32",
-    "vuepress": "2.0.0-rc.13"
+    "vuepress": "2.0.0-rc.14"
   },
   "packageManager": "pnpm@9.4.0+sha512.f549b8a52c9d2b8536762f99c0722205efc5af913e77835dbccc3b0b0b2ca9e7dc8022b78062c17291c48e88749c70ce88eb5a74f1fa8c4bf5e18bb46c8bd83a"
 }

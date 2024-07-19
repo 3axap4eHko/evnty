@@ -15,39 +15,39 @@
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [API](#api)
-  - [Event](#event)
-    - [constructor(dispose?: Callback)](#constructordispose-callback)
-    - [error(): Event<unknown>](#error-eventunknown)
-    - [size(): number](#size-number)
-    - [lacks(listener: Listener<T, R>): boolean](#lackslistener-listenert-r-boolean)
-    - [has(listener: Listener<T, R>): boolean](#haslistener-listenert-r-boolean)
-    - [off(listener: Listener<T, R>): this](#offlistener-listenert-r-this)
-    - [on(listener: Listener<T, R>): Unsubscribe](#onlistener-listenert-r-unsubscribe)
-    - [once(listener: Listener<T, R>): Unsubscribe](#oncelistener-listenert-r-unsubscribe)
-    - [clear(): this](#clear-this)
-    - [then(onfulfilled, onrejected): Promise<TResult1 | TResult2>](#thenonfulfilled-onrejected-promisetresult1--tresult2)
-    - [promise(): Promise<T>](#promise-promiset)
-    - [Symbol.asyncIterator(): AsyncIterator<T>](#symbolasynciterator-asynciteratort)
-    - [pipe(generator): Event<PT, R>](#pipegenerator-eventpt-r)
-    - [generator(generator): AsyncGenerator<Awaited<PT>, void, unknown>](#generatorgenerator-asyncgeneratorawaitedpt-void-unknown)
-    - [filter(predicate: Predicate<T, P>): Event<P, R>](#filterpredicate-predicatet-p-eventp-r)
-    - [filter(filter: FilterFunction<T>): Event<P, R>](#filterfilter-filterfunctiont-eventp-r)
-    - [filter(filter: Filter<T, P>): Event<P, R>](#filterfilter-filtert-p-eventp-r)
-    - [first(predicate: Predicate<T, P>): Event<P, R>](#firstpredicate-predicatet-p-eventp-r)
-    - [first(filter: FilterFunction<T>): Event<P, R>](#firstfilter-filterfunctiont-eventp-r)
-    - [first(filter: Filter<T, P>): Event<P, R>](#firstfilter-filtert-p-eventp-r)
-    - [map(mapper: Mapper<T, M>): Event<Awaited<M>, MR>](#mapmapper-mappert-m-eventawaitedm-mr)
-    - [reduce(reducer: Reducer<T, A>, init?: A): Event<Awaited<A>, AR>](#reducereducer-reducert-a-init-a-eventawaiteda-ar)
-    - [reduce(reducer: Reducer<T, A>, ...init: unknown[]): Event<Awaited<A>, AR>](#reducereducer-reducert-a-init-unknown-eventawaiteda-ar)
-    - [expand(expander: Expander<T, ET[]>): Event<Awaited<ET>, ER>](#expandexpander-expandert-et-eventawaitedet-er)
-    - [orchestrate(conductor: Event<any, any>): Event<T, R>](#orchestrateconductor-eventany-any-eventt-r)
-    - [debounce(interval: number): Event<Awaited<T>, unknown>](#debounceinterval-number-eventawaitedt-unknown)
-    - [throttle(interval: number): Event<Awaited<T>, unknown>](#throttleinterval-number-eventawaitedt-unknown)
-    - [batch(interval: number, size?: number): Event<T[], R>](#batchinterval-number-size-number-eventt-r)
-    - [queue(): Queue<T>](#queue-queuet)
-  - [merge(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>>](#mergeevents-events-eventalleventsparametersevents-alleventsresultsevents)
-  - [createInterval(interval: number): Event<number, R>](#createintervalinterval-number-eventnumber-r)
-  - [createEvent(): Event<T, R>](#createevent-eventt-r)
+  - [`Event`](#event)
+    - [`constructor(dispose?: Callback)`](#constructordispose-callback)
+    - [`error(): Event<unknown>`](#error-eventunknown)
+    - [`size(): number`](#size-number)
+    - [`lacks(listener: Listener<T, R>): boolean`](#lackslistener-listenert-r-boolean)
+    - [`has(listener: Listener<T, R>): boolean`](#haslistener-listenert-r-boolean)
+    - [`off(listener: Listener<T, R>): this`](#offlistener-listenert-r-this)
+    - [`on(listener: Listener<T, R>): Unsubscribe`](#onlistener-listenert-r-unsubscribe)
+    - [`once(listener: Listener<T, R>): Unsubscribe`](#oncelistener-listenert-r-unsubscribe)
+    - [`clear(): this`](#clear-this)
+    - [`then(onfulfilled, onrejected): Promise<TResult1 | TResult2>`](#thenonfulfilled-onrejected-promisetresult1--tresult2)
+    - [`promise(): Promise<T>`](#promise-promiset)
+    - [`Symbol.asyncIterator(): AsyncIterator<T>`](#symbolasynciterator-asynciteratort)
+    - [`pipe(generator): Event<PT, R>`](#pipegenerator-eventpt-r)
+    - [`generator(generator): AsyncGenerator<Awaited<PT>, void, unknown>`](#generatorgenerator-asyncgeneratorawaitedpt-void-unknown)
+    - [`filter(predicate: Predicate<T, P>): Event<P, R>`](#filterpredicate-predicatet-p-eventp-r)
+    - [`filter(filter: FilterFunction<T>): Event<P, R>`](#filterfilter-filterfunctiont-eventp-r)
+    - [`filter(filter: Filter<T, P>): Event<P, R>`](#filterfilter-filtert-p-eventp-r)
+    - [`first(predicate: Predicate<T, P>): Event<P, R>`](#firstpredicate-predicatet-p-eventp-r)
+    - [`first(filter: FilterFunction<T>): Event<P, R>`](#firstfilter-filterfunctiont-eventp-r)
+    - [`first(filter: Filter<T, P>): Event<P, R>`](#firstfilter-filtert-p-eventp-r)
+    - [`map(mapper: Mapper<T, M>): Event<Awaited<M>, MR>`](#mapmapper-mappert-m-eventawaitedm-mr)
+    - [`reduce(reducer: Reducer<T, A>, init?: A): Event<Awaited<A>, AR>`](#reducereducer-reducert-a-init-a-eventawaiteda-ar)
+    - [`reduce(reducer: Reducer<T, A>, ...init: unknown[]): Event<Awaited<A>, AR>`](#reducereducer-reducert-a-init-unknown-eventawaiteda-ar)
+    - [`expand(expander: Expander<T, ET[]>): Event<Awaited<ET>, ER>`](#expandexpander-expandert-et-eventawaitedet-er)
+    - [`orchestrate(conductor: Event<any, any>): Event<T, R>`](#orchestrateconductor-eventany-any-eventt-r)
+    - [`debounce(interval: number): Event<Awaited<T>, unknown>`](#debounceinterval-number-eventawaitedt-unknown)
+    - [`throttle(interval: number): Event<Awaited<T>, unknown>`](#throttleinterval-number-eventawaitedt-unknown)
+    - [`batch(interval: number, size?: number): Event<T[], R>`](#batchinterval-number-size-number-eventt-r)
+    - [`queue(): Queue<T>`](#queue-queuet)
+  - [`merge(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>>`](#mergeevents-events-eventalleventsparametersevents-alleventsresultsevents)
+  - [`createInterval(interval: number): Event<number, R>`](#createintervalinterval-number-eventnumber-r)
+  - [`createEvent(): Event<T, R>`](#createevent-eventt-r)
 - [Examples](#examples)
 - [Migration](#migration)
 - [License](#license)
@@ -125,14 +125,14 @@ clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
 
 Error event that emits errors.
 
-- @returns {Event<unknown>} The error event.
+- @returns `{Event<unknown>}` The error event.
 
 #### `size(): number`
 
 The number of listeners for the event.
 
 - @readonly
-- @type {number}
+- @type `{number}`
 
 #### `lacks(listener: Listener<T, R>): boolean`
 
@@ -209,7 +209,7 @@ const onceUnsubscribe = event.once((data) => {
 Removes all listeners from the event, effectively resetting it. This is useful when you need to
 cleanly dispose of all event handlers to prevent memory leaks or unwanted triggerings after certain conditions.
 
-- @returns {this} The instance of the event, allowing for method chaining.
+- @returns `{this}` The instance of the event, allowing for method chaining.
 
 ```typescript
 const myEvent = new Event();
@@ -236,7 +236,7 @@ await clickEvent;
 
 A promise that resolves with the first emitted value from this event.
 
-- @returns {Promise<T>} The promise value.
+- @returns `{Promise<T>}` The promise value.
 
 #### `Symbol.asyncIterator(): AsyncIterator<T>`
 
@@ -310,8 +310,8 @@ await numbersEvent(3);
 Filters events, creating a new event that only triggers when the provided filter function returns `true`.
 This method can be used to selectively process events that meet certain criteria.
 
-- @param {Filter<T, P>} predicate The filter function or predicate to apply to each event.
-- @returns {Event<P, R>} A new event that only triggers for filtered events.
+- @param `{Filter<T, P>}` predicate The filter function or predicate to apply to each event.
+- @returns `{Event<P, R>}` A new event that only triggers for filtered events.
 
 ```typescript
 const keyPressedEvent = new Event<string>();
@@ -328,8 +328,8 @@ enterPressedEvent.on(() => console.log('Enter key was pressed.'));
 Creates a new event that will only be triggered once when the provided filter function returns `true`.
 This method is useful for handling one-time conditions in a stream of events.
 
-- @param {Filter<T, P>} predicate - The filter function or predicate.
-- @returns {Event<P, R>} A new event that will be triggered only once when the filter condition is met.
+- @param `{Filter<T, P>}` predicate - The filter function or predicate.
+- @returns `{Event<P, R>}` A new event that will be triggered only once when the filter condition is met.
 
 ```typescript
 const sizeChangeEvent = new Event<number>();
@@ -345,8 +345,8 @@ or adapting the event's data structure.
 
 - @template M The type of data that the mapper function will produce.
 - @template MR The type of data emitted by the mapped event, usually related to or the same as `M`.
-- @param {Mapper<T, M>} mapper A function that takes the original event data and returns the transformed data.
-- @returns {Event<M, MR>} A new `Event` instance that emits the mapped values.
+- @param `{Mapper<T, M>}` mapper A function that takes the original event data and returns the transformed data.
+- @returns `{Event<M, MR>}` A new `Event` instance that emits the mapped values.
 
 ```typescript
 // Assuming an event that emits numbers, create a new event that emits their squares.
@@ -366,9 +366,9 @@ new value is then emitted by the returned `Event` instance. This is particularly
 
 - @template A The type of the accumulator value.
 - @template AR The type of data emitted by the reduced event, usually the same as `A`.
-- @param {Reducer<T, A>} reducer A function that takes the current accumulated value and the new event data, returning the new accumulated value.
-- @param {A} init The initial value of the accumulator.
-- @returns {Event<A, AR>} A new `Event` instance that emits the reduced value.
+- @param `{Reducer<T, A>}` reducer A function that takes the current accumulated value and the new event data, returning the new accumulated value.
+- @param `{A}` init The initial value of the accumulator.
+- @returns `{Event<A, AR>}` A new `Event` instance that emits the reduced value.
 
 ```typescript
 const sumEvent = numberEvent.reduce((a, b) => a + b, 0);
@@ -387,8 +387,8 @@ be expanded into multiple, separate pieces of data which should each trigger fur
 
 - @template ET - The type of data elements in the array returned by the expander function.
 - @template ER - The type of responses emitted by the expanded event, usually related to or the same as `ET`.
-- @param {Expander<T, ET[]>} expander - A function that takes the original event data and returns an array of new data elements.
-- @returns {Event<ET, ER>} - A new `Event` instance that emits each value from the array returned by the expander function.
+- @param `{Expander<T, ET[]>}` expander - A function that takes the original event data and returns an array of new data elements.
+- @returns `{Event<ET, ER>}` - A new `Event` instance that emits each value from the array returned by the expander function.
 
 ```typescript
 // Assuming an event that emits a sentence, create a new event that emits each word from the sentence separately.
@@ -406,8 +406,8 @@ events, where the emission of one event controls the timing of another.
 
 - @template T The type of data emitted by the original event.
 - @template R The type of data emitted by the orchestrated event, usually the same as `T`.
-- @param {Event<unknown, unknown>} conductor An event that signals when the orchestrated event should emit.
-- @returns {Event<T, R>} An orchestrated event that emits values based on the conductor's trigger.
+- @param `{Event<unknown, unknown>}` conductor An event that signals when the orchestrated event should emit.
+- @returns `{Event<T, R>}` An orchestrated event that emits values based on the conductor's trigger.
 
 ```typescript
 const rightClickPositionEvent = mouseMoveEvent.orchestrate(mouseRightClickEvent);
@@ -431,8 +431,8 @@ following the last time it was invoked. This method is particularly useful for l
 at which a function is executed. Common use cases include handling rapid user inputs, window resizing,
 or scroll events.
 
-- @param {number} interval - The amount of time to wait (in milliseconds) before firing the debounced event.
-- @returns {Event<T, R>} An event of debounced events.
+- @param `{number}` interval - The amount of time to wait (in milliseconds) before firing the debounced event.
+- @returns `{Event<T, R>}` An event of debounced events.
 
 ```typescript
 const debouncedEvent = textInputEvent.debounce(100);
@@ -466,10 +466,10 @@ Aggregates multiple event emissions into batches and emits the batched events ei
 time intervals or when the batch reaches a predefined size. This method is useful for grouping
 a high volume of events into manageable chunks, such as logging or processing data in bulk.
 
-- @param {number} interval - The time in milliseconds between batch emissions.
-- @param {number} [size] - Optional. The maximum size of each batch. If specified, triggers a batch emission
+- @param `{number}` interval - The time in milliseconds between batch emissions.
+- @param `{number}` [size] - Optional. The maximum size of each batch. If specified, triggers a batch emission
   once the batch reaches this size, regardless of the interval.
-- @returns {Event<T[], R>} An event of the batched results.
+- @returns `{Event<T[], R>}` An event of the batched results.
 
 ```typescript
 // Batch messages for bulk processing every 1 second or when 10 messages are collected
@@ -483,7 +483,7 @@ batchedMessageEvent.on((messages) => console.log('Batched Messages:', messages))
 Creates a queue from the event, where each emitted value is sequentially processed. The returned object allows popping elements
 from the queue, ensuring that elements are handled one at a time. This method is ideal for scenarios where order and sequential processing are critical.
 
-- @returns {Queue<T>} An object representing the queue. The 'pop' method retrieves the next element from the queue, while 'stop' halts further processing.
+- @returns `{Queue<T>}` An object representing the queue. The 'pop' method retrieves the next element from the queue, while 'stop' halts further processing.
 
 ```typescript
 // Queueing tasks for sequential execution
@@ -505,8 +505,8 @@ and results of the merged event are derived from the input events, providing a f
 handle multiple sources of events in a unified manner.
 
 - @template Events - An array of `Event` instances.
-- @param {...Events} events - A rest parameter that takes multiple events to be merged.
-- @returns {Event<AllEventsParameters<Events>, AllEventsResults<Events>>} - Returns a new `Event` instance
+- @param `{...Events}` events - A rest parameter that takes multiple events to be merged.
+- @returns `{Event<AllEventsParameters<Events>, AllEventsResults<Events>>}` - Returns a new `Event` instance
   that triggers with the parameters and results of any of the merged input events.
 
 ```typescript
@@ -525,8 +525,8 @@ for creating time-based triggers within an application, such as updating UI elem
 or any other timed operation.
 
 - @template R - The return type of the event handler function, defaulting to `void`.
-- @param {number} interval - The interval in milliseconds at which the event should trigger.
-- @returns {Event<number, R>} - An `Event` instance that triggers at the specified interval,
+- @param `{number}` interval - The interval in milliseconds at which the event should trigger.
+- @returns `{Event<number, R>}` - An `Event` instance that triggers at the specified interval,
   emitting an incrementing counter value.
 
 ```typescript
@@ -542,7 +542,7 @@ This factory function simplifies the creation of events by encapsulating the ins
 
 - @typeParam T - The tuple of argument types that the event will accept.
 - @typeParam R - The return type of the event handler function, which is emitted after processing the event data.
-- @returns {Event<T, R>} - A new instance of the `Event` class, ready to have listeners added to it.
+- @returns `{Event<T, R>}` - A new instance of the `Event` class, ready to have listeners added to it.
 
 ```typescript
 // Create a new event that accepts a string and returns the string length
