@@ -2,6 +2,8 @@
 
 0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
 
+![Evnty][logo]
+
 [![Coverage Status][codecov-image]][codecov-url]
 [![Github Build Status][github-image]][github-url]
 [![NPM version][npm-image]][npm-url]
@@ -625,6 +627,7 @@ const messagesBatchEvent = messageEvent.batch(100);
 License [MIT](./LICENSE)
 Copyright (c) 2024 Ivan Zakharchanka
 
+[logo]: ./logo-64.png
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200
 [npm-image]: https://img.shields.io/npm/v/evnty.svg?maxAge=43200
