@@ -2,13 +2,20 @@
 
 0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
 
-![Evnty][logo]
+<div align="center">
+  <a href="https://github.com/3axap4ehko/evnty">
+    <img width="200" height="200" src="./logo.svg">
+  </a>
+  <br>
+  <br>
 
 [![Coverage Status][codecov-image]][codecov-url]
 [![Github Build Status][github-image]][github-url]
 [![NPM version][npm-image]][npm-url]
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
+
+</div>
 
 ## Table of Contents
 
