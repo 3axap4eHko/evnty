@@ -81,6 +81,7 @@ export const setTimeoutAsync = (timeout: number, signal?: AbortSignal) =>
  * @internal
  */
 export abstract class Callable extends Function {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   constructor(func: Function) {
     super();
     return Object.setPrototypeOf(func, new.target.prototype);
