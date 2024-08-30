@@ -666,4 +666,23 @@ describe('Anonymous Event test suite', () => {
     await queue.stop();
     expect(event.size).toEqual(0);
   });
+
+  it('Should iterate queue', async () => {
+    const event = new Event<string, number | string>();
+    const queue = event.queue();
+    await event('test1');
+    await event('test2');
+    process.nextTick(async () => {
+      await event('test3');
+      process.nextTick(() => queue.stop());
+    });
+    const handler = jest.fn();
+    for await (const value of queue) {
+      handler(value);
+    }
+    expect(handler).toHaveBeenCalledWith('test1');
+    expect(handler).toHaveBeenCalledWith('test2');
+    expect(handler).toHaveBeenCalledWith('test3');
+    expect(event.size).toEqual(0);
+  });
 });

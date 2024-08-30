@@ -123,9 +123,10 @@ export class Unsubscribe extends Callable {
   }
 }
 
-export interface Queue<T> {
+export interface Queue<T> extends AsyncIterable<T> {
   pop(): MaybePromise<T>;
   stop(): MaybePromise<void>;
+  stopped: boolean;
 }
 
 export interface Event<T = any, R = any> {
@@ -777,21 +778,37 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   queue(): Queue<T> {
     const queue: T[] = [];
+    let done = false;
     const valueEvent = new Event<void>();
     const unsubscribe = this.on(async (value) => {
       queue.push(value);
       await valueEvent();
     });
 
+    const pop = async () => {
+      if (!queue.length) {
+        await valueEvent;
+      }
+      return queue.shift()!;
+    };
+    const stop = async () => {
+      await unsubscribe();
+      done = true;
+      await valueEvent();
+    };
+
     return {
-      async pop() {
-        if (!queue.length) {
-          await valueEvent;
-        }
-        return queue.shift()!;
+      pop,
+      stop,
+      get stopped() {
+        return done;
       },
-      async stop() {
-        await unsubscribe();
+      [Symbol.asyncIterator]() {
+        return {
+          next: async () => {
+            return { value: await pop(), done };
+          },
+        };
       },
     };
   }
@@ -847,7 +864,7 @@ export const merge = <Events extends Event<any, any>[]>(...events: Events): Even
  * tickEvent.on(tickNumber => console.log('Tick:', tickNumber));
  * ```
  */
-export const createInterval = <R = void>(interval: number): Event<number, R> => {
+export const createInterval = <R = unknown>(interval: number): Event<number, R> => {
   let counter = 0;
   const intervalEvent = new Event<number, R>(() => clearInterval(timerId));
   const timerId: ReturnType<typeof setInterval> = setInterval(() => intervalEvent(counter++), interval);
