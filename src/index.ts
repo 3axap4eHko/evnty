@@ -49,7 +49,7 @@ export interface Expander<T, R> {
  * console.log(wasRemoved); // Output: true
  * ```
  */
-export const removeListener = <T, R>(listeners: Listener<T, R>[], listener: Listener<T, R>): boolean => {
+export const removeListener = (listeners: unknown[], listener: unknown): boolean => {
   let index = listeners.indexOf(listener);
   const wasRemoved = index !== -1;
   while (~index) {
@@ -96,8 +96,17 @@ export interface Unsubscribe {
  * @internal
  */
 export class Unsubscribe extends Callable {
+  private _done = false;
+
   constructor(callback: Callback) {
-    super(callback);
+    super(() => {
+      this._done = true;
+      callback();
+    });
+  }
+
+  get done() {
+    return this._done;
   }
 
   pre(callback: Callback): Unsubscribe {
@@ -123,14 +132,13 @@ export class Unsubscribe extends Callable {
   }
 }
 
-export interface Queue<T> extends AsyncIterable<T> {
-  pop(): MaybePromise<T>;
-  stop(): MaybePromise<void>;
-  stopped: boolean;
-}
-
 export interface Event<T = any, R = any> {
   (event: T): Promise<(void | Awaited<R>)[]>;
+}
+
+enum SpyType {
+  Add,
+  Remove,
 }
 
 /**
@@ -145,7 +153,9 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   private listeners: Listener<T, R>[];
 
-  private spies: Array<(listener: Listener<T, R> | void) => void> = [];
+  private spies: Array<(listener: Listener<T, R> | void, type: SpyType) => void> = [];
+
+  private _disposed = false;
 
   /**
    * A function that disposes of the event and its listeners.
@@ -170,6 +180,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
     this.listeners = listeners;
 
     this.dispose = async () => {
+      this._disposed = true;
       void this.clear();
       await this._error?.dispose();
       await dispose?.();
@@ -195,6 +206,14 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   get size(): number {
     return this.listeners.length;
+  }
+
+  /**
+   * Checks if the event has been disposed.
+   * @returns {boolean} `true` if the event has been disposed; otherwise, `false`.
+   */
+  get disposed(): boolean {
+    return this._disposed;
   }
 
   /**
@@ -244,7 +263,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   off(listener: Listener<T, R>): this {
     if (removeListener(this.listeners, listener) && this.spies.length) {
-      [...this.spies].forEach((spy) => spy(listener));
+      [...this.spies].forEach((spy) => spy(listener, SpyType.Remove));
     }
     return this;
   }
@@ -265,6 +284,9 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   on(listener: Listener<T, R>): Unsubscribe {
     this.listeners.push(listener);
+    if (this.spies.length) {
+      [...this.spies].forEach((spy) => spy(listener, SpyType.Add));
+    }
     return new Unsubscribe(() => {
       void this.off(listener);
     });
@@ -307,7 +329,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
   clear(): this {
     this.listeners.splice(0);
     if (this.spies.length) {
-      [...this.spies].forEach((spy) => spy());
+      [...this.spies].forEach((spy) => spy(undefined, SpyType.Remove));
     }
     return this;
   }
@@ -375,8 +397,8 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
       await doneEvent.dispose();
     });
 
-    const spy: (typeof this.spies)[number] = (target = emitEvent) => {
-      if (target === emitEvent) {
+    const spy: (typeof this.spies)[number] = (target = emitEvent, action) => {
+      if (target === emitEvent && action === SpyType.Remove) {
         void doneEvent(true);
         void unsubscribe();
       }
@@ -436,8 +458,8 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
       removeListener(this.spies, spy);
     });
 
-    const spy: (typeof this.spies)[number] = (target = emitEvent) => {
-      if (target === emitEvent) {
+    const spy: (typeof this.spies)[number] = (target = emitEvent, action) => {
+      if (target === emitEvent && action === SpyType.Remove) {
         void unsubscribe();
       }
     };
@@ -770,16 +792,32 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    * const taskQueue = taskEvent.queue();
    * (async () => {
    *   console.log('Processing:', await taskQueue.pop()); // Processing: Task 1
-   *   console.log('Processing:', await taskQueue.pop()); // Processing: Task 2
+   *   // Queue also can be used as a Promise
+   *   console.log('Processing:', await taskQueue); // Processing: Task 2
+   * })();
+   * await taskEvent('Task 1');
+   * await taskEvent('Task 2');
+   *```
+   *
+   *```typescript
+   * // Additionally, the queue can be used as an async iterator
+   * const taskEvent = new Event<string>();
+   * const taskQueue = taskEvent.queue();
+   * (async () => {
+   *   for await (const task of taskQueue) {
+   *     console.log('Processing:', task);
+   *   }
    * })();
    * await taskEvent('Task 1');
    * await taskEvent('Task 2');
    * ```
+   *
    */
   queue(): Queue<T> {
     const queue: T[] = [];
     let done = false;
     const valueEvent = new Event<void>();
+
     const unsubscribe = this.on(async (value) => {
       queue.push(value);
       await valueEvent();
@@ -803,6 +841,12 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
       get stopped() {
         return done;
       },
+      then<TResult1 = T, TResult2 = never>(
+        onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
+        onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
+      ): Promise<TResult1 | TResult2> {
+        return this.pop().then(onfulfilled, onrejected);
+      },
       [Symbol.asyncIterator]() {
         return {
           next: async () => {
@@ -812,6 +856,12 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
       },
     };
   }
+}
+
+export interface Queue<T> extends AsyncIterable<T>, PromiseLike<T> {
+  pop(): Promise<T>;
+  stop(): Promise<void>;
+  stopped: boolean;
 }
 
 export type EventParameters<T> = T extends Event<infer P, any> ? P : never;

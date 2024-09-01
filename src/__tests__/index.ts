@@ -1,5 +1,4 @@
-import { setTimeout as setTimeoutAsync } from 'node:timers/promises';
-import createEvent, { merge, createInterval, Event, Unsubscribe, Callable, EventHandler, FilterFunction, Predicate } from '../index';
+import createEvent, { merge, createInterval, Event, Unsubscribe, Callable, EventHandler, FilterFunction, Predicate, setTimeoutAsync } from '../index';
 
 const processTick = () => new Promise(resolve => process.nextTick(resolve));
 
@@ -8,11 +7,39 @@ describe('Anonymous Event test suite', () => {
     expect(Callable.prototype).toBeInstanceOf(Function);
   });
 
-  test('Dismiss extends from FunctionExt', () => {
+  test('setTimeoutAsync resolves to true on completion', async () => {
+    const abort = new AbortController();
+    const timeout = setTimeoutAsync(0, abort.signal);
+    expect(timeout).toBeInstanceOf(Promise);
+    await expect(timeout).resolves.toEqual(true);
+  });
+
+  test('setTimeoutAsync resolves to true on abort', async () => {
+    const abort = new AbortController();
+    const timeout = setTimeoutAsync(0, abort.signal);
+    abort.abort();
+    await expect(timeout).resolves.toEqual(false);
+  });
+
+  test('Dismiss extends from Callable', () => {
     expect(Unsubscribe.prototype).toBeInstanceOf(Callable);
   });
 
-  test('Event extends from FunctionExt', () => {
+  test('Unsubscribe instantiable', () => {
+    expect(() => new Unsubscribe(() => {})).not.toThrow();
+  });
+
+  test('Unsubscribe extends from FunctionExt', () => {
+    const callback = jest.fn();
+    const unsubscribe = new Unsubscribe(callback);
+    expect(unsubscribe.done).toEqual(false);
+
+    unsubscribe();
+    expect(callback).toHaveBeenCalled();
+    expect(unsubscribe.done).toEqual(true);
+  });
+
+  test('Event extends from Callable', () => {
     expect(Event.prototype).toBeInstanceOf(Callable);
   });
 
@@ -50,8 +77,11 @@ describe('Anonymous Event test suite', () => {
     const errorListener = jest.fn();
     event.error.on(errorListener);
     expect(event.error.size).toEqual(1);
+    expect(event.disposed).toEqual(false);
     event.dispose();
     expect(event.error.size).toEqual(0);
+    event.disposed;
+    expect(event.disposed).toEqual(true);
   });
 
   it('Should check event existence', () => {
@@ -82,7 +112,9 @@ describe('Anonymous Event test suite', () => {
     event.off(listener);
     await event('test');
     expect(listener).not.toHaveBeenCalled();
-    expect(spy).toHaveBeenCalledWith(listener);
+    expect(spy).toHaveBeenNthCalledWith(1, listener, 0);
+    expect(spy).toHaveBeenNthCalledWith(2, listener, 1);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it('Should remove all existing event listeners', async () => {
@@ -95,7 +127,10 @@ describe('Anonymous Event test suite', () => {
     event.off(listener);
     await event('test');
     expect(listener).not.toHaveBeenCalled();
-    expect(spy).toHaveBeenCalledWith(listener);
+    expect(spy).toHaveBeenNthCalledWith(1, listener, 0);
+    expect(spy).toHaveBeenNthCalledWith(2, listener, 0);
+    expect(spy).toHaveBeenNthCalledWith(3, listener, 1);
+    expect(spy).toHaveBeenCalledTimes(3);
   });
 
   it('Should not remove other event listeners', async () => {
@@ -657,14 +692,16 @@ describe('Anonymous Event test suite', () => {
   it('Should queue events', async () => {
     const event = new Event<string, number | string>();
     const queue = event.queue();
+    expect(queue.stopped).toEqual(false);
     await event('test1');
     await event('test2');
-    await expect(queue.pop()).resolves.toEqual('test1');
-    await expect(queue.pop()).resolves.toEqual('test2');
+    await expect(queue).resolves.toEqual('test1');
+    await expect(queue).resolves.toEqual('test2');
     process.nextTick(event, 'test3');
-    await expect(queue.pop()).resolves.toEqual('test3');
+    await expect(queue).resolves.toEqual('test3');
     await queue.stop();
     expect(event.size).toEqual(0);
+    expect(queue.stopped).toEqual(true);
   });
 
   it('Should iterate queue', async () => {

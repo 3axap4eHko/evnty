@@ -512,6 +512,18 @@ npm install evnty
  await taskEvent('Task 2');
  ```
 
+ ```typescript
+ // Additionally, the queue can be used as an async iterator
+ const taskEvent = new Event<string>();
+ const taskQueue = taskEvent.queue();
+ (async () => {
+   for await (const task of taskQueue) {
+     console.log('Processing:', task);
+   }
+ })();
+ await taskEvent('Task 1');
+ await taskEvent('Task 2');
+ ```
 ### `merge(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>>`
 
  Merges multiple events into a single event. This function takes any number of `Event` instances
