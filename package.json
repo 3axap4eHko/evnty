@@ -64,11 +64,11 @@
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.13",
     "@types/node": "^22.7.4",
-    "@typescript-eslint/eslint-plugin": "^8.7.0",
-    "@typescript-eslint/parser": "^8.7.0",
-    "@typescript-eslint/typescript-estree": "^8.7.0",
-    "@vuepress/bundler-vite": "2.0.0-rc.16",
-    "@vuepress/theme-default": "2.0.0-rc.49",
+    "@typescript-eslint/eslint-plugin": "^8.8.0",
+    "@typescript-eslint/parser": "^8.8.0",
+    "@typescript-eslint/typescript-estree": "^8.8.0",
+    "@vuepress/bundler-vite": "2.0.0-rc.17",
+    "@vuepress/theme-default": "2.0.0-rc.52",
     "eslint": "^9.11.1",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
@@ -82,7 +82,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2",
     "vue": "^3.5.10",
-    "vuepress": "2.0.0-rc.16"
+    "vuepress": "2.0.0-rc.17"
   },
   "packageManager": "pnpm@9.11.0"
 }
