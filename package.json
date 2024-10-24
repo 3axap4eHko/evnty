@@ -62,8 +62,8 @@
   "homepage": "https://github.com/3axap4eHko/evnty#readme",
   "devDependencies": {
     "@swc/jest": "^0.2.36",
-    "@types/jest": "^29.5.13",
-    "@types/node": "^22.7.8",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.7.9",
     "@typescript-eslint/eslint-plugin": "^8.11.0",
     "@typescript-eslint/parser": "^8.11.0",
     "@typescript-eslint/typescript-estree": "^8.11.0",
