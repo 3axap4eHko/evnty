@@ -63,10 +63,10 @@
   "devDependencies": {
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.8.1",
-    "@typescript-eslint/eslint-plugin": "^8.11.0",
-    "@typescript-eslint/parser": "^8.11.0",
-    "@typescript-eslint/typescript-estree": "^8.11.0",
+    "@types/node": "^22.8.2",
+    "@typescript-eslint/eslint-plugin": "^8.12.1",
+    "@typescript-eslint/parser": "^8.12.1",
+    "@typescript-eslint/typescript-estree": "^8.12.1",
     "@vuepress/bundler-vite": "2.0.0-rc.18",
     "@vuepress/theme-default": "2.0.0-rc.58",
     "eslint": "^9.13.0",
@@ -84,5 +84,5 @@
     "vue": "^3.5.12",
     "vuepress": "2.0.0-rc.18"
   },
-  "packageManager": "pnpm@9.12.2"
+  "packageManager": "pnpm@9.12.3"
 }
