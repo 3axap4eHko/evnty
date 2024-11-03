@@ -34,7 +34,8 @@
   - [`on(listener: Listener<T, R>): Unsubscribe`](#onlistener-listenert-r-unsubscribe)
   - [`once(listener: Listener<T, R>): Unsubscribe`](#oncelistener-listenert-r-unsubscribe)
   - [`clear(): this`](#clear-this)
-  - [`then(onfulfilled, onrejected): Promise<TResult1 | TResult2>`](#thenonfulfilled-onrejected-promisetresult1--tresult2)
+  - [`then(onfulfilled, onrejected): Promise`](#thenonfulfilled-onrejected-promise)
+  - [`settle(): Promise`](#settle-promise)
   - [`promise(): Promise<T>`](#promise-promiset)
   - [`Symbol.asyncIterator(): AsyncIterator<T>`](#symbolasynciterator-asynciteratort)
   - [`pipe(generator): Event<PT, R>`](#pipegenerator-eventpt-r)
@@ -227,12 +228,12 @@ npm install evnty
  myEvent.clear(); // Clears all listeners
  ```
 
-#### `then(onfulfilled, onrejected): Promise<TResult1 | TResult2>`
+#### `then(onfulfilled, onrejected): Promise`
 
  Enables the `Event` to be used in a Promise chain, resolving with the first emitted value.
 
-- @template TResult1 - The type of the fulfilled value returned by `onfulfilled` (defaults to the event's type).
-- @template TResult2 - The type of the rejected value returned by `onrejected` (defaults to `never`).
+- @template OK - The type of the fulfilled value returned by `onfulfilled` (defaults to the event's type).
+- @template ERR - The type of the rejected value returned by `onrejected` (defaults to `never`).
 - @param onfulfilled - A function called when the event emits its first value.
 - @param onrejected - A function called if an error occurs before the event emits.
 - @returns A Promise that resolves with the result of `onfulfilled` or `onrejected`.
@@ -242,7 +243,23 @@ npm install evnty
  await clickEvent;
  ```
 
-#### `promise(): Promise<T>`
+#### `settle(): Promise`
+
+ Waits for the event to settle, returning a `PromiseSettledResult`.
+
+- @returns `{Promise<PromiseSettledResult<T>>}` A promise that resolves with the settled result.
+
+- @example
+ ```typescript
+ const result = await event.settle();
+ if (result.status === 'fulfilled') {
+   console.log('Event fulfilled with value:', result.value);
+ } else {
+   console.error('Event rejected with reason:', result.reason);
+ }
+ ```
+
+#### `promise(): Promise`
 
  A promise that resolves with the first emitted value from this event.
 
@@ -327,10 +344,6 @@ npm install evnty
  enterPressedEvent.on(() => console.log('Enter key was pressed.'));
  ```
 
-
-
-
-
 #### `first(predicate: Predicate<T, P>): Event<P, R>`
 #### `first(filter: FilterFunction<T>): Event<P, R>`
 #### `first(filter: Filter<T, P>): Event<P, R>`
@@ -346,10 +359,6 @@ npm install evnty
  const sizeReachedEvent = sizeChangeEvent.first(size => size > 1024);
  sizeReachedEvent.on(() => console.log('Size threshold exceeded.'));
  ```
-
-
-
-
 
 #### `map(mapper: Mapper<T, M>): Event<Awaited<M>, MR>`
 
@@ -581,7 +590,7 @@ npm install evnty
 ## Examples
 
 ```js
-import createEvent, { Event } from 'evnty';
+import { createEvent, Event } from 'evnty';
 
 // Creates a click event
 type Click = { button: string };

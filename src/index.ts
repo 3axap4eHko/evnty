@@ -61,11 +61,22 @@ export const removeListener = (listeners: unknown[], listener: unknown): boolean
 
 /**
  * @internal
- * @param timeout
- * @param signal
- * @returns
+ * Creates a promise that resolves after a specified timeout. If an `AbortSignal` is provided and triggered,
+ * the timeout is cleared, and the promise resolves to `false`.
+ *
+ * @param {number} timeout - The time in milliseconds to wait before resolving the promise.
+ * @param {AbortSignal} [signal] - An optional `AbortSignal` that can abort the timeout.
+ * @returns {Promise<boolean>} A promise that resolves to `true` if the timeout completed, or `false` if it was aborted.
+ *
+ * @example
+ * ```typescript
+ * const controller = new AbortController();
+ * setTimeout(() => controller.abort(), 500);
+ * const result = await setTimeoutAsync(1000, controller.signal);
+ * console.log(result); // false
+ * ```
  */
-export const setTimeoutAsync = (timeout: number, signal?: AbortSignal) =>
+export const setTimeoutAsync = (timeout: number, signal?: AbortSignal): Promise<boolean> =>
   new Promise<boolean>((resolve) => {
     const timerId = setTimeout(resolve, timeout, true);
     signal?.addEventListener('abort', () => {
@@ -99,9 +110,9 @@ export class Unsubscribe extends Callable {
   private _done = false;
 
   constructor(callback: Callback) {
-    super(() => {
+    super(async () => {
       this._done = true;
-      callback();
+      await callback();
     });
   }
 
@@ -176,7 +187,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
   constructor(dispose?: Callback) {
     const listeners: Listener<T, R>[] = [];
     // passes listeners exceptions to catch method
-    super(async (value: T): Promise<(void | Awaited<R>)[]> => Promise.all(listeners.map(async (listener) => listener(await value))));
+    super((value: T): Promise<(void | Awaited<R>)[]> => Promise.all(listeners.map(async (listener) => listener(await value))));
     this.listeners = listeners;
 
     this.dispose = async () => {
@@ -337,8 +348,8 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
   /**
    * Enables the `Event` to be used in a Promise chain, resolving with the first emitted value.
    *
-   * @template TResult1 - The type of the fulfilled value returned by `onfulfilled` (defaults to the event's type).
-   * @template TResult2 - The type of the rejected value returned by `onrejected` (defaults to `never`).
+   * @template OK - The type of the fulfilled value returned by `onfulfilled` (defaults to the event's type).
+   * @template ERR - The type of the rejected value returned by `onrejected` (defaults to `never`).
    * @param onfulfilled - A function called when the event emits its first value.
    * @param onrejected - A function called if an error occurs before the event emits.
    * @returns A Promise that resolves with the result of `onfulfilled` or `onrejected`.
@@ -348,13 +359,38 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    * await clickEvent;
    * ```
    */
-  then<TResult1 = T, TResult2 = never>(
-    onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
-  ): Promise<TResult1 | TResult2> {
-    const promise = new Promise<T>((resolve) => this.once(resolve));
+  then<OK = T, ERR = never>(
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null | undefined,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null | undefined,
+  ): Promise<OK | ERR> {
+    const unsubscribe: Unsubscribe[] = [];
+    const promise = new Promise<T>((resolve, reject) => {
+      unsubscribe.push(this.once(resolve));
+      unsubscribe.push(this.error.once(reject));
+    });
 
-    return promise.then(onfulfilled, onrejected);
+    return promise.then(onfulfilled, onrejected).finally(async () => {
+      await Promise.all(unsubscribe.map((u) => u()));
+    });
+  }
+
+  /**
+   * Waits for the event to settle, returning a `PromiseSettledResult`.
+   *
+   * @returns {Promise<PromiseSettledResult<T>>} A promise that resolves with the settled result.
+   *
+   * @example
+   * ```typescript
+   * const result = await event.settle();
+   * if (result.status === 'fulfilled') {
+   *   console.log('Event fulfilled with value:', result.value);
+   * } else {
+   *   console.error('Event rejected with reason:', result.reason);
+   * }
+   * ```
+   */
+  async settle(): Promise<PromiseSettledResult<T>> {
+    return await Promise.allSettled([this.promise]).then(([settled]) => settled);
   }
 
   /**
@@ -363,7 +399,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    * @returns {Promise<T>} The promise value.
    */
   get promise(): Promise<T> {
-    return this.then((v) => v);
+    return this.then();
   }
 
   /**
@@ -447,7 +483,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
     const emitEvent = async (value: T) => {
       try {
         for await (const generatedValue of generator(value)) {
-          await result(generatedValue).catch((e) => result.error(e));
+          await result(generatedValue).catch(result.error);
         }
       } catch (e) {
         await result.error(e);
@@ -633,13 +669,12 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
 
   /**
    * Creates a new event that emits values based on a conductor event. The orchestrated event will emit the last value
-   * captured from the original event each time the conductor event is triggered. This method is useful for synchronizing
-   * events, where the emission of one event controls the timing of another.
+   * captured from the original event each time the conductor event is triggered.
    *
    * @template T The type of data emitted by the original event.
    * @template R The type of data emitted by the orchestrated event, usually the same as `T`.
-   * @param {Event<unknown, unknown>} conductor An event that signals when the orchestrated event should emit.
-   * @returns {Event<T, R>} An orchestrated event that emits values based on the conductor's trigger.
+   * @param {Event<unknown, unknown>} conductor The event that triggers the emission of the last captured value.
+   * @returns {Event<T, R>} A new event that emits values based on the conductor's triggers.
    *
    * ```typescript
    * const rightClickPositionEvent = mouseMoveEvent.orchestrate(mouseRightClickEvent);
@@ -656,7 +691,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    * await tickEvent(); // Logs: "Data on tick: World!"
    * ```
    */
-  orchestrate(conductor: Event<any, any>): Event<T, R> {
+  orchestrate<CT, CR>(conductor: Event<CT, CR>): Event<T, R> {
     let initialized = false;
     let lastValue: T;
     const unsubscribe = this.on(async (event) => {

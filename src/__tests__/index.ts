@@ -1,4 +1,4 @@
-import createEvent, { merge, createInterval, Event, Unsubscribe, Callable, EventHandler, FilterFunction, Predicate, setTimeoutAsync } from '../index';
+import createEventDefault, { createEvent, merge, createInterval, Event, Unsubscribe, Callable, EventHandler, FilterFunction, Predicate, setTimeoutAsync, removeListener } from '../index';
 
 const processTick = () => new Promise(resolve => process.nextTick(resolve));
 
@@ -21,6 +21,13 @@ describe('Anonymous Event test suite', () => {
     await expect(timeout).resolves.toEqual(false);
   });
 
+  test('removeListener remove all listeners', () => {
+    const listener = jest.fn();
+    const listeners = [listener, listener, jest.fn()];
+    expect(removeListener(listeners, listener)).toEqual(true);
+    expect(listeners.length).toEqual(1);
+  });
+
   test('Dismiss extends from Callable', () => {
     expect(Unsubscribe.prototype).toBeInstanceOf(Callable);
   });
@@ -41,6 +48,10 @@ describe('Anonymous Event test suite', () => {
 
   test('Event extends from Callable', () => {
     expect(Event.prototype).toBeInstanceOf(Callable);
+  });
+
+  it('Should export default', () => {
+    expect(createEventDefault).toEqual(createEvent);
   });
 
   it('Should be instantiable', () => {
@@ -172,16 +183,48 @@ describe('Anonymous Event test suite', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('Should reject event promise on error', async () => {
+    const event = new Event();
+    process.nextTick(event.error, new Error('error'));
+    await expect(event.promise).rejects.toThrow('error');
+  });
+
   it('Should return event promise', async () => {
     const listener = jest.fn();
     const event = new Event();
     event.on(listener);
     expect(listener).not.toHaveBeenCalled();
-    const promise = event.promise;
+    const { promise } = event;
     await event('test');
     const result = await promise;
     expect(result).toEqual('test');
     expect(listener).toHaveBeenCalledWith('test');
+  });
+
+  it('Should return event promise', async () => {
+    const listener = jest.fn(() => { throw new Error('error'); });
+    const event = new Event();
+    event.on(listener);
+    expect(listener).not.toHaveBeenCalled();
+    const promise = event.promise;
+    await expect(event('test')).rejects.toThrow('error');
+    const result = await promise;
+    expect(result).toEqual('test');
+    expect(listener).toHaveBeenCalledWith('test');
+  });
+
+  it('Should settle an error event', async () => {
+    const event = new Event();
+    process.nextTick(event.error, new Error('error'));
+    const settled = await event.settle();
+    expect(settled).toEqual({ reason: new Error('error'), status: 'rejected' });
+  });
+
+  it('Should settle a success event', async () => {
+    const event = new Event();
+    process.nextTick(event, 'test');
+    const settled = await event.settle();
+    expect(settled).toEqual({ value: 'test', status: 'fulfilled' });
   });
 
   it('Should work as a promise', async () => {

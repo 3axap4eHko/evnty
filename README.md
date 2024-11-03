@@ -79,7 +79,7 @@ npm install evnty
 ## Examples
 
 ```js
-import createEvent, { Event } from 'evnty';
+import { createEvent, Event } from 'evnty';
 
 // Creates a click event
 type Click = { button: string };
