@@ -2,6 +2,8 @@ import createEventDefault, { createEvent, merge, createInterval, Event, Unsubscr
 
 const processTick = () => new Promise(resolve => process.nextTick(resolve));
 
+const HOOKS = "hooks";
+
 describe('Anonymous Event test suite', () => {
   test('FunctionExt extends from Function', () => {
     expect(Callable.prototype).toBeInstanceOf(Function);
@@ -28,7 +30,7 @@ describe('Anonymous Event test suite', () => {
     expect(listeners.length).toEqual(1);
   });
 
-  test('Dismiss extends from Callable', () => {
+  test('Unsubscribe extends from Callable', () => {
     expect(Unsubscribe.prototype).toBeInstanceOf(Callable);
   });
 
@@ -45,6 +47,7 @@ describe('Anonymous Event test suite', () => {
     expect(callback).toHaveBeenCalled();
     expect(unsubscribe.done).toEqual(true);
   });
+
 
   test('Event extends from Callable', () => {
     expect(Event.prototype).toBeInstanceOf(Callable);
@@ -116,7 +119,7 @@ describe('Anonymous Event test suite', () => {
   it('Should remove existing event listener', async () => {
     const event = new Event();
     const spy = jest.fn();
-    event["spies"].push(spy);
+    event[HOOKS].push(spy);
 
     const listener = jest.fn();
     event.on(listener);
@@ -131,7 +134,7 @@ describe('Anonymous Event test suite', () => {
   it('Should remove all existing event listeners', async () => {
     const event = new Event();
     const spy = jest.fn();
-    event["spies"].push(spy);
+    event[HOOKS].push(spy);
     const listener = jest.fn();
     event.on(listener);
     event.on(listener);

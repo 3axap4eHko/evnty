@@ -1,12 +1,12 @@
+export interface Fn<A extends unknown[], R> {
+  (...args: A): R;
+}
+
 export type MaybePromise<T> = Promise<T> | PromiseLike<T> | T;
 
-export interface Callback<R = void> {
-  (): MaybePromise<R>;
-}
+export interface Callback<R = void> extends Fn<[], MaybePromise<R>> {}
 
-export interface Listener<T, R = unknown> {
-  (event: T): MaybePromise<R | void>;
-}
+export interface Listener<T, R = unknown> extends Fn<[T], MaybePromise<R | void>> {}
 
 export interface FilterFunction<T> {
   (event: T): MaybePromise<boolean>;
@@ -35,8 +35,8 @@ export interface Expander<T, R> {
  * This method ensures that the listener is fully unregistered, preventing any residual calls to a potentially deprecated handler.
  *
  * @internal
- * @param {Listener<T, R>[]} listeners - The array of listeners from which to remove the listener.
- * @param {Listener<T, R>} listener - The listener function to remove from the list of listeners.
+ * @param {unknown[]} listeners - The array of listeners from which to remove the listener.
+ * @param {unknown} listener - The listener function to remove from the list of listeners.
  * @returns {boolean} - Returns `true` if the listener was found and removed, `false` otherwise.
  *
  * @template T - The type of the event that listeners are associated with.
@@ -86,12 +86,20 @@ export const setTimeoutAsync = (timeout: number, signal?: AbortSignal): Promise<
   });
 
 /**
+ * @internal
+ */
+export interface Callable<T extends unknown[], R> {
+  (...args: T): R;
+}
+
+/**
  * An abstract class that extends the built-in Function class. It allows instances of the class
  * to be called as functions. When an instance of Callable is called as a function, it will
  * call the function passed to its constructor with the same arguments.
  * @internal
  */
-export abstract class Callable extends Function {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export abstract class Callable<T, R> extends Function {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   constructor(func: Function) {
     super();
@@ -99,14 +107,10 @@ export abstract class Callable extends Function {
   }
 }
 
-export interface Unsubscribe {
-  (): MaybePromise<void>;
-}
-
 /**
  * @internal
  */
-export class Unsubscribe extends Callable {
+export class Unsubscribe extends Callable<[], MaybePromise<void>> {
   private _done = false;
 
   constructor(callback: Callback) {
@@ -143,11 +147,7 @@ export class Unsubscribe extends Callable {
   }
 }
 
-export interface Event<T = any, R = any> {
-  (event: T): Promise<(void | Awaited<R>)[]>;
-}
-
-enum SpyType {
+enum HookType {
   Add,
   Remove,
 }
@@ -158,13 +158,13 @@ enum SpyType {
  * @template T - The event type.
  * @template R - The return type of the event.
  */
-export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLike<T> {
+export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void | Awaited<R>)[]>> implements AsyncIterable<T>, PromiseLike<T> {
   /**
    * The array of listeners for the event.
    */
   private listeners: Listener<T, R>[];
 
-  private spies: Array<(listener: Listener<T, R> | void, type: SpyType) => void> = [];
+  private hooks: Array<(listener: Listener<T, R> | void, type: HookType) => void> = [];
 
   private _disposed = false;
 
@@ -188,13 +188,14 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
     const listeners: Listener<T, R>[] = [];
     // passes listeners exceptions to catch method
     super((value: T): Promise<(void | Awaited<R>)[]> => Promise.all(listeners.map(async (listener) => listener(await value))));
+
     this.listeners = listeners;
 
-    this.dispose = async () => {
+    this.dispose = () => {
       this._disposed = true;
       void this.clear();
-      await this._error?.dispose();
-      await dispose?.();
+      void this._error?.dispose();
+      void dispose?.();
     };
   }
 
@@ -273,8 +274,8 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    * ```
    */
   off(listener: Listener<T, R>): this {
-    if (removeListener(this.listeners, listener) && this.spies.length) {
-      [...this.spies].forEach((spy) => spy(listener, SpyType.Remove));
+    if (removeListener(this.listeners, listener) && this.hooks.length) {
+      [...this.hooks].forEach((spy) => spy(listener, HookType.Remove));
     }
     return this;
   }
@@ -295,8 +296,8 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   on(listener: Listener<T, R>): Unsubscribe {
     this.listeners.push(listener);
-    if (this.spies.length) {
-      [...this.spies].forEach((spy) => spy(listener, SpyType.Add));
+    if (this.hooks.length) {
+      [...this.hooks].forEach((spy) => spy(listener, HookType.Add));
     }
     return new Unsubscribe(() => {
       void this.off(listener);
@@ -327,7 +328,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
 
   /**
    * Removes all listeners from the event, effectively resetting it. This is useful when you need to
-   * cleanly dispose of all event handlers to prevent memory leaks or unwanted triggerings after certain conditions.
+   * cleanly dispose of all event handlers to prevent memory leaks or unwanted triggers after certain conditions.
    *
    * @returns {this} The instance of the event, allowing for method chaining.
    *
@@ -339,8 +340,8 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   clear(): this {
     this.listeners.splice(0);
-    if (this.spies.length) {
-      [...this.spies].forEach((spy) => spy(undefined, SpyType.Remove));
+    if (this.hooks.length) {
+      [...this.hooks].forEach((spy) => spy(undefined, HookType.Remove));
     }
     return this;
   }
@@ -422,38 +423,38 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
    */
   [Symbol.asyncIterator](): AsyncIterator<T> {
     const queue: T[] = [];
-    const doneEvent = new Event<boolean>();
+    const hasNextEvent = new Event<boolean>();
     const emitEvent = async (value: T) => {
       queue.push(value);
-      await doneEvent(false);
+      await hasNextEvent(true);
     };
     const unsubscribe = this.on(emitEvent).pre(async () => {
-      removeListener(this.spies, spy);
+      await hasNextEvent.dispose();
+      removeListener(this.hooks, spy);
       queue.splice(0);
-      await doneEvent.dispose();
     });
 
-    const spy: (typeof this.spies)[number] = (target = emitEvent, action) => {
-      if (target === emitEvent && action === SpyType.Remove) {
-        void doneEvent(true);
+    const spy: (typeof this.hooks)[number] = (target = emitEvent, action) => {
+      if (target === emitEvent && action === HookType.Remove) {
+        void hasNextEvent(false);
         void unsubscribe();
       }
     };
 
-    this.spies.push(spy);
+    this.hooks.push(spy);
     return {
       async next() {
-        if (queue.length) {
-          return { value: queue.shift()!, done: false };
-        }
-        if (!(await doneEvent)) {
-          return { value: queue.shift()!, done: false };
+        if (!hasNextEvent.disposed) {
+          const next = queue.length || (await hasNextEvent);
+          if (next) {
+            return { value: queue.shift()!, done: false };
+          }
         }
         return { value: undefined, done: true };
       },
       async return(value: unknown) {
         await unsubscribe();
-        return { done: true, value };
+        return { value, done: true };
       },
     };
   }
@@ -491,15 +492,15 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
     };
 
     const unsubscribe = this.on(emitEvent).pre(() => {
-      removeListener(this.spies, spy);
+      removeListener(this.hooks, spy);
     });
 
-    const spy: (typeof this.spies)[number] = (target = emitEvent, action) => {
-      if (target === emitEvent && action === SpyType.Remove) {
+    const spy: (typeof this.hooks)[number] = (target = emitEvent, action) => {
+      if (target === emitEvent && action === HookType.Remove) {
         void unsubscribe();
       }
     };
-    this.spies.push(spy);
+    this.hooks.push(spy);
 
     const result = new Event<PT, R>(unsubscribe);
     return result;
@@ -706,6 +707,7 @@ export class Event<T, R> extends Callable implements AsyncIterable<T>, PromiseLi
     });
 
     const orchestratedEvent = new Event<T, R>(unsubscribe.post(unsubscribeConductor));
+
     return orchestratedEvent;
   }
   /**
