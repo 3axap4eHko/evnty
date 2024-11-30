@@ -69,7 +69,7 @@
     "@typescript-eslint/typescript-estree": "^8.16.0",
     "@vuepress/bundler-vite": "2.0.0-rc.18",
     "@vuepress/theme-default": "2.0.0-rc.61",
-    "eslint": "^9.15.0",
+    "eslint": "^9.16.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.31.0",
@@ -85,5 +85,5 @@
     "vue": "^3.5.13",
     "vuepress": "2.0.0-rc.18"
   },
-  "packageManager": "pnpm@9.14.3"
+  "packageManager": "pnpm@9.14.4"
 }
