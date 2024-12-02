@@ -1,5 +1,12 @@
 # Evnty
 
+[![Coverage Status][codecov-image]][codecov-url]
+[![Github Build Status][github-image]][github-url]
+[![NPM version][npm-image]][npm-url]
+[![Downloads][downloads-image]][npm-url]
+[![Snyk][snyk-image]][snyk-url]
+
+
 0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
 
 <div align="center">
@@ -8,12 +15,6 @@
   </a>
   <br>
   <br>
-
-[![Coverage Status][codecov-image]][codecov-url]
-[![Github Build Status][github-image]][github-url]
-[![NPM version][npm-image]][npm-url]
-[![Downloads][downloads-image]][npm-url]
-[![Snyk][snyk-image]][snyk-url]
 
 </div>
 
