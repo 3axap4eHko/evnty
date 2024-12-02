@@ -1,5 +1,11 @@
 # Evnty
 
+[![Coverage Status][codecov-image]][codecov-url]
+[![Github Build Status][github-image]][github-url]
+[![NPM version][npm-image]][npm-url]
+[![Downloads][downloads-image]][npm-url]
+[![Snyk][snyk-image]][snyk-url]
+
 0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
 
 <div align="center">
@@ -8,12 +14,6 @@
   </a>
   <br>
   <br>
-
-[![Coverage Status][codecov-image]][codecov-url]
-[![Github Build Status][github-image]][github-url]
-[![NPM version][npm-image]][npm-url]
-[![Downloads][downloads-image]][npm-url]
-[![Snyk][snyk-image]][snyk-url]
 
 </div>
 
@@ -141,14 +141,14 @@ const messagesBatchEvent = messageEvent.batch(100);
 
 ## License
 
-License [MIT](./LICENSE)
+License [The MIT License](./LICENSE)
 Copyright (c) 2024 Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200
 [npm-image]: https://img.shields.io/npm/v/evnty.svg?maxAge=43200
 [github-url]: https://github.com/3axap4eHko/evnty/actions
-[github-image]: https://github.com/3axap4eHko/evnty/workflows/Build%20Package/badge.svg?branch=master
+[github-image]: https://github.com/3axap4eHko/evnty/actions/workflows/build.yml/badge.svg?branch=master
 [codecov-url]: https://codecov.io/gh/3axap4eHko/evnty
 [codecov-image]: https://codecov.io/gh/3axap4eHko/evnty/branch/master/graph/badge.svg?maxAge=43200
 [snyk-url]: https://snyk.io/test/npm/evnty/latest
