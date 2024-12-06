@@ -99,10 +99,9 @@ export interface Callable<T extends unknown[], R> {
  * @internal
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export abstract class Callable<T, R> extends Function {
+export abstract class Callable<T, R> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   constructor(func: Function) {
-    super();
     return Object.setPrototypeOf(func, new.target.prototype);
   }
 }

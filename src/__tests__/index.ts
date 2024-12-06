@@ -5,10 +5,6 @@ const processTick = () => new Promise(resolve => process.nextTick(resolve));
 const HOOKS = "hooks";
 
 describe('Anonymous Event test suite', () => {
-  test('FunctionExt extends from Function', () => {
-    expect(Callable.prototype).toBeInstanceOf(Function);
-  });
-
   test('setTimeoutAsync resolves to true on completion', async () => {
     const abort = new AbortController();
     const timeout = setTimeoutAsync(0, abort.signal);
