@@ -60,8 +60,8 @@ importers:
         specifier: ^3.5.2
         version: 3.5.2
       recast:
-        specifier: ^0.23.9
-        version: 0.23.9
+        specifier: ^0.23.10
+        version: 0.23.10
       sass-embedded:
         specifier: ^1.85.1
         version: 1.85.1
@@ -2650,8 +2650,8 @@ packages:
     resolution: {integrity: sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==}
     engines: {node: '>=8.10.0'}
 
-  recast@0.23.9:
-    resolution: {integrity: sha512-Hx/BGIbwj+Des3+xy5uAtAbdCyqK9y9wbBcDFDYanLS9JnMqf7OeF87HQwUimE87OEc72mr6tkKUKMBBL+hF9Q==}
+  recast@0.23.10:
+    resolution: {integrity: sha512-mbCmRMJUKCJ1h41V0cu2C26ULBURwuoZ34C9rChjcDaeJ/4Kv5al3O2HPwTs2m0wQ1vGhMY+tguhzU1aE8md1A==}
     engines: {node: '>= 4'}
 
   regexp.prototype.flags@1.5.3:
@@ -6356,7 +6356,7 @@ snapshots:
     dependencies:
       picomatch: 2.3.1
 
-  recast@0.23.9:
+  recast@0.23.10:
     dependencies:
       ast-types: 0.16.1
       esprima: 4.0.1
