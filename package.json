@@ -81,7 +81,7 @@
     "recast": "^0.23.11",
     "sass-embedded": "^1.86.3",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2",
+    "typescript": "^5.8.3",
     "vue": "^3.5.13",
     "vuepress": "2.0.0-rc.20"
   },
