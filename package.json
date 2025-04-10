@@ -68,7 +68,7 @@
     "@typescript-eslint/parser": "^8.29.1",
     "@typescript-eslint/typescript-estree": "^8.29.1",
     "@vuepress/bundler-vite": "2.0.0-rc.20",
-    "@vuepress/theme-default": "2.0.0-rc.91",
+    "@vuepress/theme-default": "2.0.0-rc.92",
     "eslint": "^9.24.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
