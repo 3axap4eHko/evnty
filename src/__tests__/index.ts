@@ -31,7 +31,7 @@ describe('Anonymous Event test suite', () => {
   });
 
   test('Unsubscribe instantiable', () => {
-    expect(() => new Unsubscribe(() => {})).not.toThrow();
+    expect(() => new Unsubscribe(() => { })).not.toThrow();
   });
 
   test('Unsubscribe extends from FunctionExt', () => {
@@ -753,10 +753,11 @@ describe('Anonymous Event test suite', () => {
     await event('test2');
     process.nextTick(async () => {
       await event('test3');
-      process.nextTick(() => queue.stop());
+      queue.stop();
     });
     const handler = jest.fn();
     for await (const value of queue) {
+      console.log(value);
       handler(value);
     }
     expect(handler).toHaveBeenCalledWith('test1');

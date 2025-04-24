@@ -9,25 +9,29 @@ export interface Callback<R = void> extends Fn<[], MaybePromise<R>> {}
 export interface Listener<T, R = unknown> extends Fn<[T], MaybePromise<R | void>> {}
 
 export interface FilterFunction<T> {
-  (event: T): MaybePromise<boolean>;
+  (value: T): MaybePromise<boolean>;
 }
 
 export interface Predicate<T, P extends T> {
-  (event: T): event is P;
+  (value: T): value is P;
 }
 
 export type Filter<T, P extends T> = Predicate<T, P> | FilterFunction<T>;
 
 export interface Mapper<T, R> {
-  (event: T): MaybePromise<R>;
+  (value: T): MaybePromise<R>;
+}
+
+export interface AsyncGenerable<T, R> {
+  (value: T): AsyncGenerator<R, void, unknown>;
 }
 
 export interface Reducer<T, R> {
-  (result: R, event: T): MaybePromise<R>;
+  (result: R, value: T): MaybePromise<R>;
 }
 
 export interface Expander<T, R> {
-  (event: T): MaybePromise<R>;
+  (value: T): MaybePromise<R>;
 }
 
 /**
@@ -103,6 +107,178 @@ export abstract class Callable<T, R> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   constructor(func: Function) {
     return Object.setPrototypeOf(func, new.target.prototype);
+  }
+}
+/*
+ * @internal
+ */
+export interface AsyncIterableCombinators<T> {
+  filter<U extends T>(filter: Filter<T, U>): AsyncIterableCombinators<Awaited<U>>;
+  map<U>(mapper: Mapper<T, U>): AsyncIterableCombinators<Awaited<U>>;
+  reduce<U>(reducer: Reducer<T, U>): AsyncIterableCombinators<Awaited<U>>;
+  expand<U>(expander: Mapper<T, U[]>): AsyncIterableCombinators<Awaited<U>>;
+  pipe<U>(expander: AsyncGenerable<T, U>): AsyncIterableCombinators<Awaited<U>>;
+}
+
+/*
+ * @internal
+ */
+export interface EventSource<T> extends Callable<[T], boolean>, Promise<T>, AsyncIterable<T> {
+  next(): Promise<T>;
+}
+
+/*
+ * @internal
+ */
+export class Signal<T> extends Callable<[T], boolean> implements Promise<T>, AsyncIterable<T> {
+  private rx?: PromiseWithResolvers<T>;
+
+  constructor(private readonly abortSignal?: AbortSignal) {
+    super((value: T) => {
+      if (this.rx) {
+        this.rx.resolve(value);
+        this.rx = undefined;
+        return true;
+      } else {
+        return false;
+      }
+    });
+    this.abortSignal?.addEventListener(
+      'abort',
+      () => {
+        this.rx?.reject(this.abortSignal!.reason);
+        this.rx = undefined;
+      },
+      { once: true },
+    );
+  }
+
+  get [Symbol.toStringTag](): string {
+    return `Signal(${this.abortSignal?.aborted ? 'stopped' : 'active'})`;
+  }
+
+  get promise(): Promise<T> {
+    return this.next();
+  }
+
+  async next() {
+    if (this.abortSignal?.aborted) {
+      return Promise.reject(this.abortSignal.reason);
+    }
+    if (!this.rx) {
+      this.rx = Promise.withResolvers<T>();
+    }
+    return this.rx.promise;
+  }
+
+  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null | undefined): Promise<T | OK> {
+    return this.promise.catch(onrejected);
+  }
+
+  finally(onfinally?: (() => void) | null | undefined): Promise<T> {
+    return this.promise.finally(onfinally);
+  }
+
+  then<OK = T, ERR = never>(
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null | undefined,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null | undefined,
+  ): Promise<OK | ERR> {
+    return this.promise.then(onfulfilled, onrejected);
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
+    return {
+      next: async () => {
+        try {
+          const value = await this;
+          return { value, done: false };
+        } catch {
+          return { value: undefined, done: true };
+        }
+      },
+      return: () => {
+        return Promise.resolve({ value: undefined, done: true });
+      },
+    };
+  }
+}
+
+/**
+ * @internal
+ */
+export class Sequence<T> extends Callable<[T], boolean> implements Promise<T>, AsyncIterable<T> {
+  private sequence: T[];
+  private nextSignal: Signal<boolean>;
+
+  constructor(private readonly abortSignal?: AbortSignal) {
+    super((value: T) => {
+      if (this.abortSignal?.aborted) {
+        this.nextSignal(false);
+        return false;
+      } else {
+        this.sequence.push(value);
+        if (this.sequence.length === 1) {
+          this.nextSignal(true);
+        }
+        return true;
+      }
+    });
+    this.sequence = [];
+    this.nextSignal = new Signal<boolean>(this.abortSignal);
+    this.abortSignal?.addEventListener(
+      'abort',
+      () => {
+        this.nextSignal(false);
+      },
+      { once: true },
+    );
+  }
+
+  get [Symbol.toStringTag](): string {
+    return `Sequence(${this.abortSignal?.aborted ? 'stopped' : 'active'})`;
+  }
+
+  get promise(): Promise<T> {
+    return this.next();
+  }
+
+  async next(): Promise<T> {
+    if (!this.sequence.length) {
+      await this.nextSignal;
+    }
+    return this.sequence.shift()!;
+  }
+
+  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null | undefined): Promise<T | OK> {
+    return this.promise.catch(onrejected);
+  }
+
+  finally(onfinally?: (() => void) | null | undefined): Promise<T> {
+    return this.promise.finally(onfinally);
+  }
+
+  then<OK = T, ERR = never>(
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null | undefined,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null | undefined,
+  ): Promise<OK | ERR> {
+    return this.promise.then(onfulfilled, onrejected);
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
+    return {
+      next: async () => {
+        try {
+          const value = await this;
+          return { value, done: false };
+        } catch {
+          return { value: undefined, done: true };
+        }
+      },
+      return: () => {
+        this.nextSignal(false);
+        return Promise.resolve({ value: undefined, done: true });
+      },
+    };
   }
 }
 
@@ -421,41 +597,23 @@ export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void
    * ```
    */
   [Symbol.asyncIterator](): AsyncIterator<T> {
-    const queue: T[] = [];
-    const hasNextEvent = new Event<boolean>();
-    const emitEvent = async (value: T) => {
-      queue.push(value);
-      await hasNextEvent(true);
+    const ctrl = new AbortController();
+    const sequence = new Sequence<T>(ctrl.signal);
+    const emitEvent = (value: T) => {
+      sequence(value);
     };
-    const unsubscribe = this.on(emitEvent).pre(async () => {
-      await hasNextEvent.dispose();
-      removeListener(this.hooks, spy);
-      queue.splice(0);
+    const unsubscribe = this.on(emitEvent).pre(() => {
+      ctrl.abort('done');
     });
 
     const spy: (typeof this.hooks)[number] = (target = emitEvent, action) => {
       if (target === emitEvent && action === HookType.Remove) {
-        void hasNextEvent(false);
         void unsubscribe();
       }
     };
 
     this.hooks.push(spy);
-    return {
-      async next() {
-        if (!hasNextEvent.disposed) {
-          const next = queue.length || (await hasNextEvent);
-          if (next) {
-            return { value: queue.shift()!, done: false };
-          }
-        }
-        return { value: undefined, done: true };
-      },
-      async return(value: unknown) {
-        await unsubscribe();
-        return { value, done: true };
-      },
-    };
+    return sequence[Symbol.asyncIterator]();
   }
 
   /**
@@ -491,15 +649,15 @@ export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void
     };
 
     const unsubscribe = this.on(emitEvent).pre(() => {
-      removeListener(this.hooks, spy);
+      removeListener(this.hooks, hook);
     });
 
-    const spy: (typeof this.hooks)[number] = (target = emitEvent, action) => {
+    const hook: (typeof this.hooks)[number] = (target = emitEvent, action) => {
       if (target === emitEvent && action === HookType.Remove) {
         void unsubscribe();
       }
     };
-    this.hooks.push(spy);
+    this.hooks.push(hook);
 
     const result = new Event<PT, R>(unsubscribe);
     return result;
@@ -850,43 +1008,40 @@ export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void
    *
    */
   queue(): Queue<T> {
-    const queue: T[] = [];
-    let done = false;
-    const valueEvent = new Event<void>();
-
-    const unsubscribe = this.on(async (value) => {
-      queue.push(value);
-      await valueEvent();
+    const ctrl = new AbortController();
+    const sequence = new Sequence<T>(ctrl.signal);
+    const onEvent = (value: T) => {
+      sequence(value);
+    };
+    const unsubscribe = this.on(onEvent).pre(() => {
+      ctrl.abort('done');
     });
 
-    const pop = async () => {
-      if (!queue.length) {
-        await valueEvent;
-      }
-      return queue.shift()!;
-    };
-    const stop = async () => {
-      await unsubscribe();
-      done = true;
-      await valueEvent();
-    };
+    const pop = async () => await sequence;
 
     return {
       pop,
-      stop,
+      stop: async () => {
+        await unsubscribe();
+      },
       get stopped() {
-        return done;
+        return ctrl.signal.aborted;
       },
       then<TResult1 = T, TResult2 = never>(
         onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
       ): Promise<TResult1 | TResult2> {
-        return this.pop().then(onfulfilled, onrejected);
+        return pop().then(onfulfilled, onrejected);
       },
       [Symbol.asyncIterator]() {
         return {
           next: async () => {
-            return { value: await pop(), done };
+            try {
+              const value = await pop();
+              return { value, done: false };
+            } catch {
+              return { value: undefined, done: true };
+            }
           },
         };
       },
@@ -932,6 +1087,10 @@ export const merge = <Events extends Event<any, any>[]>(...events: Events): Even
   events.forEach((event) => event.on(mergedEvent));
   return mergedEvent;
 };
+
+//export const fromIterator = (iterator: Iterator<T>): Event<T> {
+//
+//}
 
 /**
  * Creates a periodic event that triggers at a specified interval. The event will automatically emit
