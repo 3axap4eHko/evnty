@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="generator" content="VuePress 2.0.0-rc.18" />
+    <meta name="generator" content="VuePress 2.0.0-rc.21" />
     <style>
       :root {
         --vp-c-bg: #fff;
@@ -19,25 +19,25 @@
       }
     </style>
     <script>
-      const userMode = localStorage.getItem('vuepress-color-scheme')
-      const systemDarkMode =
+      const useChoice = localStorage.getItem('vuepress-color-scheme')
+      const systemStatus =
         'matchMedia' in window
           ? window.matchMedia('(prefers-color-scheme: dark)').matches
           : false
 
-      if (userMode === 'light') {
+      if (useChoice === 'light') {
         document.documentElement.dataset.theme = 'light'
-      } else if (userMode === 'dark' || systemDarkMode) {
+      } else if (useChoice === 'dark' || systemStatus) {
         document.documentElement.dataset.theme = 'dark'
       }
     </script>
     <link rel="apple-touch-icon" sizes="180x180" href="/evnty/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/evnty/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/evnty/favicon-16x16.png"><link rel="manifest" href="/evnty/site.webmanifest"><link rel="mask-icon" href="/evnty/safari-pinned-tab.svg" color="#3a0839"><link rel="shortcut icon" href="/evnty/favicon.ico"><meta name="msapplication-TileColor" content="#3a0839"><meta name="msapplication-config" content="/evnty/browserconfig.xml"><meta name="theme-color" content="#424242"><title>Evnty</title><meta name="description" content="0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.">
-    <link rel="preload" href="/evnty/assets/style-DUoPMZYq.css" as="style"><link rel="stylesheet" href="/evnty/assets/style-DUoPMZYq.css">
-    <link rel="modulepreload" href="/evnty/assets/app-0tDSbF9k.js"><link rel="modulepreload" href="/evnty/assets/404.html-kgEX7TJq.js">
-    <link rel="prefetch" href="/evnty/assets/index.html-hz7IX_o_.js" as="script"><link rel="prefetch" href="/evnty/assets/setupDevtools-7MC2TMWH-DGydr0QL.js" as="script">
+    <link rel="preload" href="/evnty/assets/style-BFoglHDT.css" as="style"><link rel="stylesheet" href="/evnty/assets/style-BFoglHDT.css">
+    <link rel="modulepreload" href="/evnty/assets/app-g-CbbY8b.js"><link rel="modulepreload" href="/evnty/assets/404.html-V_uN3XGn.js">
+    <link rel="prefetch" href="/evnty/assets/index.html-CBlhqP8v.js" as="script">
   </head>
   <body>
-    <div id="app"><!--[--><div class="vp-theme-container" vp-container data-v-a5ac2dd5><main class="page" data-v-a5ac2dd5><div class="theme-default-content" vp-content data-v-a5ac2dd5><h1 data-v-a5ac2dd5>404</h1><blockquote data-v-a5ac2dd5>There&#39;s nothing here.</blockquote><a class="route-link" href="/evnty/" data-v-a5ac2dd5>Take me home</a></div></main></div><!--[--><!----><!--]--><!--]--></div>
-    <script type="module" src="/evnty/assets/app-0tDSbF9k.js" defer></script>
+    <div id="app"><!--[--><div class="vp-theme-container" vp-container data-v-c989a395><main class="page" data-v-c989a395><div vp-content data-v-c989a395><h1 data-v-c989a395>404</h1><blockquote data-v-c989a395>How did we get here?</blockquote><a class="route-link" href="/evnty/" data-v-c989a395>Take me home</a></div></main></div><!--[--><!----><!--]--><!--]--></div>
+    <script type="module" src="/evnty/assets/app-g-CbbY8b.js" defer></script>
   </body>
 </html>
