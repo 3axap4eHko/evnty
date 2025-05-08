@@ -1,38 +1,11 @@
-export interface Fn<A extends unknown[], R> {
-  (...args: A): R;
-}
+import { MaybePromise, Callback, Listener, FilterFunction, Predicate, Filter, Mapper, AsyncGenerable, Reducer, Expander } from './types.js';
+import { Callable } from './callable.js';
+import { Sequence } from './sequence.js';
 
-export type MaybePromise<T> = Promise<T> | PromiseLike<T> | T;
-
-export interface Callback<R = void> extends Fn<[], MaybePromise<R>> {}
-
-export interface Listener<T, R = unknown> extends Fn<[T], MaybePromise<R | void>> {}
-
-export interface FilterFunction<T> {
-  (value: T): MaybePromise<boolean>;
-}
-
-export interface Predicate<T, P extends T> {
-  (value: T): value is P;
-}
-
-export type Filter<T, P extends T> = Predicate<T, P> | FilterFunction<T>;
-
-export interface Mapper<T, R> {
-  (value: T): MaybePromise<R>;
-}
-
-export interface AsyncGenerable<T, R> {
-  (value: T): AsyncGenerator<R, void, unknown>;
-}
-
-export interface Reducer<T, R> {
-  (result: R, value: T): MaybePromise<R>;
-}
-
-export interface Expander<T, R> {
-  (value: T): MaybePromise<R>;
-}
+export * from './types.js';
+export * from './callable.js';
+export * from './signal.js';
+export * from './sequence.js';
 
 /**
  * Removes a listener from the provided array of listeners. It searches for the listener and removes all instances of it from the array.
@@ -89,26 +62,6 @@ export const setTimeoutAsync = (timeout: number, signal?: AbortSignal): Promise<
     });
   });
 
-/**
- * @internal
- */
-export interface Callable<T extends unknown[], R> {
-  (...args: T): R;
-}
-
-/**
- * An abstract class that extends the built-in Function class. It allows instances of the class
- * to be called as functions. When an instance of Callable is called as a function, it will
- * call the function passed to its constructor with the same arguments.
- * @internal
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export abstract class Callable<T, R> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  constructor(func: Function) {
-    return Object.setPrototypeOf(func, new.target.prototype);
-  }
-}
 /*
  * @internal
  */
@@ -127,160 +80,9 @@ export interface EventSource<T> extends Callable<[T], boolean>, Promise<T>, Asyn
   next(): Promise<T>;
 }
 
-/*
- * @internal
- */
-export class Signal<T> extends Callable<[T], boolean> implements Promise<T>, AsyncIterable<T> {
-  private rx?: PromiseWithResolvers<T>;
-
-  constructor(private readonly abortSignal?: AbortSignal) {
-    super((value: T) => {
-      if (this.rx) {
-        this.rx.resolve(value);
-        this.rx = undefined;
-        return true;
-      } else {
-        return false;
-      }
-    });
-    this.abortSignal?.addEventListener(
-      'abort',
-      () => {
-        this.rx?.reject(this.abortSignal!.reason);
-        this.rx = undefined;
-      },
-      { once: true },
-    );
-  }
-
-  get [Symbol.toStringTag](): string {
-    return `Signal(${this.abortSignal?.aborted ? 'stopped' : 'active'})`;
-  }
-
-  get promise(): Promise<T> {
-    return this.next();
-  }
-
-  async next() {
-    if (this.abortSignal?.aborted) {
-      return Promise.reject(this.abortSignal.reason);
-    }
-    if (!this.rx) {
-      this.rx = Promise.withResolvers<T>();
-    }
-    return this.rx.promise;
-  }
-
-  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null | undefined): Promise<T | OK> {
-    return this.promise.catch(onrejected);
-  }
-
-  finally(onfinally?: (() => void) | null | undefined): Promise<T> {
-    return this.promise.finally(onfinally);
-  }
-
-  then<OK = T, ERR = never>(
-    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null | undefined,
-    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null | undefined,
-  ): Promise<OK | ERR> {
-    return this.promise.then(onfulfilled, onrejected);
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
-    return {
-      next: async () => {
-        try {
-          const value = await this;
-          return { value, done: false };
-        } catch {
-          return { value: undefined, done: true };
-        }
-      },
-      return: () => {
-        return Promise.resolve({ value: undefined, done: true });
-      },
-    };
-  }
-}
-
 /**
  * @internal
  */
-export class Sequence<T> extends Callable<[T], boolean> implements Promise<T>, AsyncIterable<T> {
-  private sequence: T[];
-  private nextSignal: Signal<boolean>;
-
-  constructor(private readonly abortSignal?: AbortSignal) {
-    super((value: T) => {
-      if (this.abortSignal?.aborted) {
-        this.nextSignal(false);
-        return false;
-      } else {
-        this.sequence.push(value);
-        if (this.sequence.length === 1) {
-          this.nextSignal(true);
-        }
-        return true;
-      }
-    });
-    this.sequence = [];
-    this.nextSignal = new Signal<boolean>(this.abortSignal);
-    this.abortSignal?.addEventListener(
-      'abort',
-      () => {
-        this.nextSignal(false);
-      },
-      { once: true },
-    );
-  }
-
-  get [Symbol.toStringTag](): string {
-    return `Sequence(${this.abortSignal?.aborted ? 'stopped' : 'active'})`;
-  }
-
-  get promise(): Promise<T> {
-    return this.next();
-  }
-
-  async next(): Promise<T> {
-    if (!this.sequence.length) {
-      await this.nextSignal;
-    }
-    return this.sequence.shift()!;
-  }
-
-  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null | undefined): Promise<T | OK> {
-    return this.promise.catch(onrejected);
-  }
-
-  finally(onfinally?: (() => void) | null | undefined): Promise<T> {
-    return this.promise.finally(onfinally);
-  }
-
-  then<OK = T, ERR = never>(
-    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null | undefined,
-    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null | undefined,
-  ): Promise<OK | ERR> {
-    return this.promise.then(onfulfilled, onrejected);
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
-    return {
-      next: async () => {
-        try {
-          const value = await this;
-          return { value, done: false };
-        } catch {
-          return { value: undefined, done: true };
-        }
-      },
-      return: () => {
-        this.nextSignal(false);
-        return Promise.resolve({ value: undefined, done: true });
-      },
-    };
-  }
-}
 
 /**
  * @internal
@@ -536,18 +338,26 @@ export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void
    * ```
    */
   then<OK = T, ERR = never>(
-    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null | undefined,
-    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null | undefined,
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null,
   ): Promise<OK | ERR> {
-    const unsubscribe: Unsubscribe[] = [];
+    const subscribers: Unsubscribe[] = [];
     const promise = new Promise<T>((resolve, reject) => {
-      unsubscribe.push(this.once(resolve));
-      unsubscribe.push(this.error.once(reject));
+      subscribers.push(this.once(resolve));
+      subscribers.push(this.error.once(reject));
     });
 
-    return promise.then(onfulfilled, onrejected).finally(async () => {
-      await Promise.all(unsubscribe.map((u) => u()));
-    });
+    const unsubscribe = async <U>(value: U) => {
+      await Promise.all(subscribers.map((u) => u()));
+      return value;
+    };
+
+    return promise
+      .then(onfulfilled, onrejected)
+      .then(unsubscribe)
+      .catch(async (error) => {
+        throw await unsubscribe(error);
+      });
   }
 
   /**
@@ -852,7 +662,7 @@ export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void
   orchestrate<CT, CR>(conductor: Event<CT, CR>): Event<T, R> {
     let initialized = false;
     let lastValue: T;
-    const unsubscribe = this.on(async (event) => {
+    const unsubscribe = this.on((event) => {
       initialized = true;
       lastValue = event;
     });
@@ -1028,8 +838,8 @@ export class Event<T = unknown, R = unknown> extends Callable<[T], Promise<(void
         return ctrl.signal.aborted;
       },
       then<TResult1 = T, TResult2 = never>(
-        onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null | undefined,
-        onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
+        onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+        onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
       ): Promise<TResult1 | TResult2> {
         return pop().then(onfulfilled, onrejected);
       },
@@ -1088,10 +898,6 @@ export const merge = <Events extends Event<any, any>[]>(...events: Events): Even
   return mergedEvent;
 };
 
-//export const fromIterator = (iterator: Iterator<T>): Event<T> {
-//
-//}
-
 /**
  * Creates a periodic event that triggers at a specified interval. The event will automatically emit
  * an incrementing counter value each time it triggers, starting from zero. This function is useful
@@ -1112,7 +918,9 @@ export const merge = <Events extends Event<any, any>[]>(...events: Events): Even
 export const createInterval = <R = unknown>(interval: number): Event<number, R> => {
   let counter = 0;
   const intervalEvent = new Event<number, R>(() => clearInterval(timerId));
-  const timerId: ReturnType<typeof setInterval> = setInterval(() => intervalEvent(counter++), interval);
+  const timerId: ReturnType<typeof setInterval> = setInterval(() => {
+    void intervalEvent(counter++);
+  }, interval);
   return intervalEvent;
 };
 

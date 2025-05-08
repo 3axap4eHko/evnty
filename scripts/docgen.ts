@@ -1,10 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, appendFile } from 'node:fs/promises';
 import { print } from 'recast';
 import { parse, TSESTree, AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 
-const fileName = `${process.cwd()}/${process.argv[2]}`;
-
-const sourceCode = await readFile(fileName, 'utf-8');
+const filename = `${process.cwd()}/${process.argv[2]}`;
+const sourceCode = await readFile(filename, 'utf-8');
 
 interface Member {
   args: string[]
@@ -245,6 +244,9 @@ for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes
     if (members.every(member => member.docs.every(doc => !doc.includes('@internal')))) {
       for (const member of members) {
         let title = `${name}(${member.args.join(', ')})${member.returnType}`;
+        if (namespace) {
+          title = `${namespace}.${title}`;
+        }
         contents.push(`${padding}- [\`${title}\`](#${normalize(title)})`);
         docs.push(`${header}# \`${title}\``);
       }
@@ -256,10 +258,9 @@ for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes
       }
     }
   }
-
 }
-await writeFile(`${process.cwd()}/docs/tmp.md`, `
-${contents.join('\n')}
 
-${docs.join('\n')}
-`);
+const sanitize = (text: string) => text.replace(/\n\n\n/g, '\n');
+
+await appendFile(`${process.cwd()}/docs/_contents.tmp.md`, sanitize(contents.join('\n')) + '\n');
+await appendFile(`${process.cwd()}/docs/_docs.tmp.md`, sanitize(docs.join('\n')) + '\n');

@@ -1,4 +1,4 @@
-import { Sequence } from '../index';
+import { Sequence } from '../sequence';
 
 describe('Sequence test suite', () => {
   it('Should create a sequence', async () => {

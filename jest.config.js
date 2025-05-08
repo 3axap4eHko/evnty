@@ -5,6 +5,9 @@ export default {
   testEnvironment: 'node',
   coveragePathIgnorePatterns: ['/coverage', '/node_modules/', '__tests__'],
   coverageDirectory: './coverage',
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   transform: {
     '\\.ts$': '@swc/jest',
   },

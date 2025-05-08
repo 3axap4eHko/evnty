@@ -1,10 +1,3 @@
 #!/bin/sh
 set -e
-CHANGED_FILES=$(git diff --name-only --cached --diff-filter=ACMR)
-STAGED_CODE=$(echo "$CHANGED_FILES" | grep -E '\.(ts|js)$' || true)
-
-if [ -z "$STAGED_CODE" ]; then
-  echo "Skip code linitng"
-else
-  pnpm eslint --fix $STAGED_CODE && git add $STAGED_CODE || exit 1
-fi
+pnpm lint --fix

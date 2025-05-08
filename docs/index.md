@@ -25,40 +25,61 @@
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [API](#api)
+- [`Signal`](#signal)
+  - [`signal.constructor(private readonly abortSignal?: AbortSignal)`](#signalconstructorprivate-readonly-abortsignal-abortsignal)
+  - [`signal.Symbol.toStringTag(): string`](#signalsymboltostringtag-string)
+  - [`signal.promise(): Promise`](#signalpromise-promise)
+  - [`signal.next()`](#signalnext)
+  - [`signal.catch(onrejected): Promise`](#signalcatchonrejected-promise)
+  - [`signal.finally(onfinally): Promise`](#signalfinallyonfinally-promise)
+  - [`signal.then(onfulfilled, onrejected): Promise`](#signalthenonfulfilled-onrejected-promise)
+  - [`signal.Symbol.asyncIterator(): AsyncIterator`](#signalsymbolasynciterator-asynciterator)
+
+- [`Sequence`](#sequence)
+  - [`sequence.constructor(private readonly abortSignal?: AbortSignal)`](#sequenceconstructorprivate-readonly-abortsignal-abortsignal)
+  - [`sequence.Symbol.toStringTag(): string`](#sequencesymboltostringtag-string)
+  - [`sequence.promise(): Promise`](#sequencepromise-promise)
+  - [`sequence.next(): Promise`](#sequencenext-promise)
+  - [`sequence.catch(onrejected): Promise`](#sequencecatchonrejected-promise)
+  - [`sequence.finally(onfinally): Promise`](#sequencefinallyonfinally-promise)
+  - [`sequence.then(onfulfilled, onrejected): Promise`](#sequencethenonfulfilled-onrejected-promise)
+  - [`sequence.Symbol.asyncIterator(): AsyncIterator`](#sequencesymbolasynciterator-asynciterator)
+
 - [`Event`](#event)
-  - [`constructor(dispose?: Callback)`](#constructordispose-callback)
-  - [`error(): Event<unknown>`](#error-eventunknown)
-  - [`size(): number`](#size-number)
-  - [`lacks(listener: Listener<T, R>): boolean`](#lackslistener-listenert-r-boolean)
-  - [`has(listener: Listener<T, R>): boolean`](#haslistener-listenert-r-boolean)
-  - [`off(listener: Listener<T, R>): this`](#offlistener-listenert-r-this)
-  - [`on(listener: Listener<T, R>): Unsubscribe`](#onlistener-listenert-r-unsubscribe)
-  - [`once(listener: Listener<T, R>): Unsubscribe`](#oncelistener-listenert-r-unsubscribe)
-  - [`clear(): this`](#clear-this)
-  - [`then(onfulfilled, onrejected): Promise`](#thenonfulfilled-onrejected-promise)
-  - [`settle(): Promise`](#settle-promise)
-  - [`promise(): Promise<T>`](#promise-promiset)
-  - [`Symbol.asyncIterator(): AsyncIterator<T>`](#symbolasynciterator-asynciteratort)
-  - [`pipe(generator): Event<PT, R>`](#pipegenerator-eventpt-r)
-  - [`generator(generator): AsyncGenerator<Awaited<PT>, void, unknown>`](#generatorgenerator-asyncgeneratorawaitedpt-void-unknown)
-  - [`filter(predicate: Predicate<T, P>): Event<P, R>`](#filterpredicate-predicatet-p-eventp-r)
-  - [`filter(filter: FilterFunction<T>): Event<P, R>`](#filterfilter-filterfunctiont-eventp-r)
-  - [`filter(filter: Filter<T, P>): Event<P, R>`](#filterfilter-filtert-p-eventp-r)
-  - [`first(predicate: Predicate<T, P>): Event<P, R>`](#firstpredicate-predicatet-p-eventp-r)
-  - [`first(filter: FilterFunction<T>): Event<P, R>`](#firstfilter-filterfunctiont-eventp-r)
-  - [`first(filter: Filter<T, P>): Event<P, R>`](#firstfilter-filtert-p-eventp-r)
-  - [`map(mapper: Mapper<T, M>): Event<Awaited<M>, MR>`](#mapmapper-mappert-m-eventawaitedm-mr)
-  - [`reduce(reducer: Reducer<T, A>, init?: A): Event<Awaited<A>, AR>`](#reducereducer-reducert-a-init-a-eventawaiteda-ar)
-  - [`reduce(reducer: Reducer<T, A>, ...init: unknown[]): Event<Awaited<A>, AR>`](#reducereducer-reducert-a-init-unknown-eventawaiteda-ar)
-  - [`expand(expander: Expander<T, ET[]>): Event<Awaited<ET>, ER>`](#expandexpander-expandert-et-eventawaitedet-er)
-  - [`orchestrate(conductor: Event<any, any>): Event<T, R>`](#orchestrateconductor-eventany-any-eventt-r)
-  - [`debounce(interval: number): Event<Awaited<T>, unknown>`](#debounceinterval-number-eventawaitedt-unknown)
-  - [`throttle(interval: number): Event<Awaited<T>, unknown>`](#throttleinterval-number-eventawaitedt-unknown)
-  - [`batch(interval: number, size?: number): Event<T[], R>`](#batchinterval-number-size-number-eventt-r)
-  - [`queue(): Queue<T>`](#queue-queuet)
-- [`merge(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>>`](#mergeevents-events-eventalleventsparametersevents-alleventsresultsevents)
-- [`createInterval(interval: number): Event<number, R>`](#createintervalinterval-number-eventnumber-r)
-- [`createEvent(): Event<T, R>`](#createevent-eventt-r)
+  - [`event.constructor(dispose?: Callback)`](#eventconstructordispose-callback)
+  - [`event.error(): Event`](#eventerror-event)
+  - [`event.size(): number`](#eventsize-number)
+  - [`event.disposed(): boolean`](#eventdisposed-boolean)
+  - [`event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
+  - [`event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
+  - [`event.off(listener: Listener): this`](#eventofflistener-listener-this)
+  - [`event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
+  - [`event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
+  - [`event.clear(): this`](#eventclear-this)
+  - [`event.then(onfulfilled, onrejected): Promise`](#eventthenonfulfilled-onrejected-promise)
+  - [`event.settle(): Promise`](#eventsettle-promise)
+  - [`event.promise(): Promise`](#eventpromise-promise)
+  - [`event.Symbol.asyncIterator(): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
+  - [`event.pipe(generator): Event`](#eventpipegenerator-event)
+  - [`event.generator(generator): AsyncGenerator`](#eventgeneratorgenerator-asyncgenerator)
+  - [`event.filter(predicate: Predicate): Event`](#eventfilterpredicate-predicate-event)
+  - [`event.filter(filter: FilterFunction): Event`](#eventfilterfilter-filterfunction-event)
+  - [`event.filter(filter: Filter): Event`](#eventfilterfilter-filter-event)
+  - [`event.first(predicate: Predicate): Event`](#eventfirstpredicate-predicate-event)
+  - [`event.first(filter: FilterFunction): Event`](#eventfirstfilter-filterfunction-event)
+  - [`event.first(filter: Filter): Event`](#eventfirstfilter-filter-event)
+  - [`event.map(mapper: Mapper): Event`](#eventmapmapper-mapper-event)
+  - [`event.reduce(reducer: Reducer, init?: A): Event`](#eventreducereducer-reducer-init-a-event)
+  - [`event.reduce(reducer: Reducer, ...init: unknown[]): Event`](#eventreducereducer-reducer-init-unknown-event)
+  - [`event.expand(expander: Expander): Event`](#eventexpandexpander-expander-event)
+  - [`event.orchestrate(conductor: Event): Event`](#eventorchestrateconductor-event-event)
+  - [`event.debounce(interval: number): Event`](#eventdebounceinterval-number-event)
+  - [`event.throttle(interval: number): Event`](#eventthrottleinterval-number-event)
+  - [`event.batch(interval: number, size?: number): Event`](#eventbatchinterval-number-size-number-event)
+  - [`event.queue(): Queue`](#eventqueue-queue)
+- [`merge(...events: Events): Event`](#mergeevents-events-event)
+- [`createInterval(interval: number): Event`](#createintervalinterval-number-event)
+- [`createEvent(): Event`](#createevent-event)
 - [Examples](#examples)
 - [Migration](#migration)
 - [License](#license)
@@ -113,15 +134,60 @@ npm install evnty
 
 ## API
 
+### `Signal`
+
+ Signal is a callable construct for sending and receiving a single asynchronous value.
+ It implements both Promise and AsyncIterable, allowing it to be awaited once
+ or iterated over with `for await...of`. Once signaled, it resolves the pending promise.
+
+- @template T - The type of value the signal carries.
+- @param abortSignal - Optional AbortSignal used to abort waiting and reject the promise.
+ 
+
+#### `signal.constructor(private readonly abortSignal?: AbortSignal)`
+#### `signal.Symbol.toStringTag(): string`
+#### `signal.promise(): Promise`
+
+ Returns the internal promise that resolves with the signaled value.
+   
+#### `signal.next()`
+
+ Waits for the next signal value or rejects if aborted.
+- @returns A promise resolving to the value of type T.
+   
+#### `signal.catch(onrejected): Promise`
+#### `signal.finally(onfinally): Promise`
+#### `signal.then(onfulfilled, onrejected): Promise`
+#### `signal.Symbol.asyncIterator(): AsyncIterator`
+ 
+### `Sequence`
+
+ Sequence is a callable construct for buffering and emitting multiple values in order.
+ It implements both Promise and AsyncIterable, allowing sequential consumption of values.
+ Values pushed before consumption are queued, and consumers await `next()` or iterate via `for await...of`.
+
+- @template T - The type of values buffered in the sequence.
+- @param abortSignal - Optional AbortSignal to abort iteration and resolve pending next calls.
+ 
+
+#### `sequence.constructor(private readonly abortSignal?: AbortSignal)`
+#### `sequence.Symbol.toStringTag(): string`
+#### `sequence.promise(): Promise`
+#### `sequence.next(): Promise`
+#### `sequence.catch(onrejected): Promise`
+#### `sequence.finally(onfinally): Promise`
+#### `sequence.then(onfulfilled, onrejected): Promise`
+#### `sequence.Symbol.asyncIterator(): AsyncIterator`
+
 ### `Event`
 
  A class representing an anonymous event that can be listened to or triggered.
 
 - @template T - The event type.
 - @template R - The return type of the event.
+ 
 
-
-#### `constructor(dispose?: Callback)`
+#### `event.constructor(dispose?: Callback)`
 
  Creates a new event.
 
@@ -132,21 +198,26 @@ npm install evnty
  const clickEvent = new Event<[x: number, y: number], void>();
  clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
  ```
-
-#### `error(): Event<unknown>`
+   
+#### `event.error(): Event`
 
  Error event that emits errors.
 
 - @returns `{Event<unknown>}` The error event.
-
-#### `size(): number`
+   
+#### `event.size(): number`
 
  The number of listeners for the event.
 
 - @readonly
 - @type `{number}`
+   
+#### `event.disposed(): boolean`
 
-#### `lacks(listener: Listener<T, R>): boolean`
+ Checks if the event has been disposed.
+- @returns `{boolean}` `true` if the event has been disposed; otherwise, `false`.
+   
+#### `event.lacks(listener: Listener): boolean`
 
  Checks if the given listener is NOT registered for this event.
 
@@ -159,8 +230,8 @@ npm install evnty
    event.on(myListener);
  }
  ```
-
-#### `has(listener: Listener<T, R>): boolean`
+   
+#### `event.has(listener: Listener): boolean`
 
  Checks if the given listener is registered for this event.
 
@@ -173,8 +244,8 @@ npm install evnty
    console.log('Listener is already registered');
  }
  ```
-
-#### `off(listener: Listener<T, R>): this`
+   
+#### `event.off(listener: Listener): this`
 
  Removes a specific listener from this event.
 
@@ -185,8 +256,8 @@ npm install evnty
  // Remove a listener
  event.off(myListener);
  ```
-
-#### `on(listener: Listener<T, R>): Unsubscribe`
+   
+#### `event.on(listener: Listener): Unsubscribe`
 
  Registers a listener that gets triggered whenever the event is emitted.
  This is the primary method for adding event handlers that will react to the event being triggered.
@@ -200,8 +271,8 @@ npm install evnty
    console.log('Event data:', data);
  });
  ```
-
-#### `once(listener: Listener<T, R>): Unsubscribe`
+   
+#### `event.once(listener: Listener): Unsubscribe`
 
  Adds a listener that will be called only once the next time the event is emitted.
  This method is useful for one-time notifications or single-trigger scenarios.
@@ -215,11 +286,11 @@ npm install evnty
    console.log('Received data once:', data);
  });
  ```
-
-#### `clear(): this`
+   
+#### `event.clear(): this`
 
  Removes all listeners from the event, effectively resetting it. This is useful when you need to
- cleanly dispose of all event handlers to prevent memory leaks or unwanted triggerings after certain conditions.
+ cleanly dispose of all event handlers to prevent memory leaks or unwanted triggers after certain conditions.
 
 - @returns `{this}` The instance of the event, allowing for method chaining.
 
@@ -228,8 +299,8 @@ npm install evnty
  myEvent.on(data => console.log(data));
  myEvent.clear(); // Clears all listeners
  ```
-
-#### `then(onfulfilled, onrejected): Promise`
+   
+#### `event.then(onfulfilled, onrejected): Promise`
 
  Enables the `Event` to be used in a Promise chain, resolving with the first emitted value.
 
@@ -243,8 +314,8 @@ npm install evnty
  const clickEvent = new Event<[number, number]>();
  await clickEvent;
  ```
-
-#### `settle(): Promise`
+   
+#### `event.settle(): Promise`
 
  Waits for the event to settle, returning a `PromiseSettledResult`.
 
@@ -259,14 +330,14 @@ npm install evnty
    console.error('Event rejected with reason:', result.reason);
  }
  ```
-
-#### `promise(): Promise`
+   
+#### `event.promise(): Promise`
 
  A promise that resolves with the first emitted value from this event.
 
 - @returns `{Promise<T>}` The promise value.
-
-#### `Symbol.asyncIterator(): AsyncIterator<T>`
+   
+#### `event.Symbol.asyncIterator(): AsyncIterator`
 
  Makes this event iterable using `for await...of` loops.
 
@@ -284,8 +355,8 @@ npm install evnty
  await numberEvent(2);
  await numberEvent(3);
  ```
-
-#### `pipe(generator): Event<PT, R>`
+   
+#### `event.pipe(generator): Event`
 
  Transforms the event's values using a generator function, creating a new `Event` that emits the transformed values.
 
@@ -306,8 +377,8 @@ npm install evnty
  await numbersEvent(2);
  await numbersEvent(3);
  ```
-
-#### `generator(generator): AsyncGenerator<Awaited<PT>, void, unknown>`
+   
+#### `event.generator(generator): AsyncGenerator`
 
  Creates an async generator that yields values as they are emitted by this event.
 
@@ -328,10 +399,10 @@ npm install evnty
  await numbersEvent(2);
  await numbersEvent(3);
  ```
-
-#### `filter(predicate: Predicate<T, P>): Event<P, R>`
-#### `filter(filter: FilterFunction<T>): Event<P, R>`
-#### `filter(filter: Filter<T, P>): Event<P, R>`
+   
+#### `event.filter(predicate: Predicate): Event`
+#### `event.filter(filter: FilterFunction): Event`
+#### `event.filter(filter: Filter): Event`
 
  Filters events, creating a new event that only triggers when the provided filter function returns `true`.
  This method can be used to selectively process events that meet certain criteria.
@@ -344,10 +415,12 @@ npm install evnty
  const enterPressedEvent = keyPressedEvent.filter(key => key === 'Enter');
  enterPressedEvent.on(() => console.log('Enter key was pressed.'));
  ```
+   
 
-#### `first(predicate: Predicate<T, P>): Event<P, R>`
-#### `first(filter: FilterFunction<T>): Event<P, R>`
-#### `first(filter: Filter<T, P>): Event<P, R>`
+
+#### `event.first(predicate: Predicate): Event`
+#### `event.first(filter: FilterFunction): Event`
+#### `event.first(filter: Filter): Event`
 
  Creates a new event that will only be triggered once when the provided filter function returns `true`.
  This method is useful for handling one-time conditions in a stream of events.
@@ -360,8 +433,10 @@ npm install evnty
  const sizeReachedEvent = sizeChangeEvent.first(size => size > 1024);
  sizeReachedEvent.on(() => console.log('Size threshold exceeded.'));
  ```
+   
 
-#### `map(mapper: Mapper<T, M>): Event<Awaited<M>, MR>`
+
+#### `event.map(mapper: Mapper): Event`
 
  Transforms the data emitted by this event using a mapping function. Each emitted event is processed by the `mapper`
  function, which returns a new value that is then emitted by the returned `Event` instance. This is useful for data transformation
@@ -379,9 +454,9 @@ npm install evnty
  squaredEvent.on(squared => console.log('Squared number:', squared));
  await numberEvent(5); // Logs: "Squared number: 25"
  ```
-
-#### `reduce(reducer: Reducer<T, A>, init?: A): Event<Awaited<A>, AR>`
-#### `reduce(reducer: Reducer<T, A>, ...init: unknown[]): Event<Awaited<A>, AR>`
+   
+#### `event.reduce(reducer: Reducer, init?: A): Event`
+#### `event.reduce(reducer: Reducer, ...init: unknown[]): Event`
 
  Accumulates the values emitted by this event using a reducer function, starting from an initial value. The reducer
  function takes the accumulated value and the latest emitted event data, then returns a new accumulated value. This
@@ -400,10 +475,8 @@ npm install evnty
  await sumEvent(2);
  await sumEvent(3);
  ```
-
-
-
-#### `expand(expander: Expander<T, ET[]>): Event<Awaited<ET>, ER>`
+   
+#### `event.expand(expander: Expander): Event`
 
  Transforms each event's data into multiple events using an expander function. The expander function takes
  the original event's data and returns an array of new data elements, each of which will be emitted individually
@@ -422,17 +495,16 @@ npm install evnty
  wordEvent.on(word => console.log('Word:', word));
  await sentenceEvent('Hello world'); // Logs: "Word: Hello", "Word: world"
  ```
-
-#### `orchestrate(conductor: Event<any, any>): Event<T, R>`
+   
+#### `event.orchestrate(conductor: Event): Event`
 
  Creates a new event that emits values based on a conductor event. The orchestrated event will emit the last value
- captured from the original event each time the conductor event is triggered. This method is useful for synchronizing
- events, where the emission of one event controls the timing of another.
+ captured from the original event each time the conductor event is triggered.
 
 - @template T The type of data emitted by the original event.
 - @template R The type of data emitted by the orchestrated event, usually the same as `T`.
-- @param `{Event<unknown, unknown>}` conductor An event that signals when the orchestrated event should emit.
-- @returns `{Event<T, R>}` An orchestrated event that emits values based on the conductor's trigger.
+- @param `{Event<unknown, unknown>}` conductor The event that triggers the emission of the last captured value.
+- @returns `{Event<T, R>}` A new event that emits values based on the conductor's triggers.
 
  ```typescript
  const rightClickPositionEvent = mouseMoveEvent.orchestrate(mouseRightClickEvent);
@@ -448,8 +520,8 @@ npm install evnty
  await dataEvent('World!');
  await tickEvent(); // Logs: "Data on tick: World!"
  ```
-
-#### `debounce(interval: number): Event<Awaited<T>, unknown>`
+   
+#### `event.debounce(interval: number): Event`
 
  Creates a debounced event that delays triggering until after a specified interval has elapsed
  following the last time it was invoked. This method is particularly useful for limiting the rate
@@ -467,8 +539,8 @@ npm install evnty
  await event('tex');
  await event('text');
  ```
-
-#### `throttle(interval: number): Event<Awaited<T>, unknown>`
+   
+#### `event.throttle(interval: number): Event`
 
  Creates a throttled event that emits values at most once per specified interval.
 
@@ -484,8 +556,8 @@ npm install evnty
  const throttledScroll = scrollEvent.throttle(100); // Emit at most every 100ms
  throttledScroll.on(() => console.log("Throttled scroll event"));
  ```
-
-#### `batch(interval: number, size?: number): Event<T[], R>`
+   
+#### `event.batch(interval: number, size?: number): Event`
 
  Aggregates multiple event emissions into batches and emits the batched events either at specified
  time intervals or when the batch reaches a predefined size. This method is useful for grouping
@@ -502,8 +574,8 @@ npm install evnty
  const batchedMessageEvent = messageEvent.batch(1000, 10);
  batchedMessageEvent.on((messages) => console.log('Batched Messages:', messages));
  ```
-
-#### `queue(): Queue<T>`
+   
+#### `event.queue(): Queue`
 
  Creates a queue from the event, where each emitted value is sequentially processed. The returned object allows popping elements
  from the queue, ensuring that elements are handled one at a time. This method is ideal for scenarios where order and sequential processing are critical.
@@ -516,13 +588,14 @@ npm install evnty
  const taskQueue = taskEvent.queue();
  (async () => {
    console.log('Processing:', await taskQueue.pop()); // Processing: Task 1
-   console.log('Processing:', await taskQueue.pop()); // Processing: Task 2
+   // Queue also can be used as a Promise
+   console.log('Processing:', await taskQueue); // Processing: Task 2
  })();
  await taskEvent('Task 1');
  await taskEvent('Task 2');
- ```
+```
 
- ```typescript
+```typescript
  // Additionally, the queue can be used as an async iterator
  const taskEvent = new Event<string>();
  const taskQueue = taskEvent.queue();
@@ -534,7 +607,9 @@ npm install evnty
  await taskEvent('Task 1');
  await taskEvent('Task 2');
  ```
-### `merge(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>>`
+
+   
+### `merge(...events: Events): Event`
 
  Merges multiple events into a single event. This function takes any number of `Event` instances
  and returns a new `Event` that triggers whenever any of the input events trigger. The parameters
@@ -553,8 +628,8 @@ npm install evnty
  const inputEvent = merge(mouseEvent, keyboardEvent);
  inputEvent.on(event => console.log('Input event:', event));
  ```
-
-### `createInterval(interval: number): Event<number, R>`
+ 
+### `createInterval(interval: number): Event`
 
  Creates a periodic event that triggers at a specified interval. The event will automatically emit
  an incrementing counter value each time it triggers, starting from zero. This function is useful
@@ -571,8 +646,8 @@ npm install evnty
  const tickEvent = createInterval(1000);
  tickEvent.on(tickNumber => console.log('Tick:', tickNumber));
  ```
-
-### `createEvent(): Event<T, R>`
+ 
+### `createEvent(): Event`
 
  Creates a new instance of the `Event` class, which allows for the registration of event handlers that get called when the event is emitted.
  This factory function simplifies the creation of events by encapsulating the instantiation logic, providing a clean and simple API for event creation.
@@ -587,6 +662,8 @@ npm install evnty
  myEvent.on((str: string) => str.length);
  myEvent('hello').then(results => console.log(results)); // Logs: [5]
  ```
+
+
 
 ## Examples
 

@@ -33,6 +33,7 @@ export default defineUserConfig({
   bundler: viteBundler(),
 
   markdown: {
+    html: false,
     anchor: {
       slugify: (s) =>
         s

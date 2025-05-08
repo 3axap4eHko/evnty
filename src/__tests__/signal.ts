@@ -1,4 +1,4 @@
-import { Signal } from '../index';
+import { Signal } from '../signal';
 
 const scheduleSignal = <T>(signal: Signal<T>, value: T, success: boolean) => {
     process.nextTick((value: T) => {

@@ -3,9 +3,8 @@ build
 coverage
 node_modules
 *.log*
-*.tmp.ts
 yaee.js
 .cache
 .temp
 docs/.vuepress/dist
-docs/tmp.md
+*.tmp.*
