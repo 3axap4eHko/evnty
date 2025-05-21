@@ -64,7 +64,7 @@
     "@eslint/js": "^9.27.0",
     "@swc/jest": "^0.2.38",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.15.19",
+    "@types/node": "^22.15.21",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
     "@typescript-eslint/typescript-estree": "^8.32.1",
