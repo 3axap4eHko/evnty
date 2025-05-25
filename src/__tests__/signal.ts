@@ -7,9 +7,9 @@ const scheduleSignal = <T>(signal: Signal<T>, value: T, success: boolean) => {
 };
 
 describe('Signal test suite', () => {
-
   it('Should create a signal', async () => {
-    new Signal<string>();
+    const signal = new Signal<string>();
+    expect(signal[Symbol.toStringTag]).toEqual(`Signal`);
   });
 
   it('Should send a signal', async () => {
@@ -21,10 +21,7 @@ describe('Signal test suite', () => {
   it('Should abort a signal', async () => {
     const ctrl = new AbortController();
     const signal = new Signal<string>(ctrl.signal);
-
-    expect(signal[Symbol.toStringTag]).toEqual(`Signal(active)`);
     ctrl.abort('error');
-    expect(signal[Symbol.toStringTag]).toEqual(`Signal(stopped)`);
     expect(signal('test')).toEqual(false);
   });
 

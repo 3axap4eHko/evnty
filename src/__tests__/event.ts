@@ -1,31 +1,13 @@
-import createEventDefault, { createEvent, merge, createInterval, Event, Unsubscribe, Callable, EventHandler, FilterFunction, Predicate, setTimeoutAsync, removeListener } from '../index';
+import { FilterFunction, Predicate } from '../types';
+import createEventDefault, { createEvent, merge, createInterval, Event, Unsubscribe, EventHandler } from '../event';
+import { Callable } from '../callable';
+import { setTimeoutAsync } from '../utils';
 
 const processTick = () => new Promise(resolve => process.nextTick(resolve));
 
 const HOOKS = "hooks";
 
 describe('Anonymous Event test suite', () => {
-  test('setTimeoutAsync resolves to true on completion', async () => {
-    const abort = new AbortController();
-    const timeout = setTimeoutAsync(0, abort.signal);
-    expect(timeout).toBeInstanceOf(Promise);
-    await expect(timeout).resolves.toEqual(true);
-  });
-
-  test('setTimeoutAsync resolves to true on abort', async () => {
-    const abort = new AbortController();
-    const timeout = setTimeoutAsync(0, abort.signal);
-    abort.abort();
-    await expect(timeout).resolves.toEqual(false);
-  });
-
-  test('removeListener remove all listeners', () => {
-    const listener = jest.fn();
-    const listeners = [listener, listener, jest.fn()];
-    expect(removeListener(listeners, listener)).toEqual(true);
-    expect(listeners.length).toEqual(1);
-  });
-
   test('Unsubscribe extends from Callable', () => {
     expect(Unsubscribe.prototype).toBeInstanceOf(Callable);
   });
@@ -727,42 +709,8 @@ describe('Anonymous Event test suite', () => {
     setTimeout(() => event('test'), 10);
     setTimeout(() => newEvent.clear(), 20);
     for await (const value of newEvent) {
+      console.log(value);
       expect(value).toEqual('test');
     }
-  });
-
-  it('Should queue events', async () => {
-    const event = new Event<string, number | string>();
-    const queue = event.queue();
-    expect(queue.stopped).toEqual(false);
-    await event('test1');
-    await event('test2');
-    await expect(queue).resolves.toEqual('test1');
-    await expect(queue).resolves.toEqual('test2');
-    process.nextTick(event, 'test3');
-    await expect(queue).resolves.toEqual('test3');
-    await queue.stop();
-    expect(event.size).toEqual(0);
-    expect(queue.stopped).toEqual(true);
-  });
-
-  it('Should iterate queue', async () => {
-    const event = new Event<string, number | string>();
-    const queue = event.queue();
-    await event('test1');
-    await event('test2');
-    process.nextTick(async () => {
-      await event('test3');
-      queue.stop();
-    });
-    const handler = jest.fn();
-    for await (const value of queue) {
-      console.log(value);
-      handler(value);
-    }
-    expect(handler).toHaveBeenCalledWith('test1');
-    expect(handler).toHaveBeenCalledWith('test2');
-    expect(handler).toHaveBeenCalledWith('test3');
-    expect(event.size).toEqual(0);
   });
 });

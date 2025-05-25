@@ -1,9 +1,10 @@
+import { setTimeout } from 'node:timers/promises';
 import { Sequence } from '../sequence';
 
 describe('Sequence test suite', () => {
   it('Should create a sequence', async () => {
     const sequence = new Sequence<string>();
-    expect(`${sequence}`).toEqual(`[object Sequence(active)]`);
+    expect(`${sequence}`).toEqual(`[object Sequence]`);
   });
 
   it('Should start a sequence', async () => {
@@ -43,9 +44,7 @@ describe('Sequence test suite', () => {
   it('Should abort a sequence', async () => {
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
-    expect(sequence[Symbol.toStringTag]).toEqual(`Sequence(active)`);
     ctrl.abort('error');
-    expect(sequence[Symbol.toStringTag]).toEqual(`Sequence(stopped)`);
     expect(sequence(0)).toEqual(false);
   });
 
@@ -60,6 +59,21 @@ describe('Sequence test suite', () => {
     for await (const value of sequence) {
       expect(iterator.next().value).toEqual(value);
     }
+  });
+
+  it('Should reserve sequence capacity', async () => {
+    const values = [0, 1, 2, 3, 4, 5];
+    const ctrl = new AbortController();
+    const sequence = new Sequence<number>(ctrl.signal);
+    expect(values.every(sequence)).toEqual(true);
+    queueMicrotask(async () => {
+      while (sequence.size !== 0) {
+        await sequence.next();
+        await setTimeout(0);
+      }
+    });
+    await sequence.reserve(3);
+    expect(sequence.size).toEqual(3);
   });
 
   it('Should abort a sequence iteration and kill sequence', async () => {
