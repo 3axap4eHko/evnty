@@ -6,7 +6,7 @@
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
 
-0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
+High-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
 
 <div align="center">
   <a href="https://github.com/3axap4ehko/evnty">
@@ -14,7 +14,6 @@
   </a>
   <br>
   <br>
-
 </div>
 
 ## Table of Contents

@@ -1,4 +1,5 @@
 import { toAsyncIterable, pipe } from './utils.js';
+import { Sequence } from './sequence.js';
 
 export class AsyncIteratorObject<T, TReturn, TNext> {
   static from<T, TReturn, TNext>(iterable: Iterable<T, TReturn, TNext>): AsyncIteratorObject<T, TReturn, TNext> {
@@ -6,30 +7,54 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
     return new AsyncIteratorObject<T, TReturn, TNext>(asyncIterable);
   }
 
+  static merge<T>(...iterables: AsyncIterable<T, void, unknown>[]): AsyncIteratorObject<T, void, unknown> {
+    return new AsyncIteratorObject<T, void, unknown>({
+      [Symbol.asyncIterator]() {
+        const ctrl = new AbortController();
+        const sequence = new Sequence<T>(ctrl.signal);
+        let counter = iterables.length;
+        for (const iterable of iterables) {
+          queueMicrotask(async () => {
+            for await (const value of iterable) {
+              sequence(value);
+            }
+            if (--counter === 0) {
+              ctrl.abort();
+            }
+          });
+        }
+
+        return sequence[Symbol.asyncIterator]();
+      },
+    });
+  }
+
   #iterable: AsyncIterable<T, TReturn, TNext>;
+
+  readonly [Symbol.toStringTag] = 'AsyncIteratorObject';
 
   constructor(iterable: AsyncIterable<T, TReturn, TNext>) {
     this.#iterable = iterable;
   }
 
-  get [Symbol.toStringTag]() {
-    return `AsyncIteratorObject`;
+  pipe<U>(generatorFactory: () => (value: T) => AsyncIterable<U>, signal?: AbortSignal): AsyncIteratorObject<U, void, unknown> {
+    const generator = pipe<T, U>(this.#iterable, generatorFactory, signal);
+    return new AsyncIteratorObject<U, void, unknown>(generator);
   }
 
   map<U>(callbackfn: (value: T, index: number) => U): AsyncIteratorObject<U, void, unknown> {
-    const generator = pipe(this.#iterable, () => {
+    return this.pipe(() => {
       let index = 0;
       return async function* (value) {
         yield await callbackfn(value, index++);
       };
     });
-    return new AsyncIteratorObject<U, void, unknown>(generator);
   }
 
   filter(predicate: (value: T, index: number) => unknown): AsyncIteratorObject<T, void, unknown>;
   filter<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown>;
   filter<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown> {
-    const generator = pipe(this.#iterable, () => {
+    return this.pipe(() => {
       let index = 0;
       return async function* (value) {
         if (predicate(value, index++)) {
@@ -37,7 +62,6 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
         }
       };
     });
-    return new AsyncIteratorObject<S, void, unknown>(generator);
   }
 
   /**
@@ -45,7 +69,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param limit The maximum number of values to yield.
    */
   take(limit: number): AsyncIteratorObject<T, void, unknown> {
-    const generator = pipe(this.#iterable, () => {
+    return this.pipe(() => {
       let index = 0;
       const ctrl = new AbortController();
       return async function* (value) {
@@ -56,7 +80,6 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
         }
       };
     });
-    return new AsyncIteratorObject<T, void, unknown>(generator);
   }
 
   /**
@@ -64,7 +87,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param count The number of values to drop.
    */
   drop(count: number): AsyncIteratorObject<T, void, unknown> {
-    const generator = pipe(this.#iterable, () => {
+    return this.pipe(() => {
       let index = 0;
       return async function* (value) {
         if (index++ >= count) {
@@ -72,7 +95,6 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
         }
       };
     });
-    return new AsyncIteratorObject<T, void, unknown>(generator);
   }
 
   /**
@@ -80,7 +102,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param callback A function that accepts up to two arguments to be used to transform values from the underlying iterator into new iterators or iterables to be flattened into the result.
    */
   flatMap<U>(callback: (value: T, index: number) => AsyncIterable<U, void, unknown>): AsyncIteratorObject<U, void, unknown> {
-    const generator = pipe(this.#iterable, () => {
+    return this.pipe(() => {
       let index = 0;
       return async function* (value) {
         for await (const flat of callback(value, index++)) {
@@ -88,7 +110,6 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
         }
       };
     });
-    return new AsyncIteratorObject<U, void, unknown>(generator);
   }
 
   /**
@@ -100,7 +121,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   reduce<R>(callbackfn: (previousValue: R, currentValue: T, currentIndex: number) => R, initialValue: R): AsyncIteratorObject<R, void, unknown>;
   reduce<R>(callbackfn: (previousValue: R, currentValue: T, currentIndex: number) => R, ...args: unknown[]): AsyncIteratorObject<R, void, unknown> {
     const hasInit = args.length > 0;
-    const generator = pipe(this.#iterable, () => {
+    return this.pipe(() => {
       let index = 0;
       const state = { initialized: false, value: undefined as unknown as R };
       return async function* (value) {
@@ -120,7 +141,21 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
         index++;
       };
     });
-    return new AsyncIteratorObject<R, void, unknown>(generator);
+  }
+
+  /**
+   * Transforms each value into multiple values using an expander function. The expander function takes
+   */
+  expand<U>(callbackfn: (value: T, index: number) => Promise<Iterable<U>> | Iterable<U>): AsyncIteratorObject<U, void, unknown> {
+    return this.pipe(() => {
+      let index = 0;
+      return async function* (value) {
+        const values = await callbackfn(value, index++);
+        for await (const expanded of values) {
+          yield expanded;
+        }
+      };
+    });
   }
 
   [Symbol.asyncIterator]() {

@@ -1,11 +1,37 @@
-import { Callable } from './callable.js';
+import { RingBuffer } from 'fastds';
+import { CallableAsyncIterator } from './callable.js';
 import { Signal } from './signal.js';
-import { Ring } from './ring.js';
 
-export class Sequence<T> extends Callable<[T], boolean> implements Promise<T>, AsyncIterable<T> {
-  private queue: Ring<T>;
+export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
+  private queue: RingBuffer<T>;
   private nextSignal: Signal<boolean>;
-  private dequeueSignal: Signal<void>;
+  private sendSignal: Signal<void>;
+
+  readonly [Symbol.toStringTag] = 'Sequence';
+
+  static merge<T>(...sequences: Sequence<T>[]): Sequence<T> {
+    const ctrl = new AbortController();
+    const merged = new Sequence<T>(ctrl.signal);
+    let counter = sequences.length;
+    for (const source of sequences) {
+      queueMicrotask(async () => {
+        try {
+          for await (const value of source) {
+            merged(value);
+          }
+        } catch {
+          // sequence is aborted
+        } finally {
+          if (--counter === 0) {
+            ctrl.abort();
+            console.log('DONE');
+          }
+        }
+      });
+    }
+
+    return merged;
+  }
 
   constructor(private readonly abortSignal?: AbortSignal) {
     super((value: T) => {
@@ -14,20 +40,14 @@ export class Sequence<T> extends Callable<[T], boolean> implements Promise<T>, A
         return false;
       } else {
         this.queue.push(value);
-        if (this.queue.length === 1) {
-          this.nextSignal(true);
-        }
+        this.nextSignal(true);
         return true;
       }
     });
-    this.queue = new Ring();
+    this.queue = new RingBuffer();
     this.nextSignal = new Signal(this.abortSignal);
-    this.dequeueSignal = new Signal(this.abortSignal);
+    this.sendSignal = new Signal(this.abortSignal);
     this.abortSignal?.addEventListener('abort', () => this.nextSignal(false), { once: true });
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'Sequence';
   }
 
   get size(): number {
@@ -36,7 +56,7 @@ export class Sequence<T> extends Callable<[T], boolean> implements Promise<T>, A
 
   async reserve(capacity: number): Promise<void> {
     while (this.queue.length > capacity) {
-      await this.dequeueSignal;
+      await this.sendSignal;
       await new Promise((resolve) => setImmediate(resolve));
     }
   }
@@ -45,39 +65,11 @@ export class Sequence<T> extends Callable<[T], boolean> implements Promise<T>, A
     if (!this.queue.length) {
       await this.nextSignal;
     }
-    this.dequeueSignal();
+    this.sendSignal();
     return this.queue.shift()!;
   }
 
-  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null): Promise<T | OK> {
-    return this.next().catch(onrejected);
-  }
-
-  finally(onfinally?: (() => void) | null): Promise<T> {
-    return this.next().finally(onfinally);
-  }
-
-  then<OK = T, ERR = never>(
-    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null,
-    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null,
-  ): Promise<OK | ERR> {
-    return this.next().then(onfulfilled, onrejected);
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
-    return {
-      next: async () => {
-        try {
-          const value = await this.next();
-          return { value, done: false };
-        } catch {
-          return { value: undefined, done: true };
-        }
-      },
-      return: () => {
-        this.nextSignal(false);
-        return Promise.resolve({ value: undefined, done: true });
-      },
-    };
+  [Symbol.dispose](): void {
+    this.nextSignal(false);
   }
 }

@@ -1,10 +1,11 @@
+import { vi } from 'vitest';
 import { setTimeout } from 'node:timers/promises';
 import { Sequence } from '../sequence';
 
 describe('Sequence test suite', () => {
   it('Should create a sequence', async () => {
     const sequence = new Sequence<string>();
-    expect(`${sequence}`).toEqual(`[object Sequence]`);
+    expect(sequence[Symbol.toStringTag]).toEqual(`Sequence`);
   });
 
   it('Should start a sequence', async () => {
@@ -16,12 +17,69 @@ describe('Sequence test suite', () => {
     }
   });
 
+  it('Should pass values to another sequence', async () => {
+    const values = [0, 1, 2, 3, 4, 5];
+    const a = new Sequence<number>();
+    const b = new Sequence<number>();
+
+    expect(values.slice(0, values.length).every(a)).toEqual(true);
+    expect(a.size).toBe(values.length);
+    const ctrl = new AbortController();
+
+    queueMicrotask(async () => {
+      try {
+        for await (const value of a) {
+          if (!b(value)) {
+            break;
+          }
+        }
+      } catch {
+        //
+      } finally {
+        ctrl.abort();
+      }
+    });
+
+    for await (const value of values) {
+      await expect(b.next()).resolves.toEqual(value);
+    }
+  });
+
+  it('Should merge sequences', async () => {
+    const values = [0, 1, 2, 3, 4, 5];
+    const ctrl = new AbortController();
+    const a = new Sequence<number>(ctrl.signal);
+    const b = new Sequence<number>(ctrl.signal);
+    const sequence = Sequence.merge(a, b);
+    expect(values.slice(0, values.length / 2).every(a)).toEqual(true);
+    expect(a.size).toBe(values.length / 2);
+    expect(values.slice(values.length / 2).every(b)).toEqual(true);
+    expect(b.size).toBe(values.length / 2);
+
+    values.push(6, 7);
+
+    const result: number[] = [];
+    for await (const value of sequence) {
+      result.push(value);
+      if (value === values[values.length - 1]) {
+        ctrl.abort();
+      }
+      if (value === 5) {
+        expect(a(6)).toBe(true);
+      }
+      if (value === 6) {
+        expect(a(7)).toBe(true);
+      }
+    }
+    expect(result.sort()).toEqual(values);
+  });
+
   it('Should implement Promise', async () => {
     const ctrl = new AbortController();
     const sequence = new Sequence(ctrl.signal);
 
     sequence('then');
-    const thenMock = jest.fn(v => v);
+    const thenMock = vi.fn(v => v);
     await expect(sequence.then(thenMock)).resolves.toEqual('then');
     expect(thenMock).toHaveBeenCalledTimes(1);
     ctrl.abort('error');
@@ -30,11 +88,11 @@ describe('Sequence test suite', () => {
     await expect(sequence.then(thenMock)).rejects.toEqual('error');
     expect(thenMock).toHaveBeenCalledTimes(0);
 
-    const catchMock = jest.fn().mockReturnValue('catch');
+    const catchMock = vi.fn().mockReturnValue('catch');
     await expect(sequence.catch(catchMock)).resolves.toEqual('catch');
     expect(catchMock).toHaveBeenCalledTimes(1);
 
-    const finallyMock = jest.fn();
+    const finallyMock = vi.fn();
     await expect(sequence.finally(finallyMock)).rejects.toEqual('error');
     expect(finallyMock).toHaveBeenCalledTimes(1);
 
@@ -55,9 +113,22 @@ describe('Sequence test suite', () => {
     expect(values.every(sequence)).toEqual(true);
     ctrl.abort('done');
 
-    const iterator = values.values();
-    for await (const value of sequence) {
-      expect(iterator.next().value).toEqual(value);
+    for await (const value of values) {
+      await expect(sequence.next()).resolves.toEqual(value);
+    }
+  });
+
+  it('Should iterate a sequence late', async () => {
+    const values = [0, 1, 2, 3, 4, 5];
+    const ctrl = new AbortController();
+    const sequence = new Sequence<number>(ctrl.signal);
+    queueMicrotask(() => {
+      expect(values.every(sequence)).toEqual(true);
+      ctrl.abort('done');
+    });
+
+    for await (const value of values) {
+      await expect(sequence.next()).resolves.toEqual(value);
     }
   });
 

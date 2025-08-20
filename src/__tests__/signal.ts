@@ -1,15 +1,26 @@
+import { vi } from 'vitest';
 import { Signal } from '../signal';
 
 const scheduleSignal = <T>(signal: Signal<T>, value: T, success: boolean) => {
-    process.nextTick((value: T) => {
-      expect(signal(value)).toEqual(success);
-    }, value);
+  process.nextTick((value: T) => {
+    expect(signal(value)).toEqual(success);
+  }, value);
 };
 
 describe('Signal test suite', () => {
   it('Should create a signal', async () => {
     const signal = new Signal<string>();
     expect(signal[Symbol.toStringTag]).toEqual(`Signal`);
+  });
+
+  it('should merge signals', async () => {
+    const a = new Signal<string>();
+    const b = new Signal<string>();
+    const signal = Signal.merge(a, b);
+    scheduleSignal(a, 'test', true);
+    await expect(signal).resolves.toEqual('test');
+    scheduleSignal(b, 'test', true);
+    await expect(signal).resolves.toEqual('test');
   });
 
   it('Should send a signal', async () => {
@@ -37,7 +48,7 @@ describe('Signal test suite', () => {
     const signal = new Signal<string>(ctrl.signal);
     scheduleSignal(signal, 'test', true);
 
-    const thenMock = jest.fn(v => v);
+    const thenMock = vi.fn(v => v);
     await expect(signal.then(thenMock)).resolves.toEqual('test');
     expect(thenMock).toHaveBeenCalledTimes(1);
     ctrl.abort('error');
@@ -46,11 +57,11 @@ describe('Signal test suite', () => {
     await expect(signal.then(thenMock)).rejects.toEqual('error');
     expect(thenMock).toHaveBeenCalledTimes(0);
 
-    const catchMock = jest.fn().mockReturnValue('catch');
+    const catchMock = vi.fn().mockReturnValue('catch');
     await expect(signal.catch(catchMock)).resolves.toEqual('catch');
     expect(catchMock).toHaveBeenCalledTimes(1);
 
-    const finallyMock = jest.fn();
+    const finallyMock = vi.fn();
     await expect(signal.finally(finallyMock)).rejects.toEqual('error');
     expect(finallyMock).toHaveBeenCalledTimes(1);
   });

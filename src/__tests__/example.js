@@ -1,4 +1,4 @@
-const { createEvent, Event, once } = require('evnty');
+const { createEvent, merge, once } = require('evnty');
 
 // Creates a click event
 const clickEvent = createEvent();
@@ -12,7 +12,7 @@ const unsubscribeKeyPress = keyPressEvent.on(handleKeyPress);
 
 // Merges click and key press events into input event
 const handleInput = (input) => console.log('Input', input);;
-const inputEvent = Event.merge(clickEvent, keyPressEvent);
+const inputEvent = merge(clickEvent, keyPressEvent);
 inputEvent.on(handleInput);
 
 // Filters a click event to only include left-click events.
