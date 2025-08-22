@@ -106,10 +106,23 @@ export class EventResult<T> implements PromiseLike<T[]> {
 }
 
 /**
- * A class representing an anonymous event that can be listened to or triggered.
+ * A class representing a multi-listener event emitter with async support.
+ * Events allow multiple listeners to react to emitted values, with each listener
+ * potentially returning a result. All listeners are called for each emission.
  *
- * @template T - The event type.
- * @template R - The return type of the event.
+ * Key characteristics:
+ * - Multiple listeners - all are called for each emission
+ * - Listeners can return values collected in EventResult
+ * - Supports async listeners and async iteration
+ * - Provides lifecycle hooks for listener management
+ * - Memory efficient using RingBuffer for storage
+ *
+ * Differs from:
+ * - Signal: Events have multiple persistent listeners vs Signal's one-time resolution per consumer
+ * - Sequence: Events broadcast to all listeners vs Sequence's single consumer queue
+ *
+ * @template T - The type of value emitted to listeners (event payload)
+ * @template R - The return type of listener functions
  */
 export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, EventResult<void | R>> {
   /**
@@ -146,7 +159,6 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    */
   constructor(dispose?: Callback) {
     const listeners = new RingBuffer<Listener<T, R>>();
-    // passes listeners exceptions to catch method
     super((value: T): EventResult<void | R> => {
       const results = listeners.toArray().map(async (listener) => listener(await value));
       return new EventResult(results);
@@ -368,7 +380,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
   }
 
   [Symbol.dispose](): void {
-    this.dispose();
+    void this.dispose();
   }
 }
 
@@ -432,18 +444,24 @@ export const createInterval = <R = unknown>(interval: number): Event<number, R> 
 };
 
 /**
- * Creates a new instance of the `Event` class, which allows for the registration of event handlers that get called when the event is emitted.
- * This factory function simplifies the creation of events by encapsulating the instantiation logic, providing a clean and simple API for event creation.
+ * Creates a new Event instance for multi-listener event handling.
+ * This is the primary way to create events in the library.
  *
- * @template T - The tuple of argument types that the event will accept.
- * @template R - The return type of the event handler function, which is emitted after processing the event data.
- * @returns {Event<T, R>} A new instance of the `Event` class, ready to have listeners added to it.
+ * @template T - The type of value emitted to listeners (event payload)
+ * @template R - The return type of listener functions (collected in EventResult)
+ * @returns {Event<T, R>} A new Event instance ready for listener registration
  *
  * ```typescript
- * // Create a new event that accepts a string and returns the string length
- * const myEvent = createEvent<string, number>();
- * myEvent.on((str: string) => str.length);
- * myEvent('hello').then(results => console.log(results)); // Logs: [5]
+ * // Create an event that accepts a string payload
+ * const messageEvent = createEvent<string>();
+ * messageEvent.on(msg => console.log('Received:', msg));
+ * messageEvent('Hello'); // All listeners receive 'Hello'
+ *
+ * // Create an event where listeners return values
+ * const validateEvent = createEvent<string, boolean>();
+ * validateEvent.on(str => str.length > 0);
+ * validateEvent.on(str => str.length < 100);
+ * const results = await validateEvent('test'); // EventResult with [true, true]
  * ```
  */
 export const createEvent = <T = unknown, R = unknown>(): Event<T, R> => new Event<T, R>();
@@ -451,38 +469,50 @@ export const createEvent = <T = unknown, R = unknown>(): Event<T, R> => new Even
 export default createEvent;
 
 /**
- * A type helper that extracts the event listener type
+ * Extracts the listener function type from an Event type.
+ * Useful for type-safe listener definitions.
  *
- * @template E - The event type.
+ * @template E - The Event type to extract the listener type from
+ *
+ * @example
+ * ```typescript
+ * type MyEvent = Event<string, boolean>;
+ * type MyListener = EventHandler<MyEvent>; // (value: string) => boolean | Promise<boolean>
+ * ```
  */
 export type EventHandler<E> = E extends Event<infer T, infer R> ? Listener<T, R> : never;
 
 /**
- * A type helper that extracts the event filter type
+ * Extracts a filter function type for an Event's parameters.
+ * Used for creating type-safe event filters.
  *
- * @template E - The event type to filter.
+ * @template E - The Event type to create a filter for
  */
 export type EventFilter<E> = FilterFunction<EventParameters<E>>;
 
 /**
- * A type helper that extracts the event predicate type
+ * Extracts a predicate function type for an Event's parameters.
+ * Used for type narrowing with event values.
  *
- * @template E - The event type to predicate.
+ * @template E - The Event type to create a predicate for
+ * @template P - The narrowed type that the predicate validates
  */
 export type EventPredicate<E, P extends EventParameters<E>> = Predicate<EventParameters<E>, P>;
 
 /**
- * A type helper that extracts the event mapper type
+ * Extracts a mapper function type for transforming Event parameters.
+ * Used for creating type-safe event value transformations.
  *
- * @template E - The event type to map.
- * @template M - The new type to map `E` to.
+ * @template E - The Event type to create a mapper for
+ * @template M - The target type to map event values to
  */
 export type EventMapper<E, M> = Mapper<EventParameters<E>, M>;
 
 /**
- * A type helper that extracts the event mapper type
+ * Extracts a reducer function type for Event parameters.
+ * Used for creating type-safe event value reducers.
  *
- * @template E - The type of event to reduce.
- * @template R - The type of reduced event.
+ * @template E - The Event type to create a reducer for
+ * @template R - The accumulator type for the reduction
  */
 export type EventReducer<E, R> = Reducer<EventParameters<E>, R>;

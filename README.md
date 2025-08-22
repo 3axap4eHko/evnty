@@ -6,7 +6,7 @@
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
 
-High-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
+Async-first, reactive event handling library for complex event flows with three powerful primitives: **Event** (multi-listener broadcast), **Signal** (promise-like coordination), and **Sequence** (async queue). Built for both browser and Node.js with full TypeScript support.
 
 <div align="center">
   <a href="https://github.com/3axap4ehko/evnty">
@@ -18,29 +18,113 @@ High-performance, reactive event handling library optimized for both browser and
 
 ## Table of Contents
 
+- [Core Concepts](#core-concepts)
 - [Motivation](#motivation)
 - [Features](#features)
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [Documentation](https://3axap4ehko.github.io/evnty/)
 - [Examples](#examples)
-- [Migration](#migration)
 - [License](#license)
+
+## Core Concepts
+
+Evnty provides three complementary async primitives, each designed for specific patterns:
+
+### 🔊 Event - Multi-Listener Broadcasting
+Events allow multiple listeners to react to values. All registered listeners are called for each emission.
+
+```typescript
+const clickEvent = createEvent<{ x: number, y: number }>();
+
+// Multiple listeners can subscribe
+clickEvent.on(({ x, y }) => console.log(`Click at ${x},${y}`));
+clickEvent.on(({ x, y }) => updateUI(x, y));
+
+// All listeners receive the value
+clickEvent({ x: 100, y: 200 });
+```
+
+**Use Event when:**
+- Multiple components need to react to the same occurrence
+- You need pub/sub or observer pattern
+- Listeners should persist across multiple emissions
+
+### 📡 Signal - Promise-Based Coordination
+Signals are for coordinating async operations. When a value is sent, ALL waiting consumers receive it (broadcast).
+
+```typescript
+const signal = new Signal<string>();
+
+// Multiple consumers can wait
+const promise1 = signal.next();
+const promise2 = signal.next();
+
+// Send value - all waiting consumers receive it
+signal('data');
+const [result1, result2] = await Promise.all([promise1, promise2]);
+// result1 === 'data' && result2 === 'data'
+```
+
+**Use Signal when:**
+- You need one-time notifications
+- Multiple async operations need the same trigger
+- Implementing async coordination patterns
+
+### 📦 Sequence - Async Queue (FIFO)
+Sequences are FIFO queues for single-consumer scenarios. Values are consumed in order, with backpressure support.
+
+```typescript
+const taskQueue = new Sequence<Task>();
+
+// Producer adds tasks
+taskQueue(task1);
+taskQueue(task2);
+taskQueue(task3);
+
+// Single consumer processes in order
+for await (const task of taskQueue) {
+  await processTask(task); // task1, then task2, then task3
+}
+```
+
+**Use Sequence when:**
+- You need ordered processing (FIFO)
+- Only one consumer should handle each value
+- You want backpressure control with `reserve()`
+
+### Key Differences
+
+| | Event | Signal | Sequence |
+|---|---|---|---|
+| **Consumers** | Multiple persistent listeners | Multiple one-time receivers | Single consumer |
+| **Delivery** | All listeners called | All waiting get same value | Each value consumed once |
+| **Pattern** | Pub/Sub | Broadcast coordination | Queue/Stream |
+| **Persistence** | Listeners stay registered | Resolves once per `next()` | Values queued until consumed |
 
 ## Motivation
 
-In traditional event handling in TypeScript, events are often represented as strings, and there's no easy way to apply functional transformations like filtering or mapping directly on the event data. This approach lacks type safety, and chaining operations require additional boilerplate, making the code verbose and less maintainable.
+Traditional event handling in JavaScript/TypeScript has limitations:
+- String-based event names lack type safety
+- No built-in async coordination primitives
+- Missing functional transformations for event streams
+- Complex patterns require extensive boilerplate
 
-The proposed library introduces a robust `Event` abstraction that encapsulates event data and provides a suite of functional methods like `map`, `filter`, `reduce`, `debounce`, etc., allowing for a more declarative and type-safe approach to event handling. This design facilitates method chaining and composition, making the code more readable and maintainable. For instance, it allows developers to create new events by transforming or filtering existing ones, thus promoting code reusability and modularity.
+Evnty solves these problems by providing:
+- **Type-safe events** with full TypeScript inference
+- **Three specialized primitives** for different async patterns
+- **Rich functional operators** (map, filter, reduce, debounce, batch, etc.)
+- **Composable abstractions** that work together seamlessly
 
 ## Features
 
-- Modern: Supports Promises and module systems ESM and CommonJS
-- Zero Dependencies: Utilizes native features for optimal performance.
-- Full TypeScript Support: Ensures type safety and improves developer experience.
-- Functional Programming Techniques: Offers map, filter, reduce, expand, and more for event handling.
-- Flexible Environment Support: Works seamlessly in both the browser and Node.js, including service workers.
-- Performance Optimized: Competes with and exceeds other well-known libraries like EventEmitter3 and EventEmitter2 in performance benchmarks.
+- **Async-First Design**: Built from the ground up for asynchronous event handling with full Promise support
+- **Functional Programming**: Rich set of operators including map, filter, reduce, debounce, batch, and expand for event stream transformations
+- **Type-Safe**: Full TypeScript support with strong typing and inference throughout the event pipeline
+- **Async Iteration**: Events can be consumed as async iterables using for-await-of loops
+- **Event Composition**: Merge, combine, and transform multiple event streams into new events
+- **Minimal Dependencies**: Lightweight with only essential dependencies for optimal bundle size
+- **Universal**: Works seamlessly in both browser and Node.js environments, including service workers
 
 ## Platform Support
 
@@ -77,71 +161,109 @@ npm install evnty
 
 ## Examples
 
-```js
-import { createEvent, Event } from 'evnty';
+### Event - Multi-Listener Pattern
+```typescript
+import { createEvent } from 'evnty';
 
-// Creates a click event
-type Click = { button: string };
-const clickEvent = createEvent<Click>();
-const handleClick = ({ button }: Click) => console.log('Clicked button is', button);
-const unsubscribeClick = clickEvent.on(handleClick);
+// Create a typed event
+const userEvent = createEvent<{ id: number, name: string }>();
 
-// Creates a key press event
-type KeyPress = { key: string };
-const keyPressEvent = createEvent<KeyPress>();
-const handleKeyPress = ({ key }: KeyPress) => console.log('Key pressed', key);
-const unsubscribeKeyPress = keyPressEvent.on(handleKeyPress);
+// Multiple listeners
+userEvent.on(user => console.log('Logger:', user));
+userEvent.on(user => updateUI(user));
+userEvent.on(user => saveToCache(user));
 
-// Merges click and key press events into input event
-type Input = Click | KeyPress;
-const handleInput = (input: Input) => console.log('Input', input);;
-const inputEvent = Event.merge(clickEvent, keyPressEvent);
-inputEvent.on(handleInput);
+// Emit - all listeners are called
+userEvent({ id: 1, name: 'Alice' });
 
-// Filters a click event to only include left-click events.
-const handleLeftClick = () => console.log('Left button is clicked');
-const leftClickEvent = clickEvent.filter(({ button }) => button === 'left');
-leftClickEvent.on(handleLeftClick);
+// Functional transformations
+const adminEvent = userEvent
+  .filter(user => user.id < 100)
+  .map(user => ({ ...user, role: 'admin' }));
 
-// Will press Enter after one second
-setTimeout(keyPressEvent, 1000, { key: 'Enter' });
-// Waits once the first Enter key press event occurs
-await keyPressEvent.first(({ key }) => key === 'Enter').onceAsync();
+// Async iteration
+for await (const user of userEvent) {
+  console.log('User event:', user);
+}
+```
 
-keyPressEvent({ key: 'W' });
-keyPressEvent({ key: 'A' });
-keyPressEvent({ key: 'S' });
-keyPressEvent({ key: 'D' });
+### Signal - Async Coordination
+```typescript
+import { Signal } from 'evnty';
 
-clickEvent({ button: 'right' });
-clickEvent({ button: 'left' });
-clickEvent({ button: 'middle' });
+// Coordinate multiple async operations
+const dataSignal = new Signal<Buffer>();
 
-// Unsubscribe click listener
-unsubscribeClick();
-// It does not log anything because of click listener is unsubscribed
-leftClickEvent.off(handleLeftClick);
+// Multiple operations wait for the same data
+async function processA() {
+  const data = await dataSignal.next();
+  // Process data in way A
+}
 
-// Unsubscribe key press listener once first Esc key press occur
-unsubscribeKeyPress.after(() => keyPressEvent
-  .first(({ key }) => key === 'Esc')
-  .onceAsync()
-);
-// Press Esc to unsubscribe key press listener
-keyPressEvent({ key: 'Esc' });
+async function processB() {
+  const data = await dataSignal.next();
+  // Process data in way B
+}
 
-const messageEvent = createEvent();
-const messagesBatchEvent = messageEvent.debounce(100);
+// Start both processors
+Promise.all([processA(), processB()]);
 
-const messageEvent = createEvent();
-const messagesBatchEvent = messageEvent.batch(100);
+// Both receive the same data when it arrives
+dataSignal(Buffer.from('shared data'));
+```
 
+### Sequence - Task Queue
+```typescript
+import { Sequence } from 'evnty';
+
+// Create a task queue
+const taskQueue = new Sequence<() => Promise<void>>();
+
+// Single consumer processes tasks in order
+(async () => {
+  for await (const task of taskQueue) {
+    await task();
+    console.log('Task completed');
+  }
+})();
+
+// Multiple producers add tasks
+taskQueue(async () => fetchData());
+taskQueue(async () => processData());
+taskQueue(async () => saveResults());
+
+// Backpressure control
+await taskQueue.reserve(10); // Wait until queue has ≤10 items
+taskQueue(async () => nonUrgentTask());
+```
+
+### Combining Primitives
+```typescript
+// Event + Signal for request/response pattern
+const requestEvent = createEvent<Request>();
+const responseSignal = new Signal<Response>();
+
+requestEvent.on(async (req) => {
+  const response = await handleRequest(req);
+  responseSignal(response);
+});
+
+// Event + Sequence for buffered processing
+const dataEvent = createEvent<Data>();
+const processQueue = new Sequence<Data>();
+
+dataEvent.on(data => processQueue(data));
+
+// Process with controlled concurrency
+for await (const data of processQueue) {
+  await processWithRateLimit(data);
+}
 ```
 
 ## License
 
 License [The MIT License](./LICENSE)
-Copyright (c) 2024 Ivan Zakharchanka
+Copyright (c) 2025 Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200

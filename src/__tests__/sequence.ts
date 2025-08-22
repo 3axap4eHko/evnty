@@ -48,9 +48,10 @@ describe('Sequence test suite', () => {
   it('Should merge sequences', async () => {
     const values = [0, 1, 2, 3, 4, 5];
     const ctrl = new AbortController();
+    const sequence = new Sequence<number>(ctrl.signal);
     const a = new Sequence<number>(ctrl.signal);
     const b = new Sequence<number>(ctrl.signal);
-    const sequence = Sequence.merge(a, b);
+    Sequence.merge(sequence, a, b);
     expect(values.slice(0, values.length / 2).every(a)).toEqual(true);
     expect(a.size).toBe(values.length / 2);
     expect(values.slice(values.length / 2).every(b)).toEqual(true);
@@ -182,5 +183,32 @@ describe('Sequence test suite', () => {
 
     expect(sequence(4)).toEqual(true);
     await expect(sequence).resolves.toEqual(4);
+  });
+
+  it('Should handle race condition', async () => {
+    const sequence = new Sequence<number>();
+    process.nextTick(async () => {
+      sequence(1);
+      await setTimeout(1);
+      sequence(2);
+    });
+    const values = await Promise.all([sequence, sequence]);
+    expect(values).toEqual([1, 2]);
+  });
+
+  it('Should handle merge with throwing source iterator', async () => {
+    const ctrl = new AbortController();
+    const target = new Sequence<number>(ctrl.signal);
+    const source = {
+      async *[Symbol.asyncIterator]() {
+        yield 1;
+        throw new Error('test error');
+      }
+    } as Sequence<number>;
+    
+    Sequence.merge(target, source);
+    
+    await expect(target).resolves.toEqual(1);
+    ctrl.abort();
   });
 });

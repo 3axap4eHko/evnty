@@ -1,6 +1,6 @@
 {
   "name": "evnty",
-  "description": "High-performance, reactive event handling library optimized for both browser and Node.js environments",
+  "description": "Async-first, reactive event handling library for complex event flows in browser and Node.js",
   "version": "5.0.0-rc.0",
   "type": "module",
   "types": "build/index.d.ts",
@@ -26,7 +26,6 @@
     "docs:dev": "vuepress dev docs",
     "docs:gen": "rm -f docs/*.tmp.md && for file in src/*.ts; do node --loader ts-node/esm ./scripts/docgen.ts $file; done",
     "docs:update-package": "pnpm dlx vp-update",
-    "bench": "overtake benchmarks/queues.js",
     "prepare": "husky"
   },
   "repository": {
@@ -66,7 +65,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
-    "@toolbuilder/ring-buffer": "^1.2.3",
     "@types/node": "^24.3.0",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
@@ -87,7 +85,7 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.40.0",
     "vitest": "^3.2.4",
-    "vue": "^3.5.18",
+    "vue": "^3.5.19",
     "vuepress": "2.0.0-rc.23"
   },
   "packageManager": "pnpm@10.15.0+sha512.486ebc259d3e999a4e8691ce03b5cac4a71cbeca39372a9b762cb500cfdf0873e2cb16abe3d951b1ee2cf012503f027b98b6584e4df22524e0c7450d9ec7aa7b"
