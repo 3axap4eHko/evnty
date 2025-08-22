@@ -4,9 +4,20 @@ export interface Fn<A extends unknown[], R> {
 
 export type MaybePromise<T> = Promise<T> | PromiseLike<T> | T;
 
+export type AnyIterable<T, TReturn, TNext> = Iterable<T, TReturn, TNext> | AsyncIterable<T, TReturn, TNext>;
+
 export interface Callback<R = void> extends Fn<[], MaybePromise<R>> {}
 
 export interface Listener<T, R = unknown> extends Fn<[T], MaybePromise<R | void>> {}
+
+export enum HookType {
+  Add,
+  Remove,
+}
+
+export interface HookListener<T, R> {
+  (listener: Listener<T, R> | undefined, type: HookType): void;
+}
 
 export interface FilterIndexFunction<T> {
   (value: T, index: number): boolean;
@@ -42,17 +53,6 @@ export interface Expander<T, R> {
   (value: T): MaybePromise<R>;
 }
 
-export interface Queue<T> extends Iterable<T> {
-  get [Symbol.toStringTag](): string;
-  get length(): number;
-  enqueue(value: T): this;
-  dequeue(): T | undefined;
-  isEmpty(): boolean;
-  peek(): T | undefined;
-  has(value: T): boolean;
-  clear(): this;
-  compact(filter: FilterFunction<T>): boolean;
-  iter(): Generator<T, void, unknown>;
-  drain(): Generator<T, void, unknown>;
-  [Symbol.iterator](): Iterator<T, any, any>;
+export interface Promiseable<T> {
+  next(): Promise<T>;
 }

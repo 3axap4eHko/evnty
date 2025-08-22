@@ -28,6 +28,7 @@ export default defineUserConfig({
       { text: 'Home', link: '/' },
       { text: 'GitHub', link: 'https://github.com/3axap4ehko/evnty' },
     ],
+    sidebarDepth: 3, // Increase to 3 to show h4 headers, or 4 to show h5
   }),
 
   bundler: viteBundler(),

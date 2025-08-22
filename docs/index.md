@@ -6,8 +6,7 @@
 [![Downloads][downloads-image]][npm-url]
 [![Snyk][snyk-image]][snyk-url]
 
-
-0-dependency, high-performance, reactive event handling library optimized for both browser and Node.js environments. This library introduces a robust and type-safe abstraction for handling events, reducing boilerplate and increasing code maintainability.
+Async-first, reactive event handling library for complex event flows with three powerful primitives: **Event** (multi-listener broadcast), **Signal** (promise-like coordination), and **Sequence** (async queue). Built for both browser and Node.js with full TypeScript support.
 
 <div align="center">
   <a href="https://github.com/3axap4ehko/evnty">
@@ -15,89 +14,181 @@
   </a>
   <br>
   <br>
-
 </div>
 
 ## Table of Contents
 
+- [Core Concepts](#core-concepts)
 - [Motivation](#motivation)
 - [Features](#features)
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [API](#api)
-- [`Signal`](#signal)
-  - [`signal.constructor(private readonly abortSignal?: AbortSignal)`](#signalconstructorprivate-readonly-abortsignal-abortsignal)
-  - [`signal.Symbol.toStringTag(): string`](#signalsymboltostringtag-string)
-  - [`signal.promise(): Promise`](#signalpromise-promise)
-  - [`signal.next()`](#signalnext)
-  - [`signal.catch(onrejected): Promise`](#signalcatchonrejected-promise)
-  - [`signal.finally(onfinally): Promise`](#signalfinallyonfinally-promise)
-  - [`signal.then(onfulfilled, onrejected): Promise`](#signalthenonfulfilled-onrejected-promise)
-  - [`signal.Symbol.asyncIterator(): AsyncIterator`](#signalsymbolasynciterator-asynciterator)
+    - [`EventResult`](#eventresult)
 
-- [`Sequence`](#sequence)
-  - [`sequence.constructor(private readonly abortSignal?: AbortSignal)`](#sequenceconstructorprivate-readonly-abortsignal-abortsignal)
-  - [`sequence.Symbol.toStringTag(): string`](#sequencesymboltostringtag-string)
-  - [`sequence.promise(): Promise`](#sequencepromise-promise)
-  - [`sequence.next(): Promise`](#sequencenext-promise)
-  - [`sequence.catch(onrejected): Promise`](#sequencecatchonrejected-promise)
-  - [`sequence.finally(onfinally): Promise`](#sequencefinallyonfinally-promise)
-  - [`sequence.then(onfulfilled, onrejected): Promise`](#sequencethenonfulfilled-onrejected-promise)
-  - [`sequence.Symbol.asyncIterator(): AsyncIterator`](#sequencesymbolasynciterator-asynciterator)
+      - [`eventresult.constructor(results: MaybePromise[])`](#eventresultconstructorresults-maybepromise)
+      - [`eventresult.then(onfulfilled, onrejected): PromiseLike`](#eventresultthenonfulfilled-onrejected-promiselike)
+      - [`eventresult.all(): Promise`](#eventresultall-promise)
+      - [`eventresult.settled(): Promise`](#eventresultsettled-promise)
+    - [`Event`](#event)
+      - [`event.constructor(dispose?: Callback)`](#eventconstructordispose-callback)
+      - [`event.size(): number`](#eventsize-number)
+      - [`event.disposed(): boolean`](#eventdisposed-boolean)
+      - [`event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
+      - [`event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
+      - [`event.off(listener: Listener): this`](#eventofflistener-listener-this)
+      - [`event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
+      - [`event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
+      - [`event.clear(): this`](#eventclear-this)
+      - [`event.next(): Promise`](#eventnext-promise)
 
-- [`Event`](#event)
-  - [`event.constructor(dispose?: Callback)`](#eventconstructordispose-callback)
-  - [`event.error(): Event`](#eventerror-event)
-  - [`event.size(): number`](#eventsize-number)
-  - [`event.disposed(): boolean`](#eventdisposed-boolean)
-  - [`event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
-  - [`event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
-  - [`event.off(listener: Listener): this`](#eventofflistener-listener-this)
-  - [`event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
-  - [`event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
-  - [`event.clear(): this`](#eventclear-this)
-  - [`event.then(onfulfilled, onrejected): Promise`](#eventthenonfulfilled-onrejected-promise)
-  - [`event.settle(): Promise`](#eventsettle-promise)
-  - [`event.promise(): Promise`](#eventpromise-promise)
-  - [`event.Symbol.asyncIterator(): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
-  - [`event.pipe(generator): Event`](#eventpipegenerator-event)
-  - [`event.generator(generator): AsyncGenerator`](#eventgeneratorgenerator-asyncgenerator)
-  - [`event.filter(predicate: Predicate): Event`](#eventfilterpredicate-predicate-event)
-  - [`event.filter(filter: FilterFunction): Event`](#eventfilterfilter-filterfunction-event)
-  - [`event.filter(filter: Filter): Event`](#eventfilterfilter-filter-event)
-  - [`event.first(predicate: Predicate): Event`](#eventfirstpredicate-predicate-event)
-  - [`event.first(filter: FilterFunction): Event`](#eventfirstfilter-filterfunction-event)
-  - [`event.first(filter: Filter): Event`](#eventfirstfilter-filter-event)
-  - [`event.map(mapper: Mapper): Event`](#eventmapmapper-mapper-event)
-  - [`event.reduce(reducer: Reducer, init?: A): Event`](#eventreducereducer-reducer-init-a-event)
-  - [`event.reduce(reducer: Reducer, ...init: unknown[]): Event`](#eventreducereducer-reducer-init-unknown-event)
-  - [`event.expand(expander: Expander): Event`](#eventexpandexpander-expander-event)
-  - [`event.orchestrate(conductor: Event): Event`](#eventorchestrateconductor-event-event)
-  - [`event.debounce(interval: number): Event`](#eventdebounceinterval-number-event)
-  - [`event.throttle(interval: number): Event`](#eventthrottleinterval-number-event)
-  - [`event.batch(interval: number, size?: number): Event`](#eventbatchinterval-number-size-number-event)
-  - [`event.queue(): Queue`](#eventqueue-queue)
-- [`merge(...events: Events): Event`](#mergeevents-events-event)
-- [`createInterval(interval: number): Event`](#createintervalinterval-number-event)
-- [`createEvent(): Event`](#createevent-event)
+      - [`event.settle(): Promise`](#eventsettle-promise)
+      - [`event.Symbol.asyncIterator(): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
+
+      - [`event.Symbol.dispose(): void`](#eventsymboldispose-void)
+
+    - [`merge(...events: Events): Event`](#mergeevents-events-event)
+    - [`createInterval(interval: number): Event`](#createintervalinterval-number-event)
+    - [`createEvent(): Event`](#createevent-event)
+
+    - [`AsyncIteratorObject`](#asynciteratorobject)
+      - [`asynciteratorobject.from(iterable: Iterable): AsyncIteratorObject`](#asynciteratorobjectfromiterable-iterable-asynciteratorobject)
+      - [`asynciteratorobject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`](#asynciteratorobjectmergeiterables-asynciterable-asynciteratorobject)
+      - [`asynciteratorobject.constructor(iterable: AsyncIterable)`](#asynciteratorobjectconstructoriterable-asynciterable)
+      - [`asynciteratorobject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`](#asynciteratorobjectpipegeneratorfactory-signal-abortsignal-asynciteratorobject)
+      - [`asynciteratorobject.map(callbackfn): AsyncIteratorObject`](#asynciteratorobjectmapcallbackfn-asynciteratorobject)
+      - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+      - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+      - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+      - [`asynciteratorobject.take(limit: number): AsyncIteratorObject`](#asynciteratorobjecttakelimit-number-asynciteratorobject)
+      - [`asynciteratorobject.drop(count: number): AsyncIteratorObject`](#asynciteratorobjectdropcount-number-asynciteratorobject)
+      - [`asynciteratorobject.flatMap(callback): AsyncIteratorObject`](#asynciteratorobjectflatmapcallback-asynciteratorobject)
+      - [`asynciteratorobject.reduce(callbackfn): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-asynciteratorobject)
+      - [`asynciteratorobject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-initialvalue-r-asynciteratorobject)
+      - [`asynciteratorobject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-args-unknown-asynciteratorobject)
+      - [`asynciteratorobject.expand(callbackfn): AsyncIteratorObject`](#asynciteratorobjectexpandcallbackfn-asynciteratorobject)
+      - [`asynciteratorobject.Symbol.asyncIterator()`](#asynciteratorobjectsymbolasynciterator)
+    - [`Sequence`](#sequence)
+      - [`sequence.merge(target: Sequence, ...sequences: Sequence[]): void`](#sequencemergetarget-sequence-sequences-sequence-void)
+
+      - [`sequence.constructor(private readonly abortSignal?: AbortSignal)`](#sequenceconstructorprivate-readonly-abortsignal-abortsignal)
+      - [`sequence.size(): number`](#sequencesize-number)
+      - [`sequence.reserve(capacity: number): Promise`](#sequencereservecapacity-number-promise)
+
+      - [`sequence.next(): Promise`](#sequencenext-promise)
+      - [`sequence.Symbol.dispose(): void`](#sequencesymboldispose-void)
+    - [`Signal`](#signal)
+      - [`signal.merge(target: Signal, ...signals: Signal[]): void`](#signalmergetarget-signal-signals-signal-void)
+      - [`signal.constructor(private readonly abortSignal?: AbortSignal)`](#signalconstructorprivate-readonly-abortsignal-abortsignal)
+      - [`signal.aborted(): boolean`](#signalaborted-boolean)
+
+      - [`signal.next(): Promise`](#signalnext-promise)
+      - [`signal.Symbol.dispose(): void`](#signalsymboldispose-void)
+
+    - [`iterate(...args: number[]): Iterable`](#iterateargs-number-iterable)
+    - [`toAsyncIterable(iterable: Iterable): AsyncIterable`](#toasynciterableiterable-iterable-asynciterable)
+
 - [Examples](#examples)
-- [Migration](#migration)
 - [License](#license)
+
+## Core Concepts
+
+Evnty provides three complementary async primitives, each designed for specific patterns:
+
+### 🔊 Event - Multi-Listener Broadcasting
+Events allow multiple listeners to react to values. All registered listeners are called for each emission.
+
+```typescript
+const clickEvent = createEvent<{ x: number, y: number }>();
+
+// Multiple listeners can subscribe
+clickEvent.on(({ x, y }) => console.log(`Click at ${x},${y}`));
+clickEvent.on(({ x, y }) => updateUI(x, y));
+
+// All listeners receive the value
+clickEvent({ x: 100, y: 200 });
+```
+
+**Use Event when:**
+- Multiple components need to react to the same occurrence
+- You need pub/sub or observer pattern
+- Listeners should persist across multiple emissions
+
+### 📡 Signal - Promise-Based Coordination
+Signals are for coordinating async operations. When a value is sent, ALL waiting consumers receive it (broadcast).
+
+```typescript
+const signal = new Signal<string>();
+
+// Multiple consumers can wait
+const promise1 = signal.next();
+const promise2 = signal.next();
+
+// Send value - all waiting consumers receive it
+signal('data');
+const [result1, result2] = await Promise.all([promise1, promise2]);
+// result1 === 'data' && result2 === 'data'
+```
+
+**Use Signal when:**
+- You need one-time notifications
+- Multiple async operations need the same trigger
+- Implementing async coordination patterns
+
+### 📦 Sequence - Async Queue (FIFO)
+Sequences are FIFO queues for single-consumer scenarios. Values are consumed in order, with backpressure support.
+
+```typescript
+const taskQueue = new Sequence<Task>();
+
+// Producer adds tasks
+taskQueue(task1);
+taskQueue(task2);
+taskQueue(task3);
+
+// Single consumer processes in order
+for await (const task of taskQueue) {
+  await processTask(task); // task1, then task2, then task3
+}
+```
+
+**Use Sequence when:**
+- You need ordered processing (FIFO)
+- Only one consumer should handle each value
+- You want backpressure control with `reserve()`
+
+### Key Differences
+
+| | Event | Signal | Sequence |
+|---|---|---|---|
+| **Consumers** | Multiple persistent listeners | Multiple one-time receivers | Single consumer |
+| **Delivery** | All listeners called | All waiting get same value | Each value consumed once |
+| **Pattern** | Pub/Sub | Broadcast coordination | Queue/Stream |
+| **Persistence** | Listeners stay registered | Resolves once per `next()` | Values queued until consumed |
 
 ## Motivation
 
-In traditional event handling in TypeScript, events are often represented as strings, and there's no easy way to apply functional transformations like filtering or mapping directly on the event data. This approach lacks type safety, and chaining operations require additional boilerplate, making the code verbose and less maintainable.
+Traditional event handling in JavaScript/TypeScript has limitations:
+- String-based event names lack type safety
+- No built-in async coordination primitives
+- Missing functional transformations for event streams
+- Complex patterns require extensive boilerplate
 
-The proposed library introduces a robust `Event` abstraction that encapsulates event data and provides a suite of functional methods like `map`, `filter`, `reduce`, `debounce`, etc., allowing for a more declarative and type-safe approach to event handling. This design facilitates method chaining and composition, making the code more readable and maintainable. For instance, it allows developers to create new events by transforming or filtering existing ones, thus promoting code reusability and modularity.
+Evnty solves these problems by providing:
+- **Type-safe events** with full TypeScript inference
+- **Three specialized primitives** for different async patterns
+- **Rich functional operators** (map, filter, reduce, debounce, batch, etc.)
+- **Composable abstractions** that work together seamlessly
 
 ## Features
 
-- Modern: Supports Promises and module systems ESM and CommonJS
-- Zero Dependencies: Utilizes native features for optimal performance.
-- Full TypeScript Support: Ensures type safety and improves developer experience.
-- Functional Programming Techniques: Offers map, filter, reduce, expand, and more for event handling.
-- Flexible Environment Support: Works seamlessly in both the browser and Node.js, including service workers.
-- Performance Optimized: Competes with and exceeds other well-known libraries like EventEmitter3 and EventEmitter2 in performance benchmarks.
+- **Async-First Design**: Built from the ground up for asynchronous event handling with full Promise support
+- **Functional Programming**: Rich set of operators including map, filter, reduce, debounce, batch, and expand for event stream transformations
+- **Type-Safe**: Full TypeScript support with strong typing and inference throughout the event pipeline
+- **Async Iteration**: Events can be consumed as async iterables using for-await-of loops
+- **Event Composition**: Merge, combine, and transform multiple event streams into new events
+- **Minimal Dependencies**: Lightweight with only essential dependencies for optimal bundle size
+- **Universal**: Works seamlessly in both browser and Node.js environments, including service workers
 
 ## Platform Support
 
@@ -134,57 +225,49 @@ npm install evnty
 
 ## API
 
-### `Signal`
+### `EventResult`
 
- Signal is a callable construct for sending and receiving a single asynchronous value.
- It implements both Promise and AsyncIterable, allowing it to be awaited once
- or iterated over with `for await...of`. Once signaled, it resolves the pending promise.
+ Wraps an array of values or promises (typically listener results) and provides batch resolution.
 
-- @template T - The type of value the signal carries.
-- @param abortSignal - Optional AbortSignal used to abort waiting and reject the promise.
+- @template T
  
 
-#### `signal.constructor(private readonly abortSignal?: AbortSignal)`
-#### `signal.Symbol.toStringTag(): string`
-#### `signal.promise(): Promise`
+#### `eventresult.constructor(results: MaybePromise[])`
 
- Returns the internal promise that resolves with the signaled value.
+- @param results - An array of values or Promise-returning listener calls.
    
-#### `signal.next()`
+#### `eventresult.then(onfulfilled, onrejected): PromiseLike`
+#### `eventresult.all(): Promise`
 
- Waits for the next signal value or rejects if aborted.
-- @returns A promise resolving to the value of type T.
+ Resolves all listener results, rejecting if any promise rejects.
+
+- @returns `{Promise<T[]>}` A promise that fulfills with an array of all resolved values.
    
-#### `signal.catch(onrejected): Promise`
-#### `signal.finally(onfinally): Promise`
-#### `signal.then(onfulfilled, onrejected): Promise`
-#### `signal.Symbol.asyncIterator(): AsyncIterator`
- 
-### `Sequence`
+#### `eventresult.settled(): Promise`
 
- Sequence is a callable construct for buffering and emitting multiple values in order.
- It implements both Promise and AsyncIterable, allowing sequential consumption of values.
- Values pushed before consumption are queued, and consumers await `next()` or iterate via `for await...of`.
+ Waits for all listener results to settle, regardless of fulfillment or rejection.
 
-- @template T - The type of values buffered in the sequence.
-- @param abortSignal - Optional AbortSignal to abort iteration and resolve pending next calls.
- 
-
-#### `sequence.constructor(private readonly abortSignal?: AbortSignal)`
-#### `sequence.Symbol.toStringTag(): string`
-#### `sequence.promise(): Promise`
-#### `sequence.next(): Promise`
-#### `sequence.catch(onrejected): Promise`
-#### `sequence.finally(onfinally): Promise`
-#### `sequence.then(onfulfilled, onrejected): Promise`
-#### `sequence.Symbol.asyncIterator(): AsyncIterator`
-
+- @returns `{Promise<PromiseSettledResult<T>[]>}` A promise that fulfills with an array of each result's settled status and value/reason.
+   
 ### `Event`
 
- A class representing an anonymous event that can be listened to or triggered.
+ A class representing a multi-listener event emitter with async support.
+ Events allow multiple listeners to react to emitted values, with each listener
+ potentially returning a result. All listeners are called for each emission.
+ 
+ Key characteristics:
+ - Multiple listeners - all are called for each emission
+ - Listeners can return values collected in EventResult
+ - Supports async listeners and async iteration
+ - Provides lifecycle hooks for listener management
+ - Memory efficient using RingBuffer for storage
+ 
+ Differs from:
+ - Signal: Events have multiple persistent listeners vs Signal's one-time resolution per consumer
+ - Sequence: Events broadcast to all listeners vs Sequence's single consumer queue
 
-- @template T - The event type.
-- @template R - The return type of the event.
+- @template T - The type of value emitted to listeners (event payload)
+- @template R - The return type of listener functions
  
 
 #### `event.constructor(dispose?: Callback)`
@@ -199,12 +282,6 @@ npm install evnty
  clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
  ```
    
-#### `event.error(): Event`
-
- Error event that emits errors.
-
-- @returns `{Event<unknown>}` The error event.
-   
 #### `event.size(): number`
 
  The number of listeners for the event.
@@ -215,6 +292,7 @@ npm install evnty
 #### `event.disposed(): boolean`
 
  Checks if the event has been disposed.
+
 - @returns `{boolean}` `true` if the event has been disposed; otherwise, `false`.
    
 #### `event.lacks(listener: Listener): boolean`
@@ -222,7 +300,7 @@ npm install evnty
  Checks if the given listener is NOT registered for this event.
 
 - @param listener - The listener function to check against the registered listeners.
-- @returns `true` if the listener is not already registered; otherwise, `false`.
+- @returns `{boolean}` `true` if the listener is not already registered; otherwise, `false`.
 
  ```typescript
  // Check if a listener is not already added
@@ -236,7 +314,7 @@ npm install evnty
  Checks if the given listener is registered for this event.
 
 - @param listener - The listener function to check.
-- @returns `true` if the listener is currently registered; otherwise, `false`.
+- @returns `{boolean}` `true` if the listener is currently registered; otherwise, `false`.
 
  ```typescript
  // Verify if a listener is registered
@@ -250,7 +328,7 @@ npm install evnty
  Removes a specific listener from this event.
 
 - @param listener - The listener to remove.
-- @returns The event instance, allowing for method chaining.
+- @returns `{this}` The event instance, allowing for method chaining.
 
  ```typescript
  // Remove a listener
@@ -263,7 +341,7 @@ npm install evnty
  This is the primary method for adding event handlers that will react to the event being triggered.
 
 - @param listener - The function to call when the event occurs.
-- @returns An object that can be used to unsubscribe the listener, ensuring easy cleanup.
+- @returns `{Unsubscribe}` An object that can be used to unsubscribe the listener, ensuring easy cleanup.
 
  ```typescript
  // Add a listener to an event
@@ -278,7 +356,7 @@ npm install evnty
  This method is useful for one-time notifications or single-trigger scenarios.
 
 - @param listener - The listener to trigger once.
-- @returns An object that can be used to remove the listener if the event has not yet occurred.
+- @returns `{Unsubscribe}` An object that can be used to remove the listener if the event has not yet occurred.
 
  ```typescript
  // Register a one-time listener
@@ -300,20 +378,12 @@ npm install evnty
  myEvent.clear(); // Clears all listeners
  ```
    
-#### `event.then(onfulfilled, onrejected): Promise`
+#### `event.next(): Promise`
 
- Enables the `Event` to be used in a Promise chain, resolving with the first emitted value.
+ Waits for the next event emission and returns the emitted value.
+ This method allows the event to be used as a promise that resolves with the next emitted value.
 
-- @template OK - The type of the fulfilled value returned by `onfulfilled` (defaults to the event's type).
-- @template ERR - The type of the rejected value returned by `onrejected` (defaults to `never`).
-- @param onfulfilled - A function called when the event emits its first value.
-- @param onrejected - A function called if an error occurs before the event emits.
-- @returns A Promise that resolves with the result of `onfulfilled` or `onrejected`.
-
- ```typescript
- const clickEvent = new Event<[number, number]>();
- await clickEvent;
- ```
+- @returns `{Promise<T>}` A promise that resolves with the next emitted event value.
    
 #### `event.settle(): Promise`
 
@@ -331,17 +401,11 @@ npm install evnty
  }
  ```
    
-#### `event.promise(): Promise`
-
- A promise that resolves with the first emitted value from this event.
-
-- @returns `{Promise<T>}` The promise value.
-   
 #### `event.Symbol.asyncIterator(): AsyncIterator`
 
  Makes this event iterable using `for await...of` loops.
 
-- @returns An async iterator that yields values as they are emitted by this event.
+- @returns `{AsyncIterator<T>}` An async iterator that yields values as they are emitted by this event.
 
  ```typescript
  // Assuming an event that emits numbers
@@ -356,259 +420,7 @@ npm install evnty
  await numberEvent(3);
  ```
    
-#### `event.pipe(generator): Event`
-
- Transforms the event's values using a generator function, creating a new `Event` that emits the transformed values.
-
-- @template PT - The type of values emitted by the transformed `Event`.
-- @template PR - The return type of the listeners of the transformed `Event`.
-- @param generator - A function that takes the original event's value and returns a generator (sync or async) that yields the transformed values.
-- @returns A new `Event` instance that emits the transformed values.
-
- ```typescript
- const numbersEvent = new Event<number>();
- const evenNumbersEvent = numbersEvent.pipe(function*(value) {
-    if (value % 2 === 0) {
-      yield value;
-    }
- });
- evenNumbersEvent.on((evenNumber) => console.log(evenNumber));
- await numbersEvent(1);
- await numbersEvent(2);
- await numbersEvent(3);
- ```
-   
-#### `event.generator(generator): AsyncGenerator`
-
- Creates an async generator that yields values as they are emitted by this event.
-
-- @template PT - The type of values yielded by the async generator.
-- @param generator - An optional function that takes the original event's value and returns a generator (sync or async)
-                  that yields values to include in the async generator.
-- @returns An async generator that yields values from this event as they occur.
-
- ```typescript
- const numbersEvent = new Event<number>();
- const evenNumbersEvent = numbersEvent.pipe(function*(value) {
-    if (value % 2 === 0) {
-      yield value;
-    }
- });
- evenNumbersEvent.on((evenNumber) => console.log(evenNumber));
- await numbersEvent(1);
- await numbersEvent(2);
- await numbersEvent(3);
- ```
-   
-#### `event.filter(predicate: Predicate): Event`
-#### `event.filter(filter: FilterFunction): Event`
-#### `event.filter(filter: Filter): Event`
-
- Filters events, creating a new event that only triggers when the provided filter function returns `true`.
- This method can be used to selectively process events that meet certain criteria.
-
-- @param `{Filter<T, P>}` predicate The filter function or predicate to apply to each event.
-- @returns `{Event<P, R>}` A new event that only triggers for filtered events.
-
- ```typescript
- const keyPressedEvent = new Event<string>();
- const enterPressedEvent = keyPressedEvent.filter(key => key === 'Enter');
- enterPressedEvent.on(() => console.log('Enter key was pressed.'));
- ```
-   
-
-
-#### `event.first(predicate: Predicate): Event`
-#### `event.first(filter: FilterFunction): Event`
-#### `event.first(filter: Filter): Event`
-
- Creates a new event that will only be triggered once when the provided filter function returns `true`.
- This method is useful for handling one-time conditions in a stream of events.
-
-- @param `{Filter<T, P>}` predicate - The filter function or predicate.
-- @returns `{Event<P, R>}` A new event that will be triggered only once when the filter condition is met.
-
- ```typescript
- const sizeChangeEvent = new Event<number>();
- const sizeReachedEvent = sizeChangeEvent.first(size => size > 1024);
- sizeReachedEvent.on(() => console.log('Size threshold exceeded.'));
- ```
-   
-
-
-#### `event.map(mapper: Mapper): Event`
-
- Transforms the data emitted by this event using a mapping function. Each emitted event is processed by the `mapper`
- function, which returns a new value that is then emitted by the returned `Event` instance. This is useful for data transformation
- or adapting the event's data structure.
-
-- @template M The type of data that the mapper function will produce.
-- @template MR The type of data emitted by the mapped event, usually related to or the same as `M`.
-- @param `{Mapper<T, M>}` mapper A function that takes the original event data and returns the transformed data.
-- @returns `{Event<M, MR>}` A new `Event` instance that emits the mapped values.
-
- ```typescript
- // Assuming an event that emits numbers, create a new event that emits their squares.
- const numberEvent = new Event<number>();
- const squaredEvent = numberEvent.map(num => num num);
- squaredEvent.on(squared => console.log('Squared number:', squared));
- await numberEvent(5); // Logs: "Squared number: 25"
- ```
-   
-#### `event.reduce(reducer: Reducer, init?: A): Event`
-#### `event.reduce(reducer: Reducer, ...init: unknown[]): Event`
-
- Accumulates the values emitted by this event using a reducer function, starting from an initial value. The reducer
- function takes the accumulated value and the latest emitted event data, then returns a new accumulated value. This
- new value is then emitted by the returned `Event` instance. This is particularly useful for accumulating state over time.
-
-- @template A The type of the accumulator value.
-- @template AR The type of data emitted by the reduced event, usually the same as `A`.
-- @param `{Reducer<T, A>}` reducer A function that takes the current accumulated value and the new event data, returning the new accumulated value.
-- @param `{A}` init The initial value of the accumulator.
-- @returns `{Event<A, AR>}` A new `Event` instance that emits the reduced value.
-
- ```typescript
- const sumEvent = numberEvent.reduce((a, b) => a + b, 0);
- sumEvent.on((sum) => console.log(sum)); // 1, 3, 6
- await sumEvent(1);
- await sumEvent(2);
- await sumEvent(3);
- ```
-   
-#### `event.expand(expander: Expander): Event`
-
- Transforms each event's data into multiple events using an expander function. The expander function takes
- the original event's data and returns an array of new data elements, each of which will be emitted individually
- by the returned `Event` instance. This method is useful for scenarios where an event's data can naturally
- be expanded into multiple, separate pieces of data which should each trigger further processing independently.
-
-- @template ET - The type of data elements in the array returned by the expander function.
-- @template ER - The type of responses emitted by the expanded event, usually related to or the same as `ET`.
-- @param `{Expander<T, ET[]>}` expander - A function that takes the original event data and returns an array of new data elements.
-- @returns `{Event<ET, ER>}` - A new `Event` instance that emits each value from the array returned by the expander function.
-
- ```typescript
- // Assuming an event that emits a sentence, create a new event that emits each word from the sentence separately.
- const sentenceEvent = new Event<string>();
- const wordEvent = sentenceEvent.expand(sentence => sentence.split(' '));
- wordEvent.on(word => console.log('Word:', word));
- await sentenceEvent('Hello world'); // Logs: "Word: Hello", "Word: world"
- ```
-   
-#### `event.orchestrate(conductor: Event): Event`
-
- Creates a new event that emits values based on a conductor event. The orchestrated event will emit the last value
- captured from the original event each time the conductor event is triggered.
-
-- @template T The type of data emitted by the original event.
-- @template R The type of data emitted by the orchestrated event, usually the same as `T`.
-- @param `{Event<unknown, unknown>}` conductor The event that triggers the emission of the last captured value.
-- @returns `{Event<T, R>}` A new event that emits values based on the conductor's triggers.
-
- ```typescript
- const rightClickPositionEvent = mouseMoveEvent.orchestrate(mouseRightClickEvent);
- ```
-
- ```typescript
- // An event that emits whenever a "tick" event occurs.
- const tickEvent = new Event<void>();
- const dataEvent = new Event<string>();
- const synchronizedEvent = dataEvent.orchestrate(tickEvent);
- synchronizedEvent.on(data => console.log('Data on tick:', data));
- await dataEvent('Hello');
- await dataEvent('World!');
- await tickEvent(); // Logs: "Data on tick: World!"
- ```
-   
-#### `event.debounce(interval: number): Event`
-
- Creates a debounced event that delays triggering until after a specified interval has elapsed
- following the last time it was invoked. This method is particularly useful for limiting the rate
- at which a function is executed. Common use cases include handling rapid user inputs, window resizing,
- or scroll events.
-
-- @param `{number}` interval - The amount of time to wait (in milliseconds) before firing the debounced event.
-- @returns `{Event<T, R>}` An event of debounced events.
-
- ```typescript
- const debouncedEvent = textInputEvent.debounce(100);
- debouncedEvent.on((str) => console.log(str)); // only 'text' is emitted
- await event('t');
- await event('te');
- await event('tex');
- await event('text');
- ```
-   
-#### `event.throttle(interval: number): Event`
-
- Creates a throttled event that emits values at most once per specified interval.
-
- This is useful for controlling the rate of event emissions, especially for high-frequency events.
- The throttled event will immediately emit the first value, and then only emit subsequent values
- if the specified interval has passed since the last emission.
-
-- @param interval - The time interval (in milliseconds) between allowed emissions.
-- @returns A new Event that emits throttled values.
-
- ```typescript
- const scrollEvent = new Event();
- const throttledScroll = scrollEvent.throttle(100); // Emit at most every 100ms
- throttledScroll.on(() => console.log("Throttled scroll event"));
- ```
-   
-#### `event.batch(interval: number, size?: number): Event`
-
- Aggregates multiple event emissions into batches and emits the batched events either at specified
- time intervals or when the batch reaches a predefined size. This method is useful for grouping
- a high volume of events into manageable chunks, such as logging or processing data in bulk.
-
-- @param `{number}` interval - The time in milliseconds between batch emissions.
-- @param `{number}` [size] - Optional. The maximum size of each batch. If specified, triggers a batch emission
- once the batch reaches this size, regardless of the interval.
-- @returns `{Event<T[], R>}` An event of the batched results.
-
- ```typescript
- // Batch messages for bulk processing every 1 second or when 10 messages are collected
- const messageEvent = createEvent<string, void>();
- const batchedMessageEvent = messageEvent.batch(1000, 10);
- batchedMessageEvent.on((messages) => console.log('Batched Messages:', messages));
- ```
-   
-#### `event.queue(): Queue`
-
- Creates a queue from the event, where each emitted value is sequentially processed. The returned object allows popping elements
- from the queue, ensuring that elements are handled one at a time. This method is ideal for scenarios where order and sequential processing are critical.
-
-- @returns `{Queue<T>}` An object representing the queue. The 'pop' method retrieves the next element from the queue, while 'stop' halts further processing.
-
- ```typescript
- // Queueing tasks for sequential execution
- const taskEvent = new Event<string>();
- const taskQueue = taskEvent.queue();
- (async () => {
-   console.log('Processing:', await taskQueue.pop()); // Processing: Task 1
-   // Queue also can be used as a Promise
-   console.log('Processing:', await taskQueue); // Processing: Task 2
- })();
- await taskEvent('Task 1');
- await taskEvent('Task 2');
-```
-
-```typescript
- // Additionally, the queue can be used as an async iterator
- const taskEvent = new Event<string>();
- const taskQueue = taskEvent.queue();
- (async () => {
-   for await (const task of taskQueue) {
-     console.log('Processing:', task);
-   }
- })();
- await taskEvent('Task 1');
- await taskEvent('Task 2');
- ```
-
-   
+#### `event.Symbol.dispose(): void`
 ### `merge(...events: Events): Event`
 
  Merges multiple events into a single event. This function takes any number of `Event` instances
@@ -617,8 +429,8 @@ npm install evnty
  handle multiple sources of events in a unified manner.
 
 - @template Events - An array of `Event` instances.
-- @param `{...Events}` events - A rest parameter that takes multiple events to be merged.
-- @returns `{Event<AllEventsParameters<Events>, AllEventsResults<Events>>}` - Returns a new `Event` instance
+- @param events - A rest parameter that takes multiple events to be merged.
+- @returns `{Event<AllEventsParameters<Events>, AllEventsResults<Events>>}` Returns a new `Event` instance
            that triggers with the parameters and results of any of the merged input events.
 
  ```typescript
@@ -637,8 +449,8 @@ npm install evnty
  or any other timed operation.
 
 - @template R - The return type of the event handler function, defaulting to `void`.
-- @param `{number}` interval - The interval in milliseconds at which the event should trigger.
-- @returns `{Event<number, R>}` - An `Event` instance that triggers at the specified interval,
+- @param interval - The interval in milliseconds at which the event should trigger.
+- @returns `{Event<number, R>}` An `Event` instance that triggers at the specified interval,
            emitting an incrementing counter value.
 
  ```typescript
@@ -649,96 +461,594 @@ npm install evnty
  
 ### `createEvent(): Event`
 
- Creates a new instance of the `Event` class, which allows for the registration of event handlers that get called when the event is emitted.
- This factory function simplifies the creation of events by encapsulating the instantiation logic, providing a clean and simple API for event creation.
+ Creates a new Event instance for multi-listener event handling.
+ This is the primary way to create events in the library.
 
-- @typeParam T - The tuple of argument types that the event will accept.
-- @typeParam R - The return type of the event handler function, which is emitted after processing the event data.
-- @returns `{Event<T, R>}` - A new instance of the `Event` class, ready to have listeners added to it.
+- @template T - The type of value emitted to listeners (event payload)
+- @template R - The return type of listener functions (collected in EventResult)
+- @returns `{Event<T, R>}` A new Event instance ready for listener registration
 
  ```typescript
- // Create a new event that accepts a string and returns the string length
- const myEvent = createEvent<string, number>();
- myEvent.on((str: string) => str.length);
- myEvent('hello').then(results => console.log(results)); // Logs: [5]
+ // Create an event that accepts a string payload
+ const messageEvent = createEvent<string>();
+ messageEvent.on(msg => console.log('Received:', msg));
+ messageEvent('Hello'); // All listeners receive 'Hello'
+ 
+ // Create an event where listeners return values
+ const validateEvent = createEvent<string, boolean>();
+ validateEvent.on(str => str.length > 0);
+ validateEvent.on(str => str.length < 100);
+ const results = await validateEvent('test'); // EventResult with [true, true]
  ```
+ 
+
+### `AsyncIteratorObject`
+
+ A wrapper class providing functional operations on async iterables.
+ Enables lazy evaluation and chainable transformations on async data streams.
+ 
+ Key characteristics:
+ - Lazy evaluation - operations are not executed until iteration begins
+ - Chainable - all transformation methods return new AsyncIteratorObject instances
+ - Supports both sync and async transformation functions
+ - Memory efficient - processes values one at a time
+ 
+- @template T The type of values yielded by the iterator
+- @template TReturn The return type of the iterator
+- @template TNext The type of value that can be passed to next()
+ 
+ ```typescript
+ // Create from an async generator
+ async function* numbers() {
+   yield 1; yield 2; yield 3;
+ }
+ 
+ const iterator = new AsyncIteratorObject(numbers())
+   .map(x => x 2)
+   .filter(x => x > 2);
+ 
+ for await (const value of iterator) {
+   console.log(value); // 4, 6
+ }
+ ```
+ 
+
+#### `asynciteratorobject.from(iterable: Iterable): AsyncIteratorObject`
+
+ A wrapper class providing functional operations on async iterables.
+ Enables lazy evaluation and chainable transformations on async data streams.
+ 
+ Key characteristics:
+ - Lazy evaluation - operations are not executed until iteration begins
+ - Chainable - all transformation methods return new AsyncIteratorObject instances
+ - Supports both sync and async transformation functions
+ - Memory efficient - processes values one at a time
+ 
+- @template T The type of values yielded by the iterator
+- @template TReturn The return type of the iterator
+- @template TNext The type of value that can be passed to next()
+ 
+ ```typescript
+ // Create from an async generator
+ async function* numbers() {
+   yield 1; yield 2; yield 3;
+ }
+ 
+ const iterator = new AsyncIteratorObject(numbers())
+   .map(x => x 2)
+   .filter(x => x > 2);
+ 
+ for await (const value of iterator) {
+   console.log(value); // 4, 6
+ }
+ ```
+ 
+ Creates an AsyncIteratorObject from a synchronous iterable.
+ Converts the sync iterable to async for uniform handling.
+ 
+- @param iterable A synchronous iterable to convert
+- @returns A new AsyncIteratorObject wrapping the converted iterable
+ 
+ ```typescript
+ const syncArray = [1, 2, 3, 4, 5];
+ const asyncIterator = AsyncIteratorObject.from(syncArray);
+ 
+ for await (const value of asyncIterator) {
+   console.log(value); // 1, 2, 3, 4, 5
+ }
+ ```
+   
+#### `asynciteratorobject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`
+
+ Merges multiple async iterables into a single stream.
+ Values from all sources are interleaved as they become available.
+ The merged iterator completes when all source iterators complete.
+ 
+- @param iterables The async iterables to merge
+- @returns A new AsyncIteratorObject yielding values from all sources
+ 
+ ```typescript
+ async function* source1() { yield 1; yield 3; }
+ async function* source2() { yield 2; yield 4; }
+ 
+ const merged = AsyncIteratorObject.merge(source1(), source2());
+ 
+ for await (const value of merged) {
+   console.log(value); // Order depends on timing: 1, 2, 3, 4 or similar
+ }
+ ```
+   
+#### `asynciteratorobject.constructor(iterable: AsyncIterable)`
+#### `asynciteratorobject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`
+
+ Low-level transformation method using generator functions.
+ Allows custom async transformations by providing a generator factory.
+ Used internally by other transformation methods.
+ 
+- @param generatorFactory A function that returns a generator function for transforming values
+- @param signal Optional AbortSignal to cancel the operation
+- @returns A new AsyncIteratorObject with transformed values
+   
+#### `asynciteratorobject.map(callbackfn): AsyncIteratorObject`
+
+ Transforms each value using a mapping function.
+ The callback can be synchronous or return a promise.
+ 
+- @param callbackfn Function to transform each value
+- @returns A new AsyncIteratorObject yielding transformed values
+ 
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3]);
+ const doubled = numbers.map(x => x 2);
+ 
+ for await (const value of doubled) {
+   console.log(value); // 2, 4, 6
+ }
+ ```
+   
+#### `asynciteratorobject.filter(predicate): AsyncIteratorObject`
+#### `asynciteratorobject.filter(predicate): AsyncIteratorObject`
+#### `asynciteratorobject.filter(predicate): AsyncIteratorObject`
+
+ Filters values based on a predicate function.
+ Only values for which the predicate returns truthy are yielded.
+ Supports type guard predicates for type narrowing.
+ 
+- @param predicate Function to test each value
+- @returns A new AsyncIteratorObject yielding only values that pass the test
+ 
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
+ const evens = numbers.filter(x => x % 2 === 0);
+ 
+ for await (const value of evens) {
+   console.log(value); // 2, 4
+ }
+ ```
+   
 
 
+#### `asynciteratorobject.take(limit: number): AsyncIteratorObject`
+
+ Creates an iterator whose values are the values from this iterator, stopping once the provided limit is reached.
+- @param limit The maximum number of values to yield.
+   
+#### `asynciteratorobject.drop(count: number): AsyncIteratorObject`
+
+ Creates an iterator whose values are the values from this iterator after skipping the provided count.
+- @param count The number of values to drop.
+   
+#### `asynciteratorobject.flatMap(callback): AsyncIteratorObject`
+
+ Creates an iterator whose values are the result of applying the callback to the values from this iterator and then flattening the resulting iterators or iterables.
+- @param callback A function that accepts up to two arguments to be used to transform values from the underlying iterator into new iterators or iterables to be flattened into the result.
+   
+#### `asynciteratorobject.reduce(callbackfn): AsyncIteratorObject`
+#### `asynciteratorobject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`
+#### `asynciteratorobject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`
+
+ Creates an iterator of accumulated values by applying a reducer function.
+ Unlike Array.reduce, this returns an iterator that yields each intermediate accumulated value,
+ not just the final result. This allows observing the accumulation process.
+ 
+- @param callbackfn Reducer function to accumulate values
+- @param initialValue Optional initial value for the accumulation
+- @returns A new AsyncIteratorObject yielding accumulated values at each step
+ 
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3, 4]);
+ const sums = numbers.reduce((sum, x) => sum + x, 0);
+ 
+ for await (const value of sums) {
+   console.log(value); // 1, 3, 6, 10 (running totals)
+ }
+ ```
+   
+
+
+#### `asynciteratorobject.expand(callbackfn): AsyncIteratorObject`
+
+ Transforms each value into multiple values using an expander function.
+ Each input value is expanded into zero or more output values.
+ Similar to flatMap but for expanding to multiple values rather than flattening iterables.
+ 
+- @param callbackfn Function that returns an iterable of values for each input
+- @returns A new AsyncIteratorObject yielding all expanded values
+ 
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3]);
+ const expanded = numbers.expand(x => [x, x 10]);
+ 
+ for await (const value of expanded) {
+   console.log(value); // 1, 10, 2, 20, 3, 30
+ }
+ ```
+   
+#### `asynciteratorobject.Symbol.asyncIterator()`
+
+
+### `Sequence`
+
+ A sequence is a FIFO (First-In-First-Out) queue for async consumption.
+ Designed for single consumer with multiple producers pattern.
+ Values are queued and consumed in order, with backpressure support.
+
+ Key characteristics:
+ - Single consumer - values are consumed once, in order
+ - Multiple producers can push values concurrently
+ - FIFO ordering - first value in is first value out
+ - Backpressure control via reserve() method
+ - Async iteration support for continuous consumption
+
+- @template T The type of values in the sequence.
+
+ ```typescript
+ // Create a sequence for processing tasks
+ const tasks = new Sequence<string>();
+
+ // Producer: Add tasks to the queue
+ tasks('task1');
+ tasks('task2');
+ tasks('task3');
+
+ // Consumer: Process tasks in order
+ const task1 = await tasks.next(); // 'task1'
+ const task2 = await tasks.next(); // 'task2'
+ const task3 = await tasks.next(); // 'task3'
+ ```
+ 
+
+#### `sequence.merge(target: Sequence, ...sequences: Sequence[]): void`
+
+ Merges multiple source sequences into a target sequence.
+ Values from all sources are forwarded to the target sequence.
+ Each source is consumed independently and concurrently.
+
+- @param target The sequence that will receive values from all sources
+- @param sequences The source sequences to merge from
+
+ ```typescript
+ // Create target and source sequences
+ const target = new Sequence<number>();
+ const source1 = new Sequence<number>();
+ const source2 = new Sequence<number>();
+
+ // Merge sources into target
+ Sequence.merge(target, source1, source2);
+
+ // Values from both sources appear in target
+ source1(1);
+ source2(2);
+ source1(3);
+
+ // Consumer gets values as they arrive
+ await target.next(); // Could be 1, 2, or 3 depending on timing
+ ```
+   
+#### `sequence.constructor(private readonly abortSignal?: AbortSignal)`
+#### `sequence.size(): number`
+
+ Returns the number of values currently queued.
+
+- @returns The current queue size
+   
+#### `sequence.reserve(capacity: number): Promise`
+
+ Waits until the queue size drops to or below the specified capacity.
+ Useful for implementing backpressure - producers can wait before adding more items.
+
+- @param capacity The maximum queue size to wait for
+- @returns A promise that resolves when the queue size is at or below capacity
+
+ ```typescript
+ // Producer with backpressure control
+ const sequence = new Sequence<string>();
+
+ // Wait if queue has more than 10 items
+ await sequence.reserve(10);
+ sequence('new item'); // Safe to add, queue has space
+ ```
+   
+#### `sequence.next(): Promise`
+
+ Consumes and returns the next value from the queue.
+ If the queue is empty, waits for a value to be added.
+ Values are consumed in FIFO order.
+
+- @returns A promise that resolves with the next value
+
+ ```typescript
+ const sequence = new Sequence<number>();
+
+ // Consumer waits for values
+ const valuePromise = sequence.next();
+
+ // Producer adds value
+ sequence(42);
+
+ // Consumer receives it
+ const value = await valuePromise; // 42
+ ```
+   
+#### `sequence.Symbol.dispose(): void`
+
+ Disposes of the sequence, signaling any waiting consumers.
+ Called automatically when used with `using` declaration.
+   
+### `Signal`
+
+ A signal is a broadcast async primitive for coordinating between producers and consumers.
+ When a value is sent, ALL waiting consumers receive the same value (broadcast pattern).
+ Signals can be reused - each call to next() creates a new promise for the next value.
+
+ Key characteristics:
+ - Multiple consumers can wait simultaneously
+ - All waiting consumers receive the same value when sent
+ - Reusable - can send multiple values over time
+ - Supports async iteration for continuous value streaming
+
+- @template T The type of value that this signal carries.
+
+ ```typescript
+ // Create a signal for string values
+ const signal = new Signal<string>();
+
+ // Multiple consumers wait for the same value
+ const promise1 = signal.next();
+ const promise2 = signal.next();
+
+ // Send a value - both consumers receive it
+ signal('Hello World');
+
+ const [value1, value2] = await Promise.all([promise1, promise2]);
+ console.log(value1 === value2); // true - both got 'Hello World'
+ ```
+ 
+
+#### `signal.merge(target: Signal, ...signals: Signal[]): void`
+
+ Merges multiple source signals into a target signal.
+ Values from any source signal are forwarded to the target signal.
+ The merge continues until the target signal is aborted.
+
+- @param target The signal that will receive values from all sources
+- @param signals The source signals to merge from
+
+ ```typescript
+ // Create a target signal and source signals
+ const target = new Signal<string>();
+ const source1 = new Signal<string>();
+ const source2 = new Signal<string>();
+
+ // Merge sources into target
+ Signal.merge(target, source1, source2);
+
+ // Values from any source appear in target
+ source1('Hello');
+ const value = await target; // 'Hello'
+ ```
+   
+#### `signal.constructor(private readonly abortSignal?: AbortSignal)`
+
+ Creates a new Signal instance.
+
+- @param abortSignal An optional AbortSignal that can be used to cancel the signal operation.
+
+ ```typescript
+ // Create a signal with abort capability
+ const controller = new AbortController();
+ const signal = new Signal<number>(controller.signal);
+
+ // Signal can be cancelled
+ controller.abort('Operation cancelled');
+ ```
+   
+#### `signal.aborted(): boolean`
+#### `signal.next(): Promise`
+
+ Waits for the next value to be sent to this signal. If the signal has been aborted,
+ this method will reject with the abort reason.
+
+- @returns A promise that resolves with the next value sent to the signal.
+
+ ```typescript
+ const signal = new Signal<string>();
+
+ // Wait for a value
+ const valuePromise = signal.next();
+
+ // Send a value from elsewhere
+ signal('Hello');
+
+ const value = await valuePromise; // 'Hello'
+ ```
+   
+#### `signal.Symbol.dispose(): void`
+
+ Disposes of the signal, cleaning up any pending promise resolvers.
+ This method is called automatically when the signal is used with a `using` declaration.
+   
+
+### `iterate(...args: number[]): Iterable`
+
+ Creates an iterable sequence of numbers with flexible parameters.
+ Can generate infinite sequences, finite sequences, or sequences with custom start and step values.
+ 
+- @param args Variable arguments to configure the sequence:
+   - No args: Infinite sequence starting at 0 with step 1
+   - 1 arg (count): Sequence from 0 to count-1
+   - 2 args (start, count): Sequence starting at 'start' for 'count' iterations
+   - 3 args (start, count, step): Custom start, count, and step value
+- @returns An iterable that generates numbers according to the parameters
+ 
+- @example
+ ```typescript
+ // Infinite sequence: 0, 1, 2, 3, ...
+ for (const n of iterate()) { }
+ 
+ // Count only: 0, 1, 2, 3, 4
+ for (const n of iterate(5)) { }
+ 
+ // Start and count: 10, 11, 12, 13, 14
+ for (const n of iterate(10, 5)) { }
+ 
+ // Start, count, and step: 0, 2, 4, 6, 8
+ for (const n of iterate(0, 5, 2)) { }
+ ```
+ 
+### `toAsyncIterable(iterable: Iterable): AsyncIterable`
+
+ Converts a synchronous iterable to an asynchronous iterable.
+ Wraps the sync iterator methods to return promises, enabling uniform async handling.
+ 
+- @template T The type of values yielded by the iterator
+- @template TReturn The return type of the iterator
+- @template TNext The type of value that can be passed to next()
+- @param iterable A synchronous iterable to convert
+- @returns An async iterable that yields the same values as the input
+ 
+- @example
+ ```typescript
+ const syncArray = [1, 2, 3, 4, 5];
+ const asyncIterable = toAsyncIterable(syncArray);
+ 
+ for await (const value of asyncIterable) {
+   console.log(value); // 1, 2, 3, 4, 5
+ }
+ ```
+ 
 
 ## Examples
 
-```js
-import { createEvent, Event } from 'evnty';
+### Event - Multi-Listener Pattern
+```typescript
+import { createEvent } from 'evnty';
 
-// Creates a click event
-type Click = { button: string };
-const clickEvent = createEvent<Click>();
-const handleClick = ({ button }: Click) => console.log('Clicked button is', button);
-const unsubscribeClick = clickEvent.on(handleClick);
+// Create a typed event
+const userEvent = createEvent<{ id: number, name: string }>();
 
-// Creates a key press event
-type KeyPress = { key: string };
-const keyPressEvent = createEvent<KeyPress>();
-const handleKeyPress = ({ key }: KeyPress) => console.log('Key pressed', key);
-const unsubscribeKeyPress = keyPressEvent.on(handleKeyPress);
+// Multiple listeners
+userEvent.on(user => console.log('Logger:', user));
+userEvent.on(user => updateUI(user));
+userEvent.on(user => saveToCache(user));
 
-// Merges click and key press events into input event
-type Input = Click | KeyPress;
-const handleInput = (input: Input) => console.log('Input', input);;
-const inputEvent = Event.merge(clickEvent, keyPressEvent);
-inputEvent.on(handleInput);
+// Emit - all listeners are called
+userEvent({ id: 1, name: 'Alice' });
 
-// Filters a click event to only include left-click events.
-const handleLeftClick = () => console.log('Left button is clicked');
-const leftClickEvent = clickEvent.filter(({ button }) => button === 'left');
-leftClickEvent.on(handleLeftClick);
+// Functional transformations
+const adminEvent = userEvent
+  .filter(user => user.id < 100)
+  .map(user => ({ ...user, role: 'admin' }));
 
-// Will press Enter after one second
-setTimeout(keyPressEvent, 1000, { key: 'Enter' });
-// Waits once the first Enter key press event occurs
-await keyPressEvent.first(({ key }) => key === 'Enter').onceAsync();
+// Async iteration
+for await (const user of userEvent) {
+  console.log('User event:', user);
+}
+```
 
-keyPressEvent({ key: 'W' });
-keyPressEvent({ key: 'A' });
-keyPressEvent({ key: 'S' });
-keyPressEvent({ key: 'D' });
+### Signal - Async Coordination
+```typescript
+import { Signal } from 'evnty';
 
-clickEvent({ button: 'right' });
-clickEvent({ button: 'left' });
-clickEvent({ button: 'middle' });
+// Coordinate multiple async operations
+const dataSignal = new Signal<Buffer>();
 
-// Unsubscribe click listener
-unsubscribeClick();
-// It does not log anything because of click listener is unsubscribed
-leftClickEvent.off(handleLeftClick);
+// Multiple operations wait for the same data
+async function processA() {
+  const data = await dataSignal.next();
+  // Process data in way A
+}
 
-// Unsubscribe key press listener once first Esc key press occur
-unsubscribeKeyPress.after(() => keyPressEvent
-  .first(({ key }) => key === 'Esc')
-  .onceAsync()
-);
-// Press Esc to unsubscribe key press listener
-keyPressEvent({ key: 'Esc' });
+async function processB() {
+  const data = await dataSignal.next();
+  // Process data in way B
+}
 
-const messageEvent = createEvent();
-const messagesBatchEvent = messageEvent.debounce(100);
+// Start both processors
+Promise.all([processA(), processB()]);
 
-const messageEvent = createEvent();
-const messagesBatchEvent = messageEvent.batch(100);
+// Both receive the same data when it arrives
+dataSignal(Buffer.from('shared data'));
+```
 
+### Sequence - Task Queue
+```typescript
+import { Sequence } from 'evnty';
+
+// Create a task queue
+const taskQueue = new Sequence<() => Promise<void>>();
+
+// Single consumer processes tasks in order
+(async () => {
+  for await (const task of taskQueue) {
+    await task();
+    console.log('Task completed');
+  }
+})();
+
+// Multiple producers add tasks
+taskQueue(async () => fetchData());
+taskQueue(async () => processData());
+taskQueue(async () => saveResults());
+
+// Backpressure control
+await taskQueue.reserve(10); // Wait until queue has ≤10 items
+taskQueue(async () => nonUrgentTask());
+```
+
+### Combining Primitives
+```typescript
+// Event + Signal for request/response pattern
+const requestEvent = createEvent<Request>();
+const responseSignal = new Signal<Response>();
+
+requestEvent.on(async (req) => {
+  const response = await handleRequest(req);
+  responseSignal(response);
+});
+
+// Event + Sequence for buffered processing
+const dataEvent = createEvent<Data>();
+const processQueue = new Sequence<Data>();
+
+dataEvent.on(data => processQueue(data));
+
+// Process with controlled concurrency
+for await (const data of processQueue) {
+  await processWithRateLimit(data);
+}
 ```
 
 ## License
 
-License [MIT](./LICENSE)
-Copyright (c) 2024 Ivan Zakharchanka
+License [The MIT License](./LICENSE)
+Copyright (c) 2025 Ivan Zakharchanka
 
-[logo]: ./logo-64.png
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200
 [npm-image]: https://img.shields.io/npm/v/evnty.svg?maxAge=43200
 [github-url]: https://github.com/3axap4eHko/evnty/actions
-[github-image]: https://github.com/3axap4eHko/evnty/workflows/Build%20Package/badge.svg?branch=master
+[github-image]: https://github.com/3axap4eHko/evnty/actions/workflows/build.yml/badge.svg?branch=master
 [codecov-url]: https://codecov.io/gh/3axap4eHko/evnty
 [codecov-image]: https://codecov.io/gh/3axap4eHko/evnty/branch/master/graph/badge.svg?maxAge=43200
 [snyk-url]: https://snyk.io/test/npm/evnty/latest

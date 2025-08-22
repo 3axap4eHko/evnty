@@ -1,3 +1,7 @@
+/**
+ * Interface for creating iterable number sequences with various parameter combinations.
+ * Supports infinite sequences, counted sequences, and sequences with custom start and step values.
+ */
 export interface Iterate {
   (): Iterable<number, void, unknown>;
   (count: number): Iterable<number, void, unknown>;
@@ -5,6 +9,32 @@ export interface Iterate {
   (start: number, count: number, step: number): Iterable<number, void, unknown>;
 }
 
+/**
+ * Creates an iterable sequence of numbers with flexible parameters.
+ * Can generate infinite sequences, finite sequences, or sequences with custom start and step values.
+ *
+ * @param args Variable arguments to configure the sequence:
+ *   - No args: Infinite sequence starting at 0 with step 1
+ *   - 1 arg (count): Sequence from 0 to count-1
+ *   - 2 args (start, count): Sequence starting at 'start' for 'count' iterations
+ *   - 3 args (start, count, step): Custom start, count, and step value
+ * @returns An iterable that generates numbers according to the parameters
+ *
+ * @example
+ * ```typescript
+ * // Infinite sequence: 0, 1, 2, 3, ...
+ * for (const n of iterate()) { }
+ *
+ * // Count only: 0, 1, 2, 3, 4
+ * for (const n of iterate(5)) { }
+ *
+ * // Start and count: 10, 11, 12, 13, 14
+ * for (const n of iterate(10, 5)) { }
+ *
+ * // Start, count, and step: 0, 2, 4, 6, 8
+ * for (const n of iterate(0, 5, 2)) { }
+ * ```
+ */
 export const iterate: Iterate = (...args: number[]): Iterable<number, void, unknown> => {
   let start: number, count: number, step: number;
 
@@ -53,81 +83,6 @@ export const iterate: Iterate = (...args: number[]): Iterable<number, void, unkn
   };
 };
 
-export const map = <U, T, TReturn, TNext>(
-  iterable: Iterable<T, TReturn, TNext>,
-  mapFactory: () => (result: IteratorResult<T, TReturn>) => IteratorResult<U, TReturn>,
-): Iterable<U, TReturn, TNext> => {
-  return {
-    [Symbol.iterator]() {
-      const iterator = iterable[Symbol.iterator]();
-      const map = mapFactory();
-      return {
-        next(...args: [TNext] | []) {
-          const result = iterator.next(...args);
-          return map(result);
-        },
-        return(value) {
-          const result = iterator.return?.(value) ?? ({ value, done: true } as IteratorResult<T, TReturn>);
-          return map(result);
-        },
-        throw(error) {
-          if (iterator.throw) {
-            const result = iterator.throw(error);
-            return map(result);
-          }
-          throw error;
-        },
-      } satisfies Iterator<U, TReturn, TNext>;
-    },
-  };
-};
-
-export const enumerate = <T, TReturn, TNext>(iterable: Iterable<T, TReturn, TNext>): Iterable<readonly [T, number], TReturn, TNext> => {
-  return map(iterable, () => {
-    let idx = 0;
-    return (r): IteratorResult<readonly [T, number], TReturn> => {
-      if (r.done) {
-        return { value: r.value, done: true };
-      }
-      return { value: [r.value, idx++] as const, done: false };
-    };
-  });
-};
-
-export const compact = <T>(array: T[], filter: (value: T, index: number) => boolean): boolean => {
-  const n = array.length;
-  let read = 0;
-  let write = 0;
-
-  for (; read < n; read++) {
-    const v = array[read];
-    if (filter(v, read)) {
-      array[write++] = v;
-    }
-  }
-
-  array.length = write;
-  return n !== write;
-};
-
-export const removeValue = (values: unknown[], value: unknown): boolean => {
-  return compact(values, (item) => item !== value);
-};
-
-export const transfer = <T>(input: T[], output: T[]): boolean => {
-  const length = input.length;
-  if (length === 0) {
-    return false;
-  }
-  const base = output.length;
-  output.length = base + length;
-  for (let i = 0; i < length; ++i) {
-    output[base + i] = input[length - 1 - i];
-  }
-  input.length = 0;
-  return true;
-};
-
 /**
  * @internal
  * Creates a promise that resolves after a specified timeout. If an `AbortSignal` is provided and triggered,
@@ -145,15 +100,41 @@ export const transfer = <T>(input: T[], output: T[]): boolean => {
  * console.log(result); // false
  * ```
  */
-export const setTimeoutAsync = (timeout: number, signal?: AbortSignal): Promise<boolean> =>
-  new Promise<boolean>((resolve) => {
-    const timerId = setTimeout(resolve, timeout, true);
-    signal?.addEventListener('abort', () => {
-      clearTimeout(timerId);
-      resolve(false);
-    });
-  });
+export const setTimeoutAsync = async (timeout: number, signal?: AbortSignal): Promise<boolean> => {
+  if (signal?.aborted) {
+    return false;
+  }
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const timerId = setTimeout(resolve, timeout, true);
+  const onAbort = () => {
+    clearTimeout(timerId);
+    resolve(false);
+  };
+  signal?.addEventListener('abort', onAbort);
 
+  return promise.finally(() => signal?.removeEventListener('abort', onAbort));
+};
+
+/**
+ * Converts a synchronous iterable to an asynchronous iterable.
+ * Wraps the sync iterator methods to return promises, enabling uniform async handling.
+ *
+ * @template T The type of values yielded by the iterator
+ * @template TReturn The return type of the iterator
+ * @template TNext The type of value that can be passed to next()
+ * @param iterable A synchronous iterable to convert
+ * @returns An async iterable that yields the same values as the input
+ *
+ * @example
+ * ```typescript
+ * const syncArray = [1, 2, 3, 4, 5];
+ * const asyncIterable = toAsyncIterable(syncArray);
+ *
+ * for await (const value of asyncIterable) {
+ *   console.log(value); // 1, 2, 3, 4, 5
+ * }
+ * ```
+ */
 export const toAsyncIterable = <T, TReturn, TNext>(iterable: Iterable<T, TReturn, TNext>): AsyncIterable<T, TReturn, TNext> => {
   return {
     [Symbol.asyncIterator]() {
@@ -177,11 +158,38 @@ export const toAsyncIterable = <T, TReturn, TNext>(iterable: Iterable<T, TReturn
   };
 };
 
+/**
+ * Pipes values from an async iterable through a generator transformation.
+ * Applies a generator function to each value, yielding all resulting values.
+ * Supports cancellation via AbortSignal for early termination.
+ *
+ * @template T The input value type
+ * @template U The output value type
+ * @param iterable The source async iterable
+ * @param generatorFactory A factory that returns a generator function for transforming values
+ * @param signal Optional AbortSignal to cancel the operation
+ * @returns An async generator yielding transformed values
+ *
+ * @example
+ * ```typescript
+ * async function* source() {
+ *   yield 1; yield 2; yield 3;
+ * }
+ *
+ * const doubled = pipe(source(), () => async function*(n) {
+ *   yield n * 2;
+ * });
+ *
+ * for await (const value of doubled) {
+ *   console.log(value); // 2, 4, 6
+ * }
+ * ```
+ */
 export async function* pipe<T, U>(
   iterable: AsyncIterable<T>,
   generatorFactory: () => (value: T) => AsyncIterable<U>,
   signal?: AbortSignal,
-): AsyncGenerator<Awaited<U>> {
+): AsyncGenerator<Awaited<U>, void, unknown> {
   const generator = generatorFactory();
   for await (const value of iterable) {
     if (signal?.aborted) return;

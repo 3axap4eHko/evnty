@@ -1,15 +1,27 @@
+import { vi } from 'vitest';
 import { Signal } from '../signal';
 
 const scheduleSignal = <T>(signal: Signal<T>, value: T, success: boolean) => {
-    process.nextTick((value: T) => {
-      expect(signal(value)).toEqual(success);
-    }, value);
+  process.nextTick((value: T) => {
+    expect(signal(value)).toEqual(success);
+  }, value);
 };
 
 describe('Signal test suite', () => {
   it('Should create a signal', async () => {
     const signal = new Signal<string>();
     expect(signal[Symbol.toStringTag]).toEqual(`Signal`);
+  });
+
+  it('should merge signals', async () => {
+    const signal = new Signal<string>();
+    using a = new Signal<string>();
+    using b = new Signal<string>();
+    Signal.merge(signal, a, b);
+    scheduleSignal(a, 'test', true);
+    await expect(signal).resolves.toEqual('test');
+    scheduleSignal(b, 'test', true);
+    await expect(signal).resolves.toEqual('test');
   });
 
   it('Should send a signal', async () => {
@@ -37,7 +49,7 @@ describe('Signal test suite', () => {
     const signal = new Signal<string>(ctrl.signal);
     scheduleSignal(signal, 'test', true);
 
-    const thenMock = jest.fn(v => v);
+    const thenMock = vi.fn(v => v);
     await expect(signal.then(thenMock)).resolves.toEqual('test');
     expect(thenMock).toHaveBeenCalledTimes(1);
     ctrl.abort('error');
@@ -46,11 +58,11 @@ describe('Signal test suite', () => {
     await expect(signal.then(thenMock)).rejects.toEqual('error');
     expect(thenMock).toHaveBeenCalledTimes(0);
 
-    const catchMock = jest.fn().mockReturnValue('catch');
+    const catchMock = vi.fn().mockReturnValue('catch');
     await expect(signal.catch(catchMock)).resolves.toEqual('catch');
     expect(catchMock).toHaveBeenCalledTimes(1);
 
-    const finallyMock = jest.fn();
+    const finallyMock = vi.fn();
     await expect(signal.finally(finallyMock)).rejects.toEqual('error');
     expect(finallyMock).toHaveBeenCalledTimes(1);
   });
@@ -91,5 +103,42 @@ describe('Signal test suite', () => {
     expect(i).toEqual(3);
     scheduleSignal(signal, i, true);
     await expect(signal).resolves.toEqual(3);
+  });
+
+  it('Should handle merge with throwing source iterator', async () => {
+    const target = new Signal<number>();
+    const source = {
+      async *[Symbol.asyncIterator]() {
+        yield 1;
+        throw new Error('test error');
+      }
+    } as Signal<number>;
+    
+    Signal.merge(target, source);
+    
+    await expect(target).resolves.toEqual(1);
+  });
+
+  it('Should handle merge with aborted target signal', async () => {
+    const ctrl = new AbortController();
+    const target = new Signal<number>(ctrl.signal);
+    const source = new Signal<number>();
+    
+    ctrl.abort();
+    Signal.merge(target, source);
+    
+    scheduleSignal(source, 42, true);
+    
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(target.aborted).toBe(true);
+  });
+
+  it('Should handle aborted property without abort signal', async () => {
+    const signal = new Signal<number>();
+    expect(signal.aborted).toBe(false);
+    
+    scheduleSignal(signal, 123, true);
+    await expect(signal).resolves.toEqual(123);
+    expect(signal.aborted).toBe(false);
   });
 });
