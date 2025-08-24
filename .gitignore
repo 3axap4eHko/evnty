@@ -4,7 +4,8 @@ coverage
 node_modules
 *.log*
 yaee.js
+docs/.vuepress/dist
 .cache
 .temp
-docs/.vuepress/dist
-*.tmp.*
+tmp
+*.tmp*
