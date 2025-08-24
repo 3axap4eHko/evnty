@@ -1,7 +1,7 @@
 {
   "name": "evnty",
   "description": "Async-first, reactive event handling library for complex event flows in browser and Node.js",
-  "version": "5.0.0-rc.1",
+  "version": "5.0.0",
   "type": "module",
   "types": "build/index.d.ts",
   "main": "build/index.cjs",
