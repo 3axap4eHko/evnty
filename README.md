@@ -23,7 +23,7 @@ Async-first, reactive event handling library for complex event flows with three 
 - [Features](#features)
 - [Platform Support](#platform-support)
 - [Installing](#installing)
-- [Documentation](https://3axap4ehko.github.io/evnty/)
+- [Documentation](https://3axap4ehko.github.io/evnty/) <!--API_TOC-->
 - [Examples](#examples)
 - [License](#license)
 
@@ -257,6 +257,8 @@ for await (const data of processQueue) {
   await processWithRateLimit(data);
 }
 ```
+
+<!--API_REFERENCE-->
 
 ## License
 

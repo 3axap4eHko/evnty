@@ -10,7 +10,7 @@ Async-first, reactive event handling library for complex event flows with three 
 
 <div align="center">
   <a href="https://github.com/3axap4ehko/evnty">
-    <img width="200" height="200" src="./docs/logo.svg">
+    <img width="200" height="200" src="./logo.svg">
   </a>
   <br>
   <br>
@@ -24,6 +24,86 @@ Async-first, reactive event handling library for complex event flows with three 
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [API](#api)
+  - [`Unsubscribe`](#unsubscribe)
+    - [`unsubscribe.constructor(callback: Callback)`](#unsubscribeconstructorcallback-callback)
+    - [`unsubscribe.done()`](#unsubscribedone)
+    - [`unsubscribe.pre(callback: Callback): Unsubscribe`](#unsubscribeprecallback-callback-unsubscribe)
+    - [`unsubscribe.post(callback: Callback): Unsubscribe`](#unsubscribepostcallback-callback-unsubscribe)
+    - [`unsubscribe.countdown(count: number): Unsubscribe`](#unsubscribecountdowncount-number-unsubscribe)
+  - [`EventResult`](#eventresult)
+    - [`eventresult.constructor(results: MaybePromise[])`](#eventresultconstructorresults-maybepromise)
+    - [`eventresult.then(onfulfilled, onrejected): PromiseLike`](#eventresultthenonfulfilled-onrejected-promiselike)
+    - [`eventresult.all(): Promise`](#eventresultall-promise)
+    - [`eventresult.settled(): Promise`](#eventresultsettled-promise)
+  - [`Event`](#event)
+    - [`event.constructor(dispose?: Callback)`](#eventconstructordispose-callback)
+    - [`event.size(): number`](#eventsize-number)
+    - [`event.disposed(): boolean`](#eventdisposed-boolean)
+    - [`event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
+    - [`event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
+    - [`event.off(listener: Listener): this`](#eventofflistener-listener-this)
+    - [`event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
+    - [`event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
+    - [`event.clear(): this`](#eventclear-this)
+    - [`event.next(): Promise`](#eventnext-promise)
+    - [`event.settle(): Promise`](#eventsettle-promise)
+    - [`event.Symbol.asyncIterator(): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
+    - [`event.Symbol.dispose(): void`](#eventsymboldispose-void)
+  - [`merge(...events: Events): Event`](#mergeevents-events-event)
+  - [`createInterval(interval: number): Event`](#createintervalinterval-number-event)
+  - [`createEvent(): Event`](#createevent-event)
+  - [`AsyncIteratorObject`](#asynciteratorobject)
+    - [`asynciteratorobject.from(iterable: Iterable): AsyncIteratorObject`](#asynciteratorobjectfromiterable-iterable-asynciteratorobject)
+    - [`asynciteratorobject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`](#asynciteratorobjectmergeiterables-asynciterable-asynciteratorobject)
+    - [`asynciteratorobject.constructor(iterable: AsyncIterable)`](#asynciteratorobjectconstructoriterable-asynciterable)
+    - [`asynciteratorobject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`](#asynciteratorobjectpipegeneratorfactory-signal-abortsignal-asynciteratorobject)
+    - [`asynciteratorobject.awaited(): AsyncIteratorObject`](#asynciteratorobjectawaited-asynciteratorobject)
+    - [`asynciteratorobject.map(callbackfn): AsyncIteratorObject`](#asynciteratorobjectmapcallbackfn-asynciteratorobject)
+    - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`asynciteratorobject.take(limit: number): AsyncIteratorObject`](#asynciteratorobjecttakelimit-number-asynciteratorobject)
+    - [`asynciteratorobject.drop(count: number): AsyncIteratorObject`](#asynciteratorobjectdropcount-number-asynciteratorobject)
+    - [`asynciteratorobject.flatMap(callback): AsyncIteratorObject`](#asynciteratorobjectflatmapcallback-asynciteratorobject)
+    - [`asynciteratorobject.reduce(callbackfn): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-asynciteratorobject)
+    - [`asynciteratorobject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-initialvalue-r-asynciteratorobject)
+    - [`asynciteratorobject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-args-unknown-asynciteratorobject)
+    - [`asynciteratorobject.expand(callbackfn): AsyncIteratorObject`](#asynciteratorobjectexpandcallbackfn-asynciteratorobject)
+    - [`asynciteratorobject.Symbol.asyncIterator()`](#asynciteratorobjectsymbolasynciterator)
+  - [`ListenerRegistry`](#listenerregistry)
+    - [`listenerregistry.size(): number`](#listenerregistrysize-number)
+    - [`listenerregistry.has(listener: Fn): boolean`](#listenerregistryhaslistener-fn-boolean)
+    - [`listenerregistry.lacks(listener: Fn): boolean`](#listenerregistrylackslistener-fn-boolean)
+    - [`listenerregistry.off(listener: Fn): boolean`](#listenerregistryofflistener-fn-boolean)
+    - [`listenerregistry.on(listener: Fn): boolean`](#listenerregistryonlistener-fn-boolean)
+    - [`listenerregistry.once(listener: Fn): boolean`](#listenerregistryoncelistener-fn-boolean)
+    - [`listenerregistry.clear(): void`](#listenerregistryclear-void)
+    - [`listenerregistry.dispatch(...values: P): Array`](#listenerregistrydispatchvalues-p-array)
+  - [`Sequence`](#sequence)
+    - [`sequence.merge(target: Sequence, ...sequences: Sequence[]): void`](#sequencemergetarget-sequence-sequences-sequence-void)
+    - [`sequence.constructor(private readonly abortSignal?: AbortSignal)`](#sequenceconstructorprivate-readonly-abortsignal-abortsignal)
+    - [`sequence.aborted(): boolean`](#sequenceaborted-boolean)
+    - [`sequence.size(): number`](#sequencesize-number)
+    - [`sequence.reserve(capacity: number): Promise`](#sequencereservecapacity-number-promise)
+    - [`sequence.next(): Promise`](#sequencenext-promise)
+    - [`sequence.Symbol.dispose(): void`](#sequencesymboldispose-void)
+  - [`Signal`](#signal)
+    - [`signal.merge(target: Signal, ...signals: Signal[]): void`](#signalmergetarget-signal-signals-signal-void)
+    - [`signal.constructor(private readonly abortSignal?: AbortSignal)`](#signalconstructorprivate-readonly-abortsignal-abortsignal)
+    - [`signal.aborted(): boolean`](#signalaborted-boolean)
+    - [`signal.next(): Promise`](#signalnext-promise)
+    - [`signal.Symbol.dispose(): void`](#signalsymboldispose-void)
+  - [`AbortableIterator`](#abortableiterator)
+    - [`abortableiterator.constructor(iterator: AsyncIterator, signal?: AbortSignal)`](#abortableiteratorconstructoriterator-asynciterator-signal-abortsignal)
+    - [`abortableiterator.next(...args: [] | [TNext]): Promise`](#abortableiteratornextargs---tnext-promise)
+    - [`abortableiterator.return(value?: TReturn): Promise`](#abortableiteratorreturnvalue-treturn-promise)
+    - [`abortableiterator.throw(error: unknown): Promise`](#abortableiteratorthrowerror-unknown-promise)
+    - [`abortableiterator.Symbol.asyncIterator(): AsyncIterator`](#abortableiteratorsymbolasynciterator-asynciterator)
+  - [`noop()`](#noop)
+  - [`mapIterator(iterator: AnyIterator, map: MapNext): AsyncIterator`](#mapiteratoriterator-anyiterator-map-mapnext-asynciterator)
+  - [`iterate(startOrCount?: number, countWhenTwoArgs?: number, step: number = 1): Iterable`](#iteratestartorcount-number-countwhentwoargs-number-step-number--1-iterable)
+  - [`toAsyncIterable(iterable: Iterable): AsyncIterable`](#toasynciterableiterable-iterable-asynciterable)
+  - [`mergeIterables(...iterables: AsyncIterable[]): AsyncIterable`](#mergeiterablesiterables-asynciterable-asynciterable)
 - [Examples](#examples)
 - [License](#license)
 
@@ -113,17 +193,17 @@ Traditional event handling in JavaScript/TypeScript has limitations:
 Evnty solves these problems by providing:
 - **Type-safe events** with full TypeScript inference
 - **Three specialized primitives** for different async patterns
-- **Rich functional operators** (map, filter, reduce, debounce, batch, etc.)
+- **Async iterator transformations** via `AsyncIteratorObject` (map, filter, reduce, expand, etc.)
 - **Composable abstractions** that work together seamlessly
 
 ## Features
 
 - **Async-First Design**: Built from the ground up for asynchronous event handling with full Promise support
-- **Functional Programming**: Rich set of operators including map, filter, reduce, debounce, batch, and expand for event stream transformations
+- **Iterator Transformations**: `AsyncIteratorObject` provides map, filter, reduce, take, drop, flatMap, and expand operators
 - **Type-Safe**: Full TypeScript support with strong typing and inference throughout the event pipeline
-- **Async Iteration**: Events can be consumed as async iterables using for-await-of loops
-- **Event Composition**: Merge, combine, and transform multiple event streams into new events
-- **Minimal Dependencies**: Lightweight with only essential dependencies for optimal bundle size
+- **Async Iteration**: Events, Signals, and Sequences can be consumed as async iterables using for-await-of loops
+- **Event Composition**: Merge multiple event streams into unified events
+- **Zero Dependencies**: Lightweight with no external dependencies for optimal bundle size
 - **Universal**: Works seamlessly in both browser and Node.js environments, including service workers
 
 ## Platform Support
@@ -157,6 +237,105 @@ Using npm:
 
 ```bash
 npm install evnty
+```
+
+## Examples
+
+### Event - Multi-Listener Pattern
+```typescript
+import { createEvent } from 'evnty';
+
+// Create a typed event
+const userEvent = createEvent<{ id: number, name: string }>();
+
+// Multiple listeners
+userEvent.on(user => console.log('Logger:', user));
+userEvent.on(user => updateUI(user));
+userEvent.on(user => saveToCache(user));
+
+// Emit - all listeners are called
+userEvent({ id: 1, name: 'Alice' });
+
+// One-time listener
+userEvent.once(user => console.log('First user only:', user));
+
+// Async iteration
+for await (const user of userEvent) {
+  console.log('User event:', user);
+}
+```
+
+### Signal - Async Coordination
+```typescript
+import { Signal } from 'evnty';
+
+// Coordinate multiple async operations
+const dataSignal = new Signal<Buffer>();
+
+// Multiple operations wait for the same data
+async function processA() {
+  const data = await dataSignal.next();
+  // Process data in way A
+}
+
+async function processB() {
+  const data = await dataSignal.next();
+  // Process data in way B
+}
+
+// Start both processors
+Promise.all([processA(), processB()]);
+
+// Both receive the same data when it arrives
+dataSignal(Buffer.from('shared data'));
+```
+
+### Sequence - Task Queue
+```typescript
+import { Sequence } from 'evnty';
+
+// Create a task queue
+const taskQueue = new Sequence<() => Promise<void>>();
+
+// Single consumer processes tasks in order
+(async () => {
+  for await (const task of taskQueue) {
+    await task();
+    console.log('Task completed');
+  }
+})();
+
+// Multiple producers add tasks
+taskQueue(async () => fetchData());
+taskQueue(async () => processData());
+taskQueue(async () => saveResults());
+
+// Backpressure control
+await taskQueue.reserve(10); // Wait until queue has ≤10 items
+taskQueue(async () => nonUrgentTask());
+```
+
+### Combining Primitives
+```typescript
+// Event + Signal for request/response pattern
+const requestEvent = createEvent<Request>();
+const responseSignal = new Signal<Response>();
+
+requestEvent.on(async (req) => {
+  const response = await handleRequest(req);
+  responseSignal(response);
+});
+
+// Event + Sequence for buffered processing
+const dataEvent = createEvent<Data>();
+const processQueue = new Sequence<Data>();
+
+dataEvent.on(data => processQueue(data));
+
+// Process with controlled concurrency
+for await (const data of processQueue) {
+  await processWithRateLimit(data);
+}
 ```
 
 ## API
@@ -466,7 +645,6 @@ npm install evnty
  const results = await validateEvent('test'); // EventResult with [true, true]
  ```
  
-
 ### `AsyncIteratorObject`
 
  A wrapper class providing functional operations on async iterables.
@@ -677,8 +855,6 @@ npm install evnty
  ```
    
 #### `asynciteratorobject.Symbol.asyncIterator()`
-
-
 ### `ListenerRegistry`
 
  A lightweight registry for managing listener functions with stable dispatch order.
@@ -748,7 +924,6 @@ npm install evnty
 - @param values Arguments forwarded to each listener.
 - @returns Array of listener results or promises, one per listener.
    
-
 ### `Sequence`
 
  A sequence is a FIFO (First-In-First-Out) queue for async consumption.
@@ -965,7 +1140,6 @@ npm install evnty
  Disposes of the signal, cleaning up any pending promise resolvers.
  This method is called automatically when the signal is used with a `using` declaration.
    
-
 ### `AbortableIterator`
 
  Wraps an async iterator with abort signal support.
@@ -1053,111 +1227,10 @@ npm install evnty
 - @returns A merged async iterable
  
 
-## Examples
-
-### Event - Multi-Listener Pattern
-```typescript
-import { createEvent } from 'evnty';
-
-// Create a typed event
-const userEvent = createEvent<{ id: number, name: string }>();
-
-// Multiple listeners
-userEvent.on(user => console.log('Logger:', user));
-userEvent.on(user => updateUI(user));
-userEvent.on(user => saveToCache(user));
-
-// Emit - all listeners are called
-userEvent({ id: 1, name: 'Alice' });
-
-// Functional transformations
-const adminEvent = userEvent
-  .filter(user => user.id < 100)
-  .map(user => ({ ...user, role: 'admin' }));
-
-// Async iteration
-for await (const user of userEvent) {
-  console.log('User event:', user);
-}
-```
-
-### Signal - Async Coordination
-```typescript
-import { Signal } from 'evnty';
-
-// Coordinate multiple async operations
-const dataSignal = new Signal<Buffer>();
-
-// Multiple operations wait for the same data
-async function processA() {
-  const data = await dataSignal.next();
-  // Process data in way A
-}
-
-async function processB() {
-  const data = await dataSignal.next();
-  // Process data in way B
-}
-
-// Start both processors
-Promise.all([processA(), processB()]);
-
-// Both receive the same data when it arrives
-dataSignal(Buffer.from('shared data'));
-```
-
-### Sequence - Task Queue
-```typescript
-import { Sequence } from 'evnty';
-
-// Create a task queue
-const taskQueue = new Sequence<() => Promise<void>>();
-
-// Single consumer processes tasks in order
-(async () => {
-  for await (const task of taskQueue) {
-    await task();
-    console.log('Task completed');
-  }
-})();
-
-// Multiple producers add tasks
-taskQueue(async () => fetchData());
-taskQueue(async () => processData());
-taskQueue(async () => saveResults());
-
-// Backpressure control
-await taskQueue.reserve(10); // Wait until queue has ≤10 items
-taskQueue(async () => nonUrgentTask());
-```
-
-### Combining Primitives
-```typescript
-// Event + Signal for request/response pattern
-const requestEvent = createEvent<Request>();
-const responseSignal = new Signal<Response>();
-
-requestEvent.on(async (req) => {
-  const response = await handleRequest(req);
-  responseSignal(response);
-});
-
-// Event + Sequence for buffered processing
-const dataEvent = createEvent<Data>();
-const processQueue = new Sequence<Data>();
-
-dataEvent.on(data => processQueue(data));
-
-// Process with controlled concurrency
-for await (const data of processQueue) {
-  await processWithRateLimit(data);
-}
-```
-
 ## License
 
 License [The MIT License](./LICENSE)
-Copyright (c) 2026 Ivan Zakharchanka
+Copyright (c) 2025 Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200

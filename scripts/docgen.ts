@@ -1,9 +1,9 @@
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { print } from 'recast';
 import { parse, TSESTree, AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 
-const filename = `${process.cwd()}/${process.argv[2]}`;
-const sourceCode = await readFile(filename, 'utf-8');
+const cwd = process.cwd();
+const files = process.argv.slice(2);
 
 interface Member {
   args: string[]
@@ -24,7 +24,7 @@ class ASTVisitor {
     docs: [],
   }];
   ast?: TSESTree.Program;
-  lastNode: TSESTree.Node = ast;
+  lastNode?: TSESTree.Node;
 
   debug = false;
 
@@ -34,7 +34,7 @@ class ASTVisitor {
 
   getNodeComments(node: TSESTree.Node) {
     return this.ast?.comments
-      ?.filter(comment => comment.range[0] >= this.lastNode.range[1] && comment.range[1] <= node.range[0])
+      ?.filter(comment => comment.range[0] >= (this.lastNode?.range[1] ?? 0) && comment.range[1] <= node.range[0])
       .map(comment => comment.value
         .replace(/( +\*|\*\n)/g, '')
         .replace(/(\@\w+)\s+(\{[^\}]+\})/g, '$1 `$2`')
@@ -209,58 +209,67 @@ class ASTVisitor {
 }
 
 
-const ast = parse(sourceCode, {
-  comment: true,
-  range: true,
-  loc: true,
-});
-const visitor = new ASTVisitor();
-
-visitor.visitProgram(ast);
-
 const contents: string[] = [];
 const docs: string[] = [];
 
-const normalize = (name: string) => name.replace(/[\s-]+/g, '-').replace(/[^\w-]+/g, '').toLowerCase();
+for (const file of files) {
+  const sourceCode = await readFile(`${cwd}/${file}`, 'utf-8');
+  const ast = parse(sourceCode, {
+    comment: true,
+    range: true,
+    loc: true,
+  });
+  const visitor = new ASTVisitor();
+  visitor.visitProgram(ast);
 
-visitor.docs.push(visitor.docs.shift()!);
+  const normalize = (name: string) => name.replace(/[\s-]+/g, '-').replace(/[^\w-]+/g, '').toLowerCase();
 
-for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes('@internal')))) {
-  const level = doc.name === `` ? 0 : 1;
-  const header =  `#`.repeat(level + 2);
-  const padding = ` `.repeat(level * 2);
-  const namespace = normalize(doc.name);
-  if (level !== 0) {
-    contents.push(`- [\`${doc.name}\`](#${namespace})`);
-    docs.push(
-      `${header} \`${doc.name}\``,
-      '',
-      `${doc.docs.join('\n')}`,
-      '',
-    );
-  }
+  visitor.docs.push(visitor.docs.shift()!);
 
-  for (const [name, members] of doc.members.entries()) {
-    if (members.every(member => member.docs.every(doc => !doc.includes('@internal')))) {
-      for (const member of members) {
-        let title = `${name}(${member.args.join(', ')})${member.returnType}`;
-        if (namespace) {
-          title = `${namespace}.${title}`;
+  for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes('@internal')))) {
+    const level = doc.name === `` ? 0 : 1;
+    const header =  `#`.repeat(level + 2);
+    const padding = ` `.repeat(level * 2);
+    const namespace = normalize(doc.name);
+    if (level !== 0) {
+      contents.push(`- [\`${doc.name}\`](#${namespace})`);
+      docs.push(
+        `${header} \`${doc.name}\``,
+        '',
+        `${doc.docs.join('\n')}`,
+        '',
+      );
+    }
+
+    for (const [name, members] of doc.members.entries()) {
+      if (members.every(member => member.docs.every(doc => !doc.includes('@internal')))) {
+        for (const member of members) {
+          let title = `${name}(${member.args.join(', ')})${member.returnType}`;
+          if (namespace) {
+            title = `${namespace}.${title}`;
+          }
+          contents.push(`${padding}- [\`${title}\`](#${normalize(title)})`);
+          docs.push(`${header}# \`${title}\``);
         }
-        contents.push(`${padding}- [\`${title}\`](#${normalize(title)})`);
-        docs.push(`${header}# \`${title}\``);
-      }
-      for (const member of members) {
-        docs.push(
-          '',
-          `${member.docs.join('\n')}`,
-        );
+        for (const member of members) {
+          docs.push(
+            '',
+            `${member.docs.join('\n')}`,
+          );
+        }
       }
     }
   }
 }
 
 const sanitize = (text: string) => text.replace(/\n\n\n/g, '\n');
+const toc = '- [API](#api)\n' + sanitize(contents.join('\n')).replace(/^/gm, '  ');
+const reference = '## API\n\n' + sanitize(docs.join('\n'));
 
-await appendFile(`${process.cwd()}/docs/_contents.tmp.md`, sanitize(contents.join('\n')) + '\n');
-await appendFile(`${process.cwd()}/docs/_docs.tmp.md`, sanitize(docs.join('\n')) + '\n');
+const readme = await readFile(`${cwd}/README.md`, 'utf-8');
+const combined = readme
+  .replace(/^(- \[Documentation\].*)<!--API_TOC-->$/m, toc)
+  .replace(/<!--API_REFERENCE-->/, reference)
+  .replace(/\.\/docs\/logo\.svg/g, './logo.svg');
+
+await writeFile(`${cwd}/docs/index.md`, combined);

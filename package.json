@@ -24,7 +24,7 @@
     "docs:build": "vuepress build docs",
     "docs:clean-dev": "vuepress dev docs --clean-cache",
     "docs:dev": "vuepress dev docs",
-    "docs:gen": "rm -f docs/*.tmp.md && for file in src/*.ts; do node --loader ts-node/esm ./scripts/docgen.ts $file; done",
+    "docs:gen": "node --loader ts-node/esm ./scripts/docgen.ts src/*.ts",
     "docs:update-package": "pnpm dlx vp-update",
     "bench": "overtake src/__bench__/event.ts",
     "prepare": "husky"
