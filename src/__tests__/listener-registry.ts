@@ -180,34 +180,4 @@ describe('ListenerRegistry', () => {
     expect(listener).toHaveBeenCalledWith(1, 2, 3, 4, 5, 6);
   });
 
-  it('returns [] when snapshot is empty while listeners exist (defensive guard)', () => {
-    const registry = new ListenerRegistry<[], void>();
-    const listener = () => {};
-
-    // Capture the registry's internal Map to force an empty iterator for keys()
-    const originalSet = Map.prototype.set;
-    const originalKeys = Map.prototype.keys;
-    let capturedMap: Map<unknown, unknown> | undefined;
-    try {
-      Map.prototype.set = function set(this: Map<unknown, unknown>, key, value) {
-        capturedMap ??= this;
-        return originalSet.call(this, key, value);
-      };
-
-      registry.on(listener);
-
-      Map.prototype.keys = function keys(this: Map<unknown, unknown>) {
-        if (this === capturedMap) {
-          return [][Symbol.iterator]();
-        }
-        return originalKeys.call(this);
-      };
-
-      const results = registry.dispatch();
-      expect(results).toEqual([]);
-    } finally {
-      Map.prototype.set = originalSet;
-      Map.prototype.keys = originalKeys;
-    }
-  });
 });

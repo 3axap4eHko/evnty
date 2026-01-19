@@ -4,8 +4,8 @@ import { Fn, MaybePromise } from './types.js';
  * A lightweight registry for managing listener functions with stable dispatch order.
  *
  * Key characteristics:
- * - O(1) add/remove/has using an internal Map
- * - Snapshot-based dispatch to avoid reallocating arrays when the set is unchanged
+ * - O(1) add/has using Set, O(n) remove to preserve dispatch order
+ * - Snapshot-based dispatch for safe iteration during mutations
  * - Supports one-time listeners via `once`
  * - Returns booleans for idempotent add/remove operations
  *
@@ -25,8 +25,9 @@ import { Fn, MaybePromise } from './types.js';
  * ```
  */
 export class ListenerRegistry<P extends unknown[], R> {
-  #listeners = new Map<Fn<P, R>, boolean>();
-  #snapshot: Fn<P, R>[] | null = null;
+  #listeners: Fn<P, R>[] = [];
+  #listenerSet = new Set<Fn<P, R>>();
+  #onceSet = new Set<Fn<P, R>>();
 
   readonly [Symbol.toStringTag] = 'ListenerRegistry';
 
@@ -34,21 +35,21 @@ export class ListenerRegistry<P extends unknown[], R> {
    * The number of listeners currently registered.
    */
   get size(): number {
-    return this.#listeners.size;
+    return this.#listeners.length;
   }
 
   /**
    * Checks whether the listener is currently registered.
    */
   has(listener: Fn<P, R>): boolean {
-    return this.#listeners.has(listener);
+    return this.#listenerSet.has(listener);
   }
 
   /**
    * Convenience inverse of `has`.
    */
   lacks(listener: Fn<P, R>): boolean {
-    return !this.has(listener);
+    return !this.#listenerSet.has(listener);
   }
 
   /**
@@ -57,10 +58,12 @@ export class ListenerRegistry<P extends unknown[], R> {
    * @returns `true` if removed, `false` if it was not registered.
    */
   off(listener: Fn<P, R>): boolean {
-    if (!this.#listeners.delete(listener)) {
+    if (!this.#listenerSet.delete(listener)) {
       return false;
     }
-    this.#snapshot = null;
+    this.#onceSet.delete(listener);
+    const index = this.#listeners.indexOf(listener);
+    this.#listeners.splice(index, 1);
     return true;
   }
 
@@ -70,11 +73,11 @@ export class ListenerRegistry<P extends unknown[], R> {
    * @returns `true` if added, `false` if it was already registered.
    */
   on(listener: Fn<P, R>): boolean {
-    if (this.has(listener)) {
+    if (this.#listenerSet.has(listener)) {
       return false;
     }
-    this.#listeners.set(listener, false);
-    this.#snapshot = null;
+    this.#listenerSet.add(listener);
+    this.#listeners.push(listener);
     return true;
   }
 
@@ -84,25 +87,25 @@ export class ListenerRegistry<P extends unknown[], R> {
    * @returns `true` if added, `false` if it was already registered.
    */
   once(listener: Fn<P, R>): boolean {
-    const result = this.on(listener);
-    if (result) {
-      this.#listeners.set(listener, true);
+    if (!this.on(listener)) {
+      return false;
     }
-
-    return result;
+    this.#onceSet.add(listener);
+    return true;
   }
 
   /**
    * Removes all listeners and clears the dispatch snapshot.
    */
   clear(): void {
-    this.#listeners.clear();
-    this.#snapshot = null;
+    this.#listeners.length = 0;
+    this.#listenerSet.clear();
+    this.#onceSet.clear();
   }
 
   /**
-   * Dispatches to all listeners in snapshot order.
-   * One-time listeners are removed before invocation.
+   * Dispatches to all listeners in registration order.
+   * One-time listeners are removed after invocation.
    * Exceptions are captured as rejected promises so dispatch continues.
    *
    * @param values Arguments forwarded to each listener.
@@ -110,57 +113,46 @@ export class ListenerRegistry<P extends unknown[], R> {
    */
   dispatch(...values: P): Array<MaybePromise<R | void>> {
     const listeners = this.#listeners;
-    if (listeners.size === 0) {
+    const len = listeners.length;
+    if (len === 0) {
       return [];
     }
-    let ordered = this.#snapshot;
-    if (!ordered) {
-      const snapshot = new Array<Fn<P, R>>(listeners.size);
-      let index = 0;
-      for (const fn of listeners.keys()) {
-        snapshot[index++] = fn;
-      }
-      snapshot.length = index;
-      ordered = snapshot;
-      this.#snapshot = snapshot;
-    }
-    if (ordered.length === 0) {
-      return [];
-    }
-    const results = new Array<MaybePromise<R | void>>(ordered.length);
+    const onceSet = this.#onceSet;
+    const hasOnce = onceSet.size > 0;
+    // Always snapshot to prevent corruption if listeners modify registry during dispatch
+    const ordered = listeners.slice();
+    const results: MaybePromise<R | void>[] = [];
     const argCount = values.length;
-    for (let index = 0; index < ordered.length; index++) {
-      const fn = ordered[index];
-      if (listeners.get(fn)) {
-        this.off(fn);
+    for (let i = 0; i < len; i++) {
+      const fn = ordered[i] as (...args: unknown[]) => MaybePromise<R | void>;
+      if (hasOnce && onceSet.has(ordered[i])) {
+        this.off(ordered[i]);
       }
-      const invoke = fn as (...args: unknown[]) => MaybePromise<R | void>;
       try {
         switch (argCount) {
           case 0:
-            results[index] = invoke();
+            results.push(fn());
             break;
           case 1:
-            results[index] = invoke(values[0]);
+            results.push(fn(values[0]));
             break;
           case 2:
-            results[index] = invoke(values[0], values[1]);
+            results.push(fn(values[0], values[1]));
             break;
           case 3:
-            results[index] = invoke(values[0], values[1], values[2]);
+            results.push(fn(values[0], values[1], values[2]));
             break;
           case 4:
-            results[index] = invoke(values[0], values[1], values[2], values[3]);
+            results.push(fn(values[0], values[1], values[2], values[3]));
             break;
           case 5:
-            results[index] = invoke(values[0], values[1], values[2], values[3], values[4]);
+            results.push(fn(values[0], values[1], values[2], values[3], values[4]));
             break;
           default:
-            results[index] = invoke(...values);
-            break;
+            results.push(fn(...values));
         }
       } catch (error) {
-        results[index] = Promise.reject(error);
+        results.push(Promise.reject(error));
       }
     }
     return results;

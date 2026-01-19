@@ -184,4 +184,36 @@ describe('Signal test suite', () => {
     ctrl.abort();
     expect(signal.aborted).toBe(true);
   });
+
+  it('Should support Proxy traps for property access', () => {
+    const signal = new Signal<number>();
+
+    // has trap (in operator)
+    expect('next' in signal).toBe(true);
+    expect('nonexistent' in signal).toBe(false);
+
+    // getOwnPropertyDescriptor trap
+    const descriptor = Object.getOwnPropertyDescriptor(signal, Symbol.toStringTag);
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.value).toBe('Signal');
+
+    // getPrototypeOf trap
+    expect(Object.getPrototypeOf(signal)).toBe(Signal.prototype);
+  });
+
+  it('Should support Proxy set and defineProperty traps', () => {
+    const signal = new Signal<number>() as Signal<number> & { customProp?: number };
+
+    // set trap
+    signal.customProp = 42;
+    expect(signal.customProp).toBe(42);
+
+    // defineProperty trap
+    Object.defineProperty(signal, 'definedProp', {
+      value: 100,
+      writable: true,
+      configurable: true,
+    });
+    expect((signal as unknown as { definedProp: number }).definedProp).toBe(100);
+  });
 });

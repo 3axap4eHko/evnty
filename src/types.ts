@@ -144,3 +144,12 @@ export interface Expander<T, R> {
 export interface Promiseable<T> {
   next(): Promise<T>;
 }
+
+/**
+ * An object that can emit values.
+ * @template T - The value type to emit
+ * @template R - The return type of emit
+ */
+export interface Emitter<T, R = void> {
+  emit(value: T): R;
+}

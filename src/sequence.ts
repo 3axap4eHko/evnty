@@ -1,19 +1,149 @@
-import { CallableAsyncIterator } from './callable.js';
-import { Signal } from './signal.js';
+import { Emitter, Promiseable } from './types.js';
+import { SignalCore } from './signal.js';
 import { RingBuffer } from './ring-buffer.js';
 
 /**
- * A sequence is a FIFO (First-In-First-Out) queue for async consumption.
+ * Non-callable sequence implementation providing FIFO queue for async consumption.
+ * Contains all sequence logic with an explicit emit() method.
+ *
+ * @template T The type of values in the sequence.
+ */
+export class SequenceCore<T> implements Emitter<T, boolean>, Promiseable<T>, Promise<T>, AsyncIterable<T> {
+  protected queue: RingBuffer<T>;
+  protected nextSignal: SignalCore<void>;
+  protected sendSignal: SignalCore<void>;
+
+  readonly [Symbol.toStringTag] = 'Sequence';
+
+  /**
+   * Merges multiple source sequences into a target sequence.
+   * Values from all sources are forwarded to the target sequence.
+   *
+   * @param target The sequence that will receive values from all sources
+   * @param sequences The source sequences to merge from
+   */
+  static merge<T>(target: SequenceCore<T>, ...sequences: SequenceCore<T>[]): void {
+    for (const source of sequences) {
+      queueMicrotask(async () => {
+        if (!target.aborted)
+          try {
+            for await (const value of source) {
+              if (!target.emit(value)) {
+                return;
+              }
+            }
+          } catch {
+            // sequence is aborted
+          }
+      });
+    }
+  }
+
+  /**
+   * Creates a new SequenceCore instance.
+   * @param abortSignal - Optional AbortSignal to cancel pending operations
+   */
+  constructor(protected readonly abortSignal?: AbortSignal) {
+    this.queue = new RingBuffer();
+    this.nextSignal = new SignalCore(this.abortSignal);
+    this.sendSignal = new SignalCore(this.abortSignal);
+  }
+
+  /**
+   * Indicates whether the associated AbortSignal has been triggered.
+   */
+  get aborted(): boolean {
+    return !!this.abortSignal?.aborted;
+  }
+
+  /**
+   * Returns the number of values currently queued.
+   */
+  get size(): number {
+    return this.queue.length;
+  }
+
+  /**
+   * Emits a value to the sequence queue.
+   *
+   * @param value The value to emit
+   * @returns true if the value was queued, false if aborted
+   */
+  emit(value: T): boolean {
+    if (this.abortSignal?.aborted) {
+      this.nextSignal.emit(undefined as void);
+      return false;
+    } else {
+      this.queue.push(value);
+      this.nextSignal.emit(undefined as void);
+      return true;
+    }
+  }
+
+  /**
+   * Waits until the queue size drops to or below the specified capacity.
+   *
+   * @param capacity The maximum queue size to wait for
+   */
+  async reserve(capacity: number): Promise<void> {
+    while (this.queue.length > capacity) {
+      await this.sendSignal;
+    }
+  }
+
+  /**
+   * Consumes and returns the next value from the queue.
+   * If the queue is empty, waits for a value to be added.
+   */
+  async next(): Promise<T> {
+    while (!this.queue.length) {
+      await this.nextSignal;
+    }
+    this.sendSignal.emit(undefined as void);
+    return this.queue.shift()!;
+  }
+
+  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null): Promise<T | OK> {
+    return this.next().catch(onrejected);
+  }
+
+  finally(onfinally?: (() => void) | null): Promise<T> {
+    return this.next().finally(onfinally);
+  }
+
+  then<OK = T, ERR = never>(
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null,
+  ): Promise<OK | ERR> {
+    return this.next().then(onfulfilled, onrejected);
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
+    return {
+      next: async () => {
+        try {
+          const value = await this.next();
+          return { value, done: false };
+        } catch {
+          return { value: undefined, done: true };
+        }
+      },
+    };
+  }
+
+  /**
+   * Disposes of the sequence, signaling any waiting consumers.
+   */
+  [Symbol.dispose](): void {
+    this.sendSignal[Symbol.dispose]();
+    this.nextSignal[Symbol.dispose]();
+  }
+}
+
+/**
+ * A callable FIFO (First-In-First-Out) queue for async consumption.
  * Designed for single consumer with multiple producers pattern.
  * Values are queued and consumed in order, with backpressure support.
- * Respects an optional AbortSignal: enqueue returns false when aborted; waits reject.
- *
- * Key characteristics:
- * - Single consumer - values are consumed once, in order
- * - Multiple producers can push values concurrently
- * - FIFO ordering - first value in is first value out
- * - Backpressure control via reserve() method
- * - Async iteration support for continuous consumption
  *
  * @template T The type of values in the sequence.
  *
@@ -32,12 +162,12 @@ import { RingBuffer } from './ring-buffer.js';
  * const task3 = await tasks.next(); // 'task3'
  * ```
  */
-export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
-  private queue: RingBuffer<T>;
-  private nextSignal: Signal<void>;
-  private sendSignal: Signal<void>;
+export interface Sequence<T> {
+  (value: T): boolean;
+}
 
-  readonly [Symbol.toStringTag] = 'Sequence';
+export class Sequence<T> extends SequenceCore<T> {
+  override readonly [Symbol.toStringTag] = 'Sequence';
 
   /**
    * Merges multiple source sequences into a target sequence.
@@ -65,115 +195,54 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * await target.next(); // Could be 1, 2, or 3 depending on timing
    * ```
    */
-  static merge<T>(target: Sequence<T>, ...sequences: Sequence<T>[]): void {
-    for (const source of sequences) {
-      queueMicrotask(async () => {
-        if (!target.aborted)
-          try {
-            for await (const value of source) {
-              if (!target(value)) {
-                return;
-              }
-            }
-          } catch {
-            // sequence is aborted
-          }
-      });
-    }
+  static override merge<T>(target: Sequence<T>, ...sequences: Sequence<T>[]): void {
+    SequenceCore.merge(target, ...sequences);
   }
 
   /**
    * Creates a new Sequence instance.
    * @param abortSignal - Optional AbortSignal to cancel pending operations
    */
-  constructor(private readonly abortSignal?: AbortSignal) {
-    super((value: T) => {
-      if (this.abortSignal?.aborted) {
-        this.nextSignal();
-        return false;
-      } else {
-        this.queue.push(value);
-        this.nextSignal();
+  constructor(abortSignal?: AbortSignal) {
+    super(abortSignal);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const instance = this;
+    const proto = new.target.prototype as object;
+    const boundCache = new Map<PropertyKey, (...args: unknown[]) => unknown>();
+    const fn = function (value: T): boolean {
+      return instance.emit(value);
+    };
+    return new Proxy(fn, {
+      get(_target, prop) {
+        const value = Reflect.get(instance, prop, instance) as unknown;
+        if (typeof value === 'function') {
+          let bound = boundCache.get(prop);
+          if (!bound) {
+            bound = (value as (...args: unknown[]) => unknown).bind(instance);
+            boundCache.set(prop, bound);
+          }
+          return bound;
+        }
+        return value;
+      },
+      set(_target, prop, value) {
+        boundCache.delete(prop);
+        return Reflect.set(instance, prop, value, instance);
+      },
+      defineProperty(_target, prop, descriptor) {
+        boundCache.delete(prop);
+        Object.defineProperty(instance, prop, descriptor);
         return true;
-      }
-    });
-    this.queue = new RingBuffer();
-    this.nextSignal = new Signal(this.abortSignal);
-    this.sendSignal = new Signal(this.abortSignal);
-  }
-
-  /**
-   * Indicates whether the associated AbortSignal has been triggered.
-   */
-  get aborted(): boolean {
-    return !!this.abortSignal?.aborted;
-  }
-
-  /**
-   * Returns the number of values currently queued.
-   *
-   * @returns The current queue size
-   */
-  get size(): number {
-    return this.queue.length;
-  }
-
-  /**
-   * Waits until the queue size drops to or below the specified capacity.
-   * Useful for implementing backpressure - producers can wait before adding more items.
-   *
-   * @param capacity The maximum queue size to wait for
-   * @returns A promise that resolves when the queue size is at or below capacity
-   *
-   * ```typescript
-   * // Producer with backpressure control
-   * const sequence = new Sequence<string>();
-   *
-   * // Wait if queue has more than 10 items
-   * await sequence.reserve(10);
-   * sequence('new item'); // Safe to add, queue has space
-   * ```
-   */
-  async reserve(capacity: number): Promise<void> {
-    while (this.queue.length > capacity) {
-      await this.sendSignal;
-    }
-  }
-
-  /**
-   * Consumes and returns the next value from the queue.
-   * If the queue is empty, waits for a value to be added.
-   * Values are consumed in FIFO order.
-   *
-   * @returns A promise that resolves with the next value
-   *
-   * ```typescript
-   * const sequence = new Sequence<number>();
-   *
-   * // Consumer waits for values
-   * const valuePromise = sequence.next();
-   *
-   * // Producer adds value
-   * sequence(42);
-   *
-   * // Consumer receives it
-   * const value = await valuePromise; // 42
-   * ```
-   */
-  async next(): Promise<T> {
-    while (!this.queue.length) {
-      await this.nextSignal;
-    }
-    this.sendSignal();
-    return this.queue.shift()!;
-  }
-
-  /**
-   * Disposes of the sequence, signaling any waiting consumers.
-   * Called automatically when used with `using` declaration.
-   */
-  [Symbol.dispose](): void {
-    this.sendSignal[Symbol.dispose]();
-    this.nextSignal[Symbol.dispose]();
+      },
+      getOwnPropertyDescriptor(_target, prop) {
+        return Object.getOwnPropertyDescriptor(instance, prop);
+      },
+      has(_target, prop) {
+        return prop in instance;
+      },
+      getPrototypeOf() {
+        return proto;
+      },
+    }) as unknown as Sequence<T>;
   }
 }

@@ -259,4 +259,36 @@ describe('Sequence test suite', () => {
     const sequence = new Sequence<number>();
     expect(() => sequence[Symbol.dispose]()).not.toThrow();
   });
+
+  it('Should support Proxy traps for property access', () => {
+    const sequence = new Sequence<number>();
+
+    // has trap (in operator)
+    expect('next' in sequence).toBe(true);
+    expect('nonexistent' in sequence).toBe(false);
+
+    // getOwnPropertyDescriptor trap
+    const descriptor = Object.getOwnPropertyDescriptor(sequence, Symbol.toStringTag);
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.value).toBe('Sequence');
+
+    // getPrototypeOf trap
+    expect(Object.getPrototypeOf(sequence)).toBe(Sequence.prototype);
+  });
+
+  it('Should support Proxy set and defineProperty traps', () => {
+    const sequence = new Sequence<number>() as Sequence<number> & { customProp?: number };
+
+    // set trap
+    sequence.customProp = 42;
+    expect(sequence.customProp).toBe(42);
+
+    // defineProperty trap
+    Object.defineProperty(sequence, 'definedProp', {
+      value: 100,
+      writable: true,
+      configurable: true,
+    });
+    expect((sequence as unknown as { definedProp: number }).definedProp).toBe(100);
+  });
 });

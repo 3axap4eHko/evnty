@@ -1,15 +1,147 @@
-import { CallableAsyncIterator } from './callable.js';
+import { Emitter, Promiseable } from './types.js';
 
 /**
- * A signal is a broadcast async primitive for coordinating between producers and consumers.
+ * Non-callable signal implementation providing broadcast async coordination.
+ * Contains all signal logic with an explicit emit() method.
+ *
+ * @template T The type of value that this signal carries.
+ */
+export class SignalCore<T> implements Emitter<T, boolean>, Promiseable<T>, Promise<T>, AsyncIterable<T> {
+  protected rx?: PromiseWithResolvers<T>;
+  protected abortHandler?: () => void;
+
+  readonly [Symbol.toStringTag] = 'Signal';
+
+  /**
+   * Merges multiple source signals into a target signal.
+   * Values from any source signal are forwarded to the target signal.
+   * The merge continues until the target signal is aborted.
+   *
+   * @param target The signal that will receive values from all sources
+   * @param signals The source signals to merge from
+   */
+  static merge<T>(target: SignalCore<T>, ...signals: SignalCore<T>[]): void {
+    if (target.aborted) {
+      return;
+    }
+    for (const source of signals) {
+      void (async () => {
+        try {
+          for await (const value of source) {
+            if (!target.emit(value) && target.aborted) {
+              return;
+            }
+          }
+        } catch {
+          // ignore aborted signal
+        }
+      })();
+    }
+  }
+
+  /**
+   * Creates a new SignalCore instance.
+   *
+   * @param abortSignal An optional AbortSignal that can be used to cancel the signal operation.
+   */
+  constructor(protected readonly abortSignal?: AbortSignal) {
+    this.abortHandler = undefined;
+    if (this.abortSignal) {
+      this.abortHandler = () => {
+        this.rx?.reject(this.abortSignal!.reason);
+        this.rx = undefined;
+      };
+      this.abortSignal.addEventListener('abort', this.abortHandler, { once: true });
+    }
+  }
+
+  /**
+   * Indicates whether the associated AbortSignal has been triggered.
+   */
+  get aborted(): boolean {
+    return !!this.abortSignal?.aborted;
+  }
+
+  /**
+   * Emits a value to all waiting consumers.
+   *
+   * @param value The value to emit
+   * @returns true if a consumer received the value, false otherwise
+   */
+  emit(value: T): boolean {
+    if (this.abortSignal?.aborted) {
+      return false;
+    }
+
+    if (this.rx) {
+      this.rx.resolve(value);
+      this.rx = undefined;
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Waits for the next value to be sent to this signal.
+   *
+   * @returns A promise that resolves with the next value sent to the signal.
+   */
+  next(): Promise<T> {
+    if (this.abortSignal?.aborted) {
+      return Promise.reject(this.abortSignal.reason);
+    }
+    if (!this.rx) {
+      this.rx = Promise.withResolvers<T>();
+    }
+    return this.rx.promise;
+  }
+
+  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null): Promise<T | OK> {
+    return this.next().catch(onrejected);
+  }
+
+  finally(onfinally?: (() => void) | null): Promise<T> {
+    return this.next().finally(onfinally);
+  }
+
+  then<OK = T, ERR = never>(
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null,
+  ): Promise<OK | ERR> {
+    return this.next().then(onfulfilled, onrejected);
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
+    return {
+      next: async () => {
+        try {
+          const value = await this.next();
+          return { value, done: false };
+        } catch {
+          return { value: undefined, done: true };
+        }
+      },
+    };
+  }
+
+  /**
+   * Disposes of the signal, cleaning up any pending promise resolvers.
+   */
+  [Symbol.dispose](): void {
+    if (this.abortHandler && this.abortSignal) {
+      this.abortSignal.removeEventListener('abort', this.abortHandler);
+      this.abortHandler = undefined;
+    }
+    this.rx?.reject(new Error('Disposed'));
+    this.rx = undefined;
+  }
+}
+
+/**
+ * A callable signal for broadcast async coordination between producers and consumers.
  * When a value is sent, ALL waiting consumers receive the same value (broadcast pattern).
  * Signals can be reused - each call to next() creates a new promise for the next value.
- *
- * Key characteristics:
- * - Multiple consumers can wait simultaneously
- * - All waiting consumers receive the same value when sent
- * - Reusable - can send multiple values over time
- * - Supports async iteration for continuous value streaming
  *
  * @template T The type of value that this signal carries.
  *
@@ -28,19 +160,17 @@ import { CallableAsyncIterator } from './callable.js';
  * console.log(value1 === value2); // true - both got 'Hello World'
  * ```
  */
-export class Signal<T> extends CallableAsyncIterator<T, boolean> {
-  private rx?: PromiseWithResolvers<T>;
-  private abortHandler?: () => void;
+export interface Signal<T> {
+  (value: T): boolean;
+}
 
-  readonly [Symbol.toStringTag] = 'Signal';
+export class Signal<T> extends SignalCore<T> {
+  override readonly [Symbol.toStringTag] = 'Signal';
 
   /**
    * Merges multiple source signals into a target signal.
    * Values from any source signal are forwarded to the target signal.
    * The merge continues until the target signal is aborted.
-   *
-   * Note: When the target is aborted, iteration stops after the next value
-   * from each source. For immediate cleanup, abort source signals directly.
    *
    * @param target The signal that will receive values from all sources
    * @param signals The source signals to merge from
@@ -59,23 +189,8 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * const value = await target; // 'Hello'
    * ```
    */
-  static merge<T>(target: Signal<T>, ...signals: Signal<T>[]): void {
-    if (target.aborted) {
-      return;
-    }
-    for (const source of signals) {
-      void (async () => {
-        try {
-          for await (const value of source) {
-            if (!target(value) && target.aborted) {
-              return;
-            }
-          }
-        } catch {
-          // ignore aborted signal
-        }
-      })();
-    }
+  static override merge<T>(target: Signal<T>, ...signals: Signal<T>[]): void {
+    SignalCore.merge(target, ...signals);
   }
 
   /**
@@ -92,75 +207,46 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * controller.abort('Operation cancelled');
    * ```
    */
-  constructor(private readonly abortSignal?: AbortSignal) {
-    super((value: T) => {
-      if (this.abortSignal?.aborted) {
-        return false;
-      }
-
-      if (this.rx) {
-        this.rx.resolve(value);
-        this.rx = undefined;
+  constructor(abortSignal?: AbortSignal) {
+    super(abortSignal);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const instance = this;
+    const proto = new.target.prototype as object;
+    const boundCache = new Map<PropertyKey, (...args: unknown[]) => unknown>();
+    const fn = function (value: T): boolean {
+      return instance.emit(value);
+    };
+    return new Proxy(fn, {
+      get(_target, prop) {
+        const value = Reflect.get(instance, prop, instance) as unknown;
+        if (typeof value === 'function') {
+          let bound = boundCache.get(prop);
+          if (!bound) {
+            bound = (value as (...args: unknown[]) => unknown).bind(instance);
+            boundCache.set(prop, bound);
+          }
+          return bound;
+        }
+        return value;
+      },
+      set(_target, prop, value) {
+        boundCache.delete(prop);
+        return Reflect.set(instance, prop, value, instance);
+      },
+      defineProperty(_target, prop, descriptor) {
+        boundCache.delete(prop);
+        Object.defineProperty(instance, prop, descriptor);
         return true;
-      }
-
-      return false;
-    });
-
-    if (this.abortSignal) {
-      this.abortHandler = () => {
-        this.rx?.reject(this.abortSignal!.reason);
-        this.rx = undefined;
-      };
-      this.abortSignal.addEventListener('abort', this.abortHandler, { once: true });
-    }
-  }
-
-  /**
-   * Indicates whether the associated AbortSignal has been triggered.
-   */
-  get aborted(): boolean {
-    return !!this.abortSignal?.aborted;
-  }
-
-  /**
-   * Waits for the next value to be sent to this signal. If the signal has been aborted,
-   * this method will reject with the abort reason.
-   *
-   * @returns A promise that resolves with the next value sent to the signal.
-   *
-   * ```typescript
-   * const signal = new Signal<string>();
-   *
-   * // Wait for a value
-   * const valuePromise = signal.next();
-   *
-   * // Send a value from elsewhere
-   * signal('Hello');
-   *
-   * const value = await valuePromise; // 'Hello'
-   * ```
-   */
-  next(): Promise<T> {
-    if (this.abortSignal?.aborted) {
-      return Promise.reject(this.abortSignal.reason);
-    }
-    if (!this.rx) {
-      this.rx = Promise.withResolvers<T>();
-    }
-    return this.rx.promise;
-  }
-
-  /**
-   * Disposes of the signal, cleaning up any pending promise resolvers.
-   * This method is called automatically when the signal is used with a `using` declaration.
-   */
-  [Symbol.dispose](): void {
-    if (this.abortHandler && this.abortSignal) {
-      this.abortSignal.removeEventListener('abort', this.abortHandler);
-      this.abortHandler = undefined;
-    }
-    this.rx?.reject(new Error('Disposed'));
-    this.rx = undefined;
+      },
+      getOwnPropertyDescriptor(_target, prop) {
+        return Object.getOwnPropertyDescriptor(instance, prop);
+      },
+      has(_target, prop) {
+        return prop in instance;
+      },
+      getPrototypeOf() {
+        return proto;
+      },
+    }) as unknown as Signal<T>;
   }
 }

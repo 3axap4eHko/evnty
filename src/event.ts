@@ -1,5 +1,5 @@
-import { MaybePromise, Callback, Listener, HookListener, HookType, FilterFunction, Predicate, Mapper, Reducer } from './types.js';
-import { Callable, CallableAsyncIterator } from './callable.js';
+import { MaybePromise, Callback, Listener, HookListener, HookType, FilterFunction, Predicate, Mapper, Reducer, Emitter } from './types.js';
+import { Callable } from './callable.js';
 import { Sequence } from './sequence.js';
 import { ListenerRegistry } from './listener-registry.js';
 
@@ -135,74 +135,29 @@ export class EventResult<T> implements PromiseLike<T[]> {
 }
 
 /**
- * A class representing a multi-listener event emitter with async support.
- * Events allow multiple listeners to react to emitted values, with each listener
- * potentially returning a result. All listeners are called for each emission.
- *
- * Key characteristics:
- * - Multiple listeners - all are called for each emission
- * - Listeners can return values collected in EventResult
- * - Supports async listeners and async iteration
- * - Provides lifecycle hooks for listener management
- * - Memory efficient using RingBuffer for storage
- *
- * Differs from:
- * - Signal: Events have multiple persistent listeners vs Signal's one-time resolution per consumer
- * - Sequence: Events broadcast to all listeners vs Sequence's single consumer queue
+ * Non-callable event implementation providing multi-listener event handling.
+ * Contains all event logic with an explicit emit() method.
  *
  * @template T - The type of value emitted to listeners (event payload)
  * @template R - The return type of listener functions
  */
-export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, EventResult<void | R>> {
-  /**
-   * The ring buffer containing all registered listeners for the event.
-   */
-  private listeners: ListenerRegistry<[T], MaybePromise<R | void>>;
+export class EventCore<T = unknown, R = unknown> implements Emitter<T, EventResult<void | R>>, Promise<T>, AsyncIterable<T> {
+  protected listeners: ListenerRegistry<[T], MaybePromise<R | void>>;
+  protected hooks: ListenerRegistry<[listener: Listener<T, R> | undefined, type: HookType], void>;
+  protected _disposed = false;
+  protected pending?: PromiseWithResolvers<T>;
 
-  /**
-   * The ring buffer containing hook listeners that respond to listener lifecycle events.
-   */
-  private hooks = new ListenerRegistry<[listener: Listener<T, R> | undefined, type: HookType], void>();
-
-  /**
-   * Flag indicating whether this event has been disposed.
-   */
-  private _disposed = false;
-
-  /**
-   * Pending next() resolver waiting for the next emission.
-   */
-  private pending?: PromiseWithResolvers<T>;
-
-  /**
-   * A function that disposes of the event and its listeners.
-   */
   readonly dispose: Callback;
-
   readonly [Symbol.toStringTag] = 'Event';
+
   /**
-   * Creates a new event.
+   * Creates a new EventCore instance.
    *
    * @param dispose - A function to call on the event disposal.
-   *
-   * ```typescript
-   * // Create a click event.
-   * const clickEvent = new Event<[x: number, y: number], void>();
-   * clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
-   * ```
    */
   constructor(dispose?: Callback) {
-    const listeners = new ListenerRegistry<[T], R>();
-    super((value: T): EventResult<void | R> => {
-      if (this.pending) {
-        this.pending.resolve(value);
-        this.pending = undefined;
-      }
-      const results = listeners.dispatch(value);
-      return new EventResult(results);
-    });
-
-    this.listeners = listeners;
+    this.listeners = new ListenerRegistry<[T], R>();
+    this.hooks = new ListenerRegistry();
 
     this.dispose = () => {
       this._disposed = true;
@@ -217,9 +172,6 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
 
   /**
    * The number of listeners for the event.
-   *
-   * @readonly
-   * @type {number}
    */
   get size(): number {
     return this.listeners.size;
@@ -227,11 +179,24 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
 
   /**
    * Checks if the event has been disposed.
-   *
-   * @returns {boolean} `true` if the event has been disposed; otherwise, `false`.
    */
   get disposed(): boolean {
     return this._disposed;
+  }
+
+  /**
+   * Emits a value to all listeners.
+   *
+   * @param value The value to emit
+   * @returns EventResult containing all listener return values
+   */
+  emit(value: T): EventResult<void | R> {
+    if (this.pending) {
+      this.pending.resolve(value);
+      this.pending = undefined;
+    }
+    const results = this.listeners.dispatch(value);
+    return new EventResult(results) as EventResult<void | R>;
   }
 
   /**
@@ -239,13 +204,6 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    *
    * @param listener - The listener function to check against the registered listeners.
    * @returns {boolean} `true` if the listener is not already registered; otherwise, `false`.
-   *
-   * ```typescript
-   * // Check if a listener is not already added
-   * if (event.lacks(myListener)) {
-   *   event.on(myListener);
-   * }
-   * ```
    */
   lacks(listener: Listener<T, R>): boolean {
     return !this.listeners.has(listener);
@@ -256,13 +214,6 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    *
    * @param listener - The listener function to check.
    * @returns {boolean} `true` if the listener is currently registered; otherwise, `false`.
-   *
-   * ```typescript
-   * // Verify if a listener is registered
-   * if (event.has(myListener)) {
-   *   console.log('Listener is already registered');
-   * }
-   * ```
    */
   has(listener: Listener<T, R>): boolean {
     return this.listeners.has(listener);
@@ -273,86 +224,59 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    *
    * @param listener - The listener to remove.
    * @returns {this} The event instance, allowing for method chaining.
-   *
-   * ```typescript
-   * // Remove a listener
-   * event.off(myListener);
-   * ```
    */
   off(listener: Listener<T, R>): this {
-    if (this.listeners.off(listener)) {
-      void this.hooks.dispatch(listener, HookType.Remove);
+    if (this.listeners.off(listener) && this.hooks.size > 0) {
+      this.hooks.dispatch(listener, HookType.Remove);
     }
     return this;
   }
 
   /**
    * Registers a listener that gets triggered whenever the event is emitted.
-   * This is the primary method for adding event handlers that will react to the event being triggered.
    *
    * @param listener - The function to call when the event occurs.
-   * @returns {Unsubscribe} An object that can be used to unsubscribe the listener, ensuring easy cleanup.
-   *
-   * ```typescript
-   * // Add a listener to an event
-   * const unsubscribe = event.on((data) => {
-   *   console.log('Event data:', data);
-   * });
-   * ```
+   * @returns {Unsubscribe} An object that can be used to unsubscribe the listener.
    */
   on(listener: Listener<T, R>): Unsubscribe {
-    if (this.listeners.on(listener)) {
-      void this.hooks.dispatch(listener, HookType.Add);
+    if (this.listeners.on(listener) && this.hooks.size > 0) {
+      this.hooks.dispatch(listener, HookType.Add);
     }
     return new Unsubscribe(() => {
-      void this.off(listener);
+      this.off(listener);
     });
   }
 
   /**
    * Adds a listener that will be called only once the next time the event is emitted.
-   * This method is useful for one-time notifications or single-trigger scenarios.
    *
    * @param listener - The listener to trigger once.
    * @returns {Unsubscribe} An object that can be used to remove the listener if the event has not yet occurred.
-   *
-   * ```typescript
-   * // Register a one-time listener
-   * const onceUnsubscribe = event.once((data) => {
-   *   console.log('Received data once:', data);
-   * });
-   * ```
    */
   once(listener: Listener<T, R>): Unsubscribe {
-    if (this.listeners.once(listener)) {
-      void this.hooks.dispatch(listener, HookType.Add);
+    if (this.listeners.once(listener) && this.hooks.size > 0) {
+      this.hooks.dispatch(listener, HookType.Add);
     }
     return new Unsubscribe(() => {
-      void this.off(listener);
+      this.off(listener);
     });
   }
 
   /**
-   * Removes all listeners from the event, effectively resetting it. This is useful when you need to
-   * cleanly dispose of all event handlers to prevent memory leaks or unwanted triggers after certain conditions.
+   * Removes all listeners from the event.
    *
    * @returns {this} The instance of the event, allowing for method chaining.
-   *
-   * ```typescript
-   * const myEvent = new Event();
-   * myEvent.on(data => console.log(data));
-   * myEvent.clear(); // Clears all listeners
-   * ```
    */
   clear(): this {
     this.listeners.clear();
-    void this.hooks.dispatch(undefined, HookType.Remove);
+    if (this.hooks.size > 0) {
+      this.hooks.dispatch(undefined, HookType.Remove);
+    }
     return this;
   }
 
   /**
    * Waits for the next event emission and returns the emitted value.
-   * This method allows the event to be used as a promise that resolves with the next emitted value.
    *
    * @returns {Promise<T>} A promise that resolves with the next emitted event value.
    */
@@ -364,21 +288,25 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
     return this.pending.promise;
   }
 
+  catch<OK = never>(onrejected?: ((reason: any) => OK | PromiseLike<OK>) | null): Promise<T | OK> {
+    return this.next().catch(onrejected);
+  }
+
+  finally(onfinally?: (() => void) | null): Promise<T> {
+    return this.next().finally(onfinally);
+  }
+
+  then<OK = T, ERR = never>(
+    onfulfilled?: ((value: T) => OK | PromiseLike<OK>) | null,
+    onrejected?: ((reason: unknown) => ERR | PromiseLike<ERR>) | null,
+  ): Promise<OK | ERR> {
+    return this.next().then(onfulfilled, onrejected);
+  }
+
   /**
    * Waits for the event to settle, returning a `PromiseSettledResult`.
-   * Resolves even when the next listener rejects.
    *
    * @returns {Promise<PromiseSettledResult<T>>} A promise that resolves with the settled result.
-   *
-   * @example
-   * ```typescript
-   * const result = await event.settle();
-   * if (result.status === 'fulfilled') {
-   *   console.log('Event fulfilled with value:', result.value);
-   * } else {
-   *   console.error('Event rejected with reason:', result.reason);
-   * }
-   * ```
    */
   settle(): Promise<PromiseSettledResult<T>> {
     return this.next()
@@ -389,21 +317,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
   /**
    * Makes this event iterable using `for await...of` loops.
    *
-   * @returns {AsyncIterator<T>} An async iterator that yields values as they are emitted by this event.
-   * The iterator unsubscribes and aborts internal queues when `return()` is called.
-   *
-   * ```typescript
-   * // Assuming an event that emits numbers
-   * const numberEvent = new Event<number>();
-   * (async () => {
-   *   for await (const num of numberEvent) {
-   *     console.log('Number:', num);
-   *   }
-   * })();
-   * await numberEvent(1);
-   * await numberEvent(2);
-   * await numberEvent(3);
-   * ```
+   * @returns {AsyncIterator<T>} An async iterator that yields values as they are emitted.
    */
   [Symbol.asyncIterator](): AsyncIterator<T> {
     const ctrl = new AbortController();
@@ -435,6 +349,76 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
 
   [Symbol.dispose](): void {
     void this.dispose();
+  }
+}
+
+/**
+ * A callable multi-listener event emitter with async support.
+ * Events allow multiple listeners to react to emitted values, with each listener
+ * potentially returning a result. All listeners are called for each emission.
+ *
+ * @template T - The type of value emitted to listeners (event payload)
+ * @template R - The return type of listener functions
+ */
+export interface Event<T = unknown, R = unknown> {
+  (value: T): EventResult<void | R>;
+}
+
+export class Event<T = unknown, R = unknown> extends EventCore<T, R> {
+  override readonly [Symbol.toStringTag] = 'Event';
+
+  /**
+   * Creates a new Event instance.
+   *
+   * @param dispose - A function to call on the event disposal.
+   *
+   * ```typescript
+   * // Create a click event.
+   * const clickEvent = new Event<[x: number, y: number], void>();
+   * clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
+   * ```
+   */
+  constructor(dispose?: Callback) {
+    super(dispose);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const instance = this;
+    const proto = new.target.prototype as object;
+    const boundCache = new Map<PropertyKey, (...args: unknown[]) => unknown>();
+    const fn = function (value: T): EventResult<void | R> {
+      return instance.emit(value);
+    };
+    return new Proxy(fn, {
+      get(_target, prop) {
+        const value = Reflect.get(instance, prop, instance) as unknown;
+        if (typeof value === 'function') {
+          let bound = boundCache.get(prop);
+          if (!bound) {
+            bound = (value as (...args: unknown[]) => unknown).bind(instance);
+            boundCache.set(prop, bound);
+          }
+          return bound;
+        }
+        return value;
+      },
+      set(_target, prop, value) {
+        boundCache.delete(prop);
+        return Reflect.set(instance, prop, value, instance);
+      },
+      defineProperty(_target, prop, descriptor) {
+        boundCache.delete(prop);
+        Object.defineProperty(instance, prop, descriptor);
+        return true;
+      },
+      getOwnPropertyDescriptor(_target, prop) {
+        return Object.getOwnPropertyDescriptor(instance, prop);
+      },
+      has(_target, prop) {
+        return prop in instance;
+      },
+      getPrototypeOf() {
+        return proto;
+      },
+    }) as unknown as Event<T, R>;
   }
 }
 

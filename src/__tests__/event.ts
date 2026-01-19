@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import createEventDefault, { createEvent, merge, createInterval, Event, Unsubscribe, EventResult, EventHandler } from '../event';
+import createEventDefault, { createEvent, merge, createInterval, Event, EventCore, Unsubscribe, EventResult, EventHandler } from '../event';
 import { Sequence } from '../sequence';
 import { Callable } from '../callable';
 
@@ -27,8 +27,8 @@ describe('Anonymous Event test suite', () => {
   });
 
 
-  test('Event extends from Callable', () => {
-    expect(Event.prototype).toBeInstanceOf(Callable);
+  test('Event extends from EventCore', () => {
+    expect(Event.prototype).toBeInstanceOf(EventCore);
   });
 
   describe('EventResult', () => {
@@ -172,7 +172,7 @@ describe('Anonymous Event test suite', () => {
     expect(listener).toHaveBeenCalledWith('test');
   });
 
-  it('Should return event promise', async () => {
+  it('Should return event promise even when listener throws', async () => {
     const listener = vi.fn(() => { throw new Error('error'); });
     const event = new Event();
     event.on(listener);
@@ -203,6 +203,22 @@ describe('Anonymous Event test suite', () => {
     process.nextTick(event, 'test');
     const result = await event;
     expect(result).toEqual('test');
+  });
+
+  it('Should support catch method', async () => {
+    const event = new Event<string>();
+    process.nextTick(event, 'value');
+    const result = await event.catch(() => 'fallback');
+    expect(result).toEqual('value');
+  });
+
+  it('Should support finally method', async () => {
+    const event = new Event<string>();
+    const finallyMock = vi.fn();
+    process.nextTick(event, 'value');
+    const result = await event.finally(finallyMock);
+    expect(result).toEqual('value');
+    expect(finallyMock).toHaveBeenCalled();
   });
 
   it('Should merge multiple events', async () => {
@@ -412,6 +428,38 @@ describe('Anonymous Event test suite', () => {
     event.once(listener);
 
     expect(hookSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Should support Proxy traps for property access', () => {
+    const event = new Event<number>();
+
+    // has trap (in operator)
+    expect('on' in event).toBe(true);
+    expect('nonexistent' in event).toBe(false);
+
+    // getOwnPropertyDescriptor trap
+    const descriptor = Object.getOwnPropertyDescriptor(event, Symbol.toStringTag);
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.value).toBe('Event');
+
+    // getPrototypeOf trap
+    expect(Object.getPrototypeOf(event)).toBe(Event.prototype);
+  });
+
+  it('Should support Proxy set and defineProperty traps', () => {
+    const event = new Event<number>() as Event<number> & { customProp?: number };
+
+    // set trap
+    event.customProp = 42;
+    expect(event.customProp).toBe(42);
+
+    // defineProperty trap
+    Object.defineProperty(event, 'definedProp', {
+      value: 100,
+      writable: true,
+      configurable: true,
+    });
+    expect((event as unknown as { definedProp: number }).definedProp).toBe(100);
   });
 
 });
