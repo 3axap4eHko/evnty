@@ -30,6 +30,7 @@ import { CallableAsyncIterator } from './callable.js';
  */
 export class Signal<T> extends CallableAsyncIterator<T, boolean> {
   private rx?: PromiseWithResolvers<T>;
+  private abortHandler?: () => void;
 
   readonly [Symbol.toStringTag] = 'Signal';
 
@@ -37,6 +38,9 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * Merges multiple source signals into a target signal.
    * Values from any source signal are forwarded to the target signal.
    * The merge continues until the target signal is aborted.
+   *
+   * Note: When the target is aborted, iteration stops after the next value
+   * from each source. For immediate cleanup, abort source signals directly.
    *
    * @param target The signal that will receive values from all sources
    * @param signals The source signals to merge from
@@ -56,17 +60,21 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * ```
    */
   static merge<T>(target: Signal<T>, ...signals: Signal<T>[]): void {
+    if (target.aborted) {
+      return;
+    }
     for (const source of signals) {
-      queueMicrotask(async () => {
+      void (async () => {
         try {
           for await (const value of source) {
-            if (target.aborted) break;
-            target(value);
+            if (!target(value) && target.aborted) {
+              return;
+            }
           }
         } catch {
           // ignore aborted signal
         }
-      });
+      })();
     }
   }
 
@@ -86,24 +94,31 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    */
   constructor(private readonly abortSignal?: AbortSignal) {
     super((value: T) => {
+      if (this.abortSignal?.aborted) {
+        return false;
+      }
+
       if (this.rx) {
         this.rx.resolve(value);
         this.rx = undefined;
         return true;
-      } else {
-        return false;
       }
+
+      return false;
     });
-    this.abortSignal?.addEventListener(
-      'abort',
-      () => {
+
+    if (this.abortSignal) {
+      this.abortHandler = () => {
         this.rx?.reject(this.abortSignal!.reason);
         this.rx = undefined;
-      },
-      { once: true },
-    );
+      };
+      this.abortSignal.addEventListener('abort', this.abortHandler, { once: true });
+    }
   }
 
+  /**
+   * Indicates whether the associated AbortSignal has been triggered.
+   */
   get aborted(): boolean {
     return !!this.abortSignal?.aborted;
   }
@@ -141,6 +156,10 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * This method is called automatically when the signal is used with a `using` declaration.
    */
   [Symbol.dispose](): void {
+    if (this.abortHandler && this.abortSignal) {
+      this.abortSignal.removeEventListener('abort', this.abortHandler);
+      this.abortHandler = undefined;
+    }
     this.rx?.reject(new Error('Disposed'));
     this.rx = undefined;
   }

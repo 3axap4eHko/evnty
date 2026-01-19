@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { iterate, setTimeoutAsync, toAsyncIterable, pipe } from '../utils';
+import { iterate, setTimeoutAsync, toAsyncIterable, pipe, mapIterator, AbortableIterator, noop, mergeIterables } from '../utils';
 
 describe('Utils test suite', () => {
 
@@ -154,6 +154,16 @@ describe('Utils test suite', () => {
         expect(value).toEqual(0);
       }
     });
+    it('should pipe sync generator', async () => {
+      const iterable = pipe(toAsyncIterable([0, 1, 2]), () => function*(r) {
+        yield r * 2;
+      });
+      const result: number[] = [];
+      for await (const value of iterable) {
+        result.push(value);
+      }
+      expect(result).toEqual([0, 2, 4]);
+    });
     it('should abort early', async () => {
       const ctrl = new AbortController();
       const iterable = pipe(toAsyncIterable([0, 1, 2]), () => async function*(r) {
@@ -183,6 +193,194 @@ describe('Utils test suite', () => {
       for await (const value of iterable) {
         expect(value).toEqual(0);
       }
+    });
+  });
+
+  describe('mapIterator', () => {
+    it('maps next/return/throw', async () => {
+      const base: AsyncIterator<number, number, void> = {
+        next: vi.fn().mockResolvedValue({ value: 1, done: false }),
+        return: vi.fn().mockResolvedValue({ value: 2, done: true }),
+        throw: vi.fn().mockResolvedValue({ value: 3, done: true }),
+      };
+      const mapper = vi.fn((result) => result as IteratorResult<string, string>);
+
+      const mapped = mapIterator<string, number, number, void>(base, mapper);
+
+      await mapped.next();
+      await mapped.return?.();
+      await mapped.throw?.('err');
+
+      expect(mapper).toHaveBeenCalledTimes(3);
+      expect(base.next).toHaveBeenCalled();
+      expect(base.return).toHaveBeenCalled();
+      expect(base.throw).toHaveBeenCalled();
+    });
+
+    it('handles iterator without return/throw', async () => {
+      const base: AsyncIterator<number> = {
+        next: vi.fn().mockResolvedValue({ value: 1, done: true }),
+      };
+      const mapper = vi.fn((result) => result);
+      const mapped = mapIterator(base, mapper);
+      await mapped.next();
+      expect(mapper).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('AbortableIterator', () => {
+    it('rejects throw when already aborted', async () => {
+      const ctrl = new AbortController();
+      ctrl.abort('reason');
+      const inner: AsyncIterator<number> = {
+        next: vi.fn(),
+        throw: vi.fn(),
+      };
+      const abortable = new AbortableIterator(inner, ctrl.signal);
+
+      await expect(abortable.throw?.('err')).rejects.toBe('reason');
+    });
+
+    it('rejects throw fallback when not aborted', async () => {
+      const ctrl = new AbortController();
+      const inner: AsyncIterator<number> = {
+        next: vi.fn(),
+      };
+      const abortable = new AbortableIterator(inner, ctrl.signal);
+      await expect(abortable.throw?.('err')).rejects.toBe('err');
+    });
+
+    it('returns itself as async iterator', () => {
+      const abortable = new AbortableIterator({ next: vi.fn() });
+      expect(abortable[Symbol.asyncIterator]()).toBe(abortable);
+    });
+
+    it('returns fallback when inner return missing', async () => {
+      const abortable = new AbortableIterator({ next: vi.fn() });
+      const result = await abortable.return();
+      expect(result).toEqual({ done: true, value: undefined });
+    });
+  });
+
+  it('noop returns undefined', () => {
+    expect(noop()).toBeUndefined();
+  });
+
+  describe('mergeIterables', () => {
+    it('completes immediately with no inputs', async () => {
+      const merged = mergeIterables<number>();
+      const iterator = merged[Symbol.asyncIterator]();
+      await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+    });
+
+    it('throws when a source throws', async () => {
+      const err = new Error('boom');
+      const source = {
+        async *[Symbol.asyncIterator]() {
+          throw err;
+        },
+      };
+      const merged = mergeIterables(source);
+      const iterator = merged[Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toBe(err);
+    });
+
+    it('throws AggregateError when source and return both throw', async () => {
+      const iterError = new Error('iteration error');
+      const returnError = new Error('return error');
+      const source = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => Promise.reject(iterError),
+            return: () => Promise.reject(returnError),
+          };
+        },
+      };
+      const merged = mergeIterables(source);
+      const iterator = merged[Symbol.asyncIterator]();
+
+      let caughtError: unknown;
+      try {
+        await iterator.next();
+        expect.fail('Expected iterator.next() to reject');
+      } catch (e) {
+        caughtError = e;
+      }
+
+      expect(caughtError).toBeInstanceOf(AggregateError);
+      expect((caughtError as AggregateError).errors).toContain(iterError);
+      expect((caughtError as AggregateError).errors).toContain(returnError);
+    });
+
+    it('aborts on source error before any abort', async () => {
+      const err = new Error('boom');
+      const source = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => { throw err; },
+          };
+        },
+      };
+      const merged = mergeIterables(source);
+      const iterator = merged[Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toBe(err);
+    });
+
+    it('stops enqueueing when aborted before enqueue', async () => {
+      const OriginalAbortController = global.AbortController;
+      let ctrl: AbortController | undefined;
+      class TestAbortController extends OriginalAbortController {
+        constructor() {
+          super();
+          ctrl = this;
+        }
+      }
+      global.AbortController = TestAbortController;
+
+      const source = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => {
+              queueMicrotask(() => ctrl?.abort('stop'));
+              return Promise.resolve({ value: 1, done: false });
+            },
+          };
+        },
+      };
+
+      const merged = mergeIterables(source);
+      const iterator = merged[Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toBe('stop');
+
+      global.AbortController = OriginalAbortController;
+    });
+
+    it('handles return() method', async () => {
+      const source = (async function* () {
+        yield 1;
+        yield 2;
+        yield 3;
+      })();
+
+      const merged = mergeIterables(source);
+      const iterator = merged[Symbol.asyncIterator]();
+      await iterator.next();
+      const result = await iterator.return?.();
+      expect(result).toEqual({ value: undefined, done: true });
+    });
+
+    it('handles throw() method', async () => {
+      const source = (async function* () {
+        yield 1;
+        yield 2;
+        yield 3;
+      })();
+
+      const merged = mergeIterables(source);
+      const iterator = merged[Symbol.asyncIterator]();
+      await iterator.next();
+      const result = await iterator.throw?.('error');
+      expect(result).toEqual({ value: undefined, done: true });
     });
   });
 });

@@ -10,7 +10,7 @@ Async-first, reactive event handling library for complex event flows with three 
 
 <div align="center">
   <a href="https://github.com/3axap4ehko/evnty">
-    <img width="200" height="200" src="./logo.svg">
+    <img width="200" height="200" src="./docs/logo.svg">
   </a>
   <br>
   <br>
@@ -24,70 +24,6 @@ Async-first, reactive event handling library for complex event flows with three 
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [API](#api)
-    - [`EventResult`](#eventresult)
-
-      - [`eventresult.constructor(results: MaybePromise[])`](#eventresultconstructorresults-maybepromise)
-      - [`eventresult.then(onfulfilled, onrejected): PromiseLike`](#eventresultthenonfulfilled-onrejected-promiselike)
-      - [`eventresult.all(): Promise`](#eventresultall-promise)
-      - [`eventresult.settled(): Promise`](#eventresultsettled-promise)
-    - [`Event`](#event)
-      - [`event.constructor(dispose?: Callback)`](#eventconstructordispose-callback)
-      - [`event.size(): number`](#eventsize-number)
-      - [`event.disposed(): boolean`](#eventdisposed-boolean)
-      - [`event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
-      - [`event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
-      - [`event.off(listener: Listener): this`](#eventofflistener-listener-this)
-      - [`event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
-      - [`event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
-      - [`event.clear(): this`](#eventclear-this)
-      - [`event.next(): Promise`](#eventnext-promise)
-
-      - [`event.settle(): Promise`](#eventsettle-promise)
-      - [`event.Symbol.asyncIterator(): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
-
-      - [`event.Symbol.dispose(): void`](#eventsymboldispose-void)
-
-    - [`merge(...events: Events): Event`](#mergeevents-events-event)
-    - [`createInterval(interval: number): Event`](#createintervalinterval-number-event)
-    - [`createEvent(): Event`](#createevent-event)
-
-    - [`AsyncIteratorObject`](#asynciteratorobject)
-      - [`asynciteratorobject.from(iterable: Iterable): AsyncIteratorObject`](#asynciteratorobjectfromiterable-iterable-asynciteratorobject)
-      - [`asynciteratorobject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`](#asynciteratorobjectmergeiterables-asynciterable-asynciteratorobject)
-      - [`asynciteratorobject.constructor(iterable: AsyncIterable)`](#asynciteratorobjectconstructoriterable-asynciterable)
-      - [`asynciteratorobject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`](#asynciteratorobjectpipegeneratorfactory-signal-abortsignal-asynciteratorobject)
-      - [`asynciteratorobject.map(callbackfn): AsyncIteratorObject`](#asynciteratorobjectmapcallbackfn-asynciteratorobject)
-      - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
-      - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
-      - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
-      - [`asynciteratorobject.take(limit: number): AsyncIteratorObject`](#asynciteratorobjecttakelimit-number-asynciteratorobject)
-      - [`asynciteratorobject.drop(count: number): AsyncIteratorObject`](#asynciteratorobjectdropcount-number-asynciteratorobject)
-      - [`asynciteratorobject.flatMap(callback): AsyncIteratorObject`](#asynciteratorobjectflatmapcallback-asynciteratorobject)
-      - [`asynciteratorobject.reduce(callbackfn): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-asynciteratorobject)
-      - [`asynciteratorobject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-initialvalue-r-asynciteratorobject)
-      - [`asynciteratorobject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-args-unknown-asynciteratorobject)
-      - [`asynciteratorobject.expand(callbackfn): AsyncIteratorObject`](#asynciteratorobjectexpandcallbackfn-asynciteratorobject)
-      - [`asynciteratorobject.Symbol.asyncIterator()`](#asynciteratorobjectsymbolasynciterator)
-    - [`Sequence`](#sequence)
-      - [`sequence.merge(target: Sequence, ...sequences: Sequence[]): void`](#sequencemergetarget-sequence-sequences-sequence-void)
-
-      - [`sequence.constructor(private readonly abortSignal?: AbortSignal)`](#sequenceconstructorprivate-readonly-abortsignal-abortsignal)
-      - [`sequence.size(): number`](#sequencesize-number)
-      - [`sequence.reserve(capacity: number): Promise`](#sequencereservecapacity-number-promise)
-
-      - [`sequence.next(): Promise`](#sequencenext-promise)
-      - [`sequence.Symbol.dispose(): void`](#sequencesymboldispose-void)
-    - [`Signal`](#signal)
-      - [`signal.merge(target: Signal, ...signals: Signal[]): void`](#signalmergetarget-signal-signals-signal-void)
-      - [`signal.constructor(private readonly abortSignal?: AbortSignal)`](#signalconstructorprivate-readonly-abortsignal-abortsignal)
-      - [`signal.aborted(): boolean`](#signalaborted-boolean)
-
-      - [`signal.next(): Promise`](#signalnext-promise)
-      - [`signal.Symbol.dispose(): void`](#signalsymboldispose-void)
-
-    - [`iterate(...args: number[]): Iterable`](#iterateargs-number-iterable)
-    - [`toAsyncIterable(iterable: Iterable): AsyncIterable`](#toasynciterableiterable-iterable-asynciterable)
-
 - [Examples](#examples)
 - [License](#license)
 
@@ -225,6 +161,53 @@ npm install evnty
 
 ## API
 
+### `Unsubscribe`
+
+ Represents an unsubscribe function that can be called to remove a listener.
+ Provides utilities for chaining callbacks and conditional unsubscription.
+
+- @example
+ ```typescript
+ const unsubscribe = event.on(listener);
+
+ // Chain a callback before unsubscribing
+ const withCleanup = unsubscribe.pre(() => console.log('Cleaning up...'));
+
+ // Unsubscribe after 3 calls
+ const limited = unsubscribe.countdown(3);
+ ```
+ 
+
+#### `unsubscribe.constructor(callback: Callback)`
+
+ Creates a new Unsubscribe instance.
+- @param callback - The callback to execute when unsubscribing
+   
+#### `unsubscribe.done()`
+
+ Indicates whether this unsubscribe has already been called.
+   
+#### `unsubscribe.pre(callback: Callback): Unsubscribe`
+
+ Creates a new unsubscribe function that executes the given callback before this unsubscribe.
+
+- @param callback - The callback to execute before unsubscribing.
+- @returns `{Unsubscribe}` A new Unsubscribe instance.
+   
+#### `unsubscribe.post(callback: Callback): Unsubscribe`
+
+ Creates a new unsubscribe function that executes the given callback after this unsubscribe.
+
+- @param callback - The callback to execute after unsubscribing.
+- @returns `{Unsubscribe}` A new Unsubscribe instance.
+   
+#### `unsubscribe.countdown(count: number): Unsubscribe`
+
+ Creates a new unsubscribe function that only executes after being called a specified number of times.
+
+- @param count - The number of times this must be called before actually unsubscribing.
+- @returns `{Unsubscribe}` A new Unsubscribe instance.
+   
 ### `EventResult`
 
  Wraps an array of values or promises (typically listener results) and provides batch resolution.
@@ -254,14 +237,14 @@ npm install evnty
  A class representing a multi-listener event emitter with async support.
  Events allow multiple listeners to react to emitted values, with each listener
  potentially returning a result. All listeners are called for each emission.
- 
+
  Key characteristics:
  - Multiple listeners - all are called for each emission
  - Listeners can return values collected in EventResult
  - Supports async listeners and async iteration
  - Provides lifecycle hooks for listener management
  - Memory efficient using RingBuffer for storage
- 
+
  Differs from:
  - Signal: Events have multiple persistent listeners vs Signal's one-time resolution per consumer
  - Sequence: Events broadcast to all listeners vs Sequence's single consumer queue
@@ -388,6 +371,7 @@ npm install evnty
 #### `event.settle(): Promise`
 
  Waits for the event to settle, returning a `PromiseSettledResult`.
+ Resolves even when the next listener rejects.
 
 - @returns `{Promise<PromiseSettledResult<T>>}` A promise that resolves with the settled result.
 
@@ -406,6 +390,7 @@ npm install evnty
  Makes this event iterable using `for await...of` loops.
 
 - @returns `{AsyncIterator<T>}` An async iterator that yields values as they are emitted by this event.
+ The iterator unsubscribes and aborts internal queues when `return()` is called.
 
  ```typescript
  // Assuming an event that emits numbers
@@ -473,7 +458,7 @@ npm install evnty
  const messageEvent = createEvent<string>();
  messageEvent.on(msg => console.log('Received:', msg));
  messageEvent('Hello'); // All listeners receive 'Hello'
- 
+
  // Create an event where listeners return values
  const validateEvent = createEvent<string, boolean>();
  validateEvent.on(str => str.length > 0);
@@ -486,27 +471,27 @@ npm install evnty
 
  A wrapper class providing functional operations on async iterables.
  Enables lazy evaluation and chainable transformations on async data streams.
- 
+
  Key characteristics:
  - Lazy evaluation - operations are not executed until iteration begins
  - Chainable - all transformation methods return new AsyncIteratorObject instances
  - Supports both sync and async transformation functions
  - Memory efficient - processes values one at a time
- 
+
 - @template T The type of values yielded by the iterator
 - @template TReturn The return type of the iterator
 - @template TNext The type of value that can be passed to next()
- 
+
  ```typescript
  // Create from an async generator
  async function* numbers() {
    yield 1; yield 2; yield 3;
  }
- 
+
  const iterator = new AsyncIteratorObject(numbers())
    .map(x => x 2)
    .filter(x => x > 2);
- 
+
  for await (const value of iterator) {
    console.log(value); // 4, 6
  }
@@ -517,27 +502,27 @@ npm install evnty
 
  A wrapper class providing functional operations on async iterables.
  Enables lazy evaluation and chainable transformations on async data streams.
- 
+
  Key characteristics:
  - Lazy evaluation - operations are not executed until iteration begins
  - Chainable - all transformation methods return new AsyncIteratorObject instances
  - Supports both sync and async transformation functions
  - Memory efficient - processes values one at a time
- 
+
 - @template T The type of values yielded by the iterator
 - @template TReturn The return type of the iterator
 - @template TNext The type of value that can be passed to next()
- 
+
  ```typescript
  // Create from an async generator
  async function* numbers() {
    yield 1; yield 2; yield 3;
  }
- 
+
  const iterator = new AsyncIteratorObject(numbers())
    .map(x => x 2)
    .filter(x => x > 2);
- 
+
  for await (const value of iterator) {
    console.log(value); // 4, 6
  }
@@ -545,14 +530,14 @@ npm install evnty
  
  Creates an AsyncIteratorObject from a synchronous iterable.
  Converts the sync iterable to async for uniform handling.
- 
+
 - @param iterable A synchronous iterable to convert
 - @returns A new AsyncIteratorObject wrapping the converted iterable
- 
+
  ```typescript
  const syncArray = [1, 2, 3, 4, 5];
  const asyncIterator = AsyncIteratorObject.from(syncArray);
- 
+
  for await (const value of asyncIterator) {
    console.log(value); // 1, 2, 3, 4, 5
  }
@@ -563,16 +548,16 @@ npm install evnty
  Merges multiple async iterables into a single stream.
  Values from all sources are interleaved as they become available.
  The merged iterator completes when all source iterators complete.
- 
+
 - @param iterables The async iterables to merge
 - @returns A new AsyncIteratorObject yielding values from all sources
- 
+
  ```typescript
  async function* source1() { yield 1; yield 3; }
  async function* source2() { yield 2; yield 4; }
- 
+
  const merged = AsyncIteratorObject.merge(source1(), source2());
- 
+
  for await (const value of merged) {
    console.log(value); // Order depends on timing: 1, 2, 3, 4 or similar
  }
@@ -584,23 +569,30 @@ npm install evnty
  Low-level transformation method using generator functions.
  Allows custom async transformations by providing a generator factory.
  Used internally by other transformation methods.
- 
+
 - @param generatorFactory A function that returns a generator function for transforming values
 - @param signal Optional AbortSignal to cancel the operation
 - @returns A new AsyncIteratorObject with transformed values
+   
+#### `asynciteratorobject.awaited(): AsyncIteratorObject`
+
+ Resolves promise-like values from the source iterator.
+ Useful for normalizing values before applying type-guard predicates.
+
+- @returns A new AsyncIteratorObject yielding awaited values
    
 #### `asynciteratorobject.map(callbackfn): AsyncIteratorObject`
 
  Transforms each value using a mapping function.
  The callback can be synchronous or return a promise.
- 
+
 - @param callbackfn Function to transform each value
 - @returns A new AsyncIteratorObject yielding transformed values
- 
+
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3]);
  const doubled = numbers.map(x => x 2);
- 
+
  for await (const value of doubled) {
    console.log(value); // 2, 4, 6
  }
@@ -613,14 +605,14 @@ npm install evnty
  Filters values based on a predicate function.
  Only values for which the predicate returns truthy are yielded.
  Supports type guard predicates for type narrowing.
- 
+
 - @param predicate Function to test each value
 - @returns A new AsyncIteratorObject yielding only values that pass the test
- 
+
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
  const evens = numbers.filter(x => x % 2 === 0);
- 
+
  for await (const value of evens) {
    console.log(value); // 2, 4
  }
@@ -650,15 +642,15 @@ npm install evnty
  Creates an iterator of accumulated values by applying a reducer function.
  Unlike Array.reduce, this returns an iterator that yields each intermediate accumulated value,
  not just the final result. This allows observing the accumulation process.
- 
+
 - @param callbackfn Reducer function to accumulate values
 - @param initialValue Optional initial value for the accumulation
 - @returns A new AsyncIteratorObject yielding accumulated values at each step
- 
+
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3, 4]);
  const sums = numbers.reduce((sum, x) => sum + x, 0);
- 
+
  for await (const value of sums) {
    console.log(value); // 1, 3, 6, 10 (running totals)
  }
@@ -671,14 +663,14 @@ npm install evnty
  Transforms each value into multiple values using an expander function.
  Each input value is expanded into zero or more output values.
  Similar to flatMap but for expanding to multiple values rather than flattening iterables.
- 
+
 - @param callbackfn Function that returns an iterable of values for each input
 - @returns A new AsyncIteratorObject yielding all expanded values
- 
+
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3]);
  const expanded = numbers.expand(x => [x, x 10]);
- 
+
  for await (const value of expanded) {
    console.log(value); // 1, 10, 2, 20, 3, 30
  }
@@ -687,11 +679,82 @@ npm install evnty
 #### `asynciteratorobject.Symbol.asyncIterator()`
 
 
+### `ListenerRegistry`
+
+ A lightweight registry for managing listener functions with stable dispatch order.
+
+ Key characteristics:
+ - O(1) add/remove/has using an internal Map
+ - Snapshot-based dispatch to avoid reallocating arrays when the set is unchanged
+ - Supports one-time listeners via `once`
+ - Returns booleans for idempotent add/remove operations
+
+- @template P Tuple of argument types passed to listeners
+- @template R Return type of listeners
+
+- @example
+ ```typescript
+ const registry = new ListenerRegistry<[number], void>();
+ const listener = (value: number) => console.log(value);
+
+ registry.on(listener);           // true
+ registry.on(listener);           // false (already registered)
+ registry.dispatch(1);            // calls listener
+ registry.off(listener);          // true
+ registry.dispatch(2);            // no listeners called
+ ```
+ 
+
+#### `listenerregistry.size(): number`
+
+ The number of listeners currently registered.
+   
+#### `listenerregistry.has(listener: Fn): boolean`
+
+ Checks whether the listener is currently registered.
+   
+#### `listenerregistry.lacks(listener: Fn): boolean`
+
+ Convenience inverse of `has`.
+   
+#### `listenerregistry.off(listener: Fn): boolean`
+
+ Removes a listener if present.
+
+- @returns `true` if removed, `false` if it was not registered.
+   
+#### `listenerregistry.on(listener: Fn): boolean`
+
+ Registers a listener if not already present.
+
+- @returns `true` if added, `false` if it was already registered.
+   
+#### `listenerregistry.once(listener: Fn): boolean`
+
+ Registers a listener that will automatically unregister after its next dispatch.
+
+- @returns `true` if added, `false` if it was already registered.
+   
+#### `listenerregistry.clear(): void`
+
+ Removes all listeners and clears the dispatch snapshot.
+   
+#### `listenerregistry.dispatch(...values: P): Array`
+
+ Dispatches to all listeners in snapshot order.
+ One-time listeners are removed before invocation.
+ Exceptions are captured as rejected promises so dispatch continues.
+
+- @param values Arguments forwarded to each listener.
+- @returns Array of listener results or promises, one per listener.
+   
+
 ### `Sequence`
 
  A sequence is a FIFO (First-In-First-Out) queue for async consumption.
  Designed for single consumer with multiple producers pattern.
  Values are queued and consumed in order, with backpressure support.
+ Respects an optional AbortSignal: enqueue returns false when aborted; waits reject.
 
  Key characteristics:
  - Single consumer - values are consumed once, in order
@@ -746,6 +809,14 @@ npm install evnty
  ```
    
 #### `sequence.constructor(private readonly abortSignal?: AbortSignal)`
+
+ Creates a new Sequence instance.
+- @param abortSignal - Optional AbortSignal to cancel pending operations
+   
+#### `sequence.aborted(): boolean`
+
+ Indicates whether the associated AbortSignal has been triggered.
+   
 #### `sequence.size(): number`
 
  Returns the number of values currently queued.
@@ -831,6 +902,9 @@ npm install evnty
  Values from any source signal are forwarded to the target signal.
  The merge continues until the target signal is aborted.
 
+ Note: When the target is aborted, iteration stops after the next value
+ from each source. For immediate cleanup, abort source signals directly.
+
 - @param target The signal that will receive values from all sources
 - @param signals The source signals to merge from
 
@@ -864,6 +938,9 @@ npm install evnty
  ```
    
 #### `signal.aborted(): boolean`
+
+ Indicates whether the associated AbortSignal has been triggered.
+   
 #### `signal.next(): Promise`
 
  Waits for the next value to be sent to this signal. If the signal has been aborted,
@@ -889,29 +966,58 @@ npm install evnty
  This method is called automatically when the signal is used with a `using` declaration.
    
 
-### `iterate(...args: number[]): Iterable`
+### `AbortableIterator`
+
+ Wraps an async iterator with abort signal support.
+ When the signal is aborted, iteration terminates gracefully.
+- @template T - The yielded value type
+- @template TReturn - The return value type
+- @template TNext - The type passed to next()
+ 
+
+#### `abortableiterator.constructor(iterator: AsyncIterator, signal?: AbortSignal)`
+#### `abortableiterator.next(...args: [] | [TNext]): Promise`
+#### `abortableiterator.return(value?: TReturn): Promise`
+#### `abortableiterator.throw(error: unknown): Promise`
+#### `abortableiterator.Symbol.asyncIterator(): AsyncIterator`
+### `noop()`
+
+ A no-operation function. Useful as a default callback or placeholder.
+ 
+### `mapIterator(iterator: AnyIterator, map: MapNext): AsyncIterator`
+
+ Wraps an iterator with a mapping function applied to each result.
+- @template U - The output value type
+- @template T - The input value type
+- @template TReturn - The iterator return type
+- @template TNext - The type passed to next()
+- @param iterator - The source iterator to wrap
+- @param map - The mapping function to apply to each result
+- @returns An async iterator with mapped results
+ 
+### `iterate(startOrCount?: number, countWhenTwoArgs?: number, step: number = 1): Iterable`
 
  Creates an iterable sequence of numbers with flexible parameters.
  Can generate infinite sequences, finite sequences, or sequences with custom start and step values.
- 
+
 - @param args Variable arguments to configure the sequence:
    - No args: Infinite sequence starting at 0 with step 1
    - 1 arg (count): Sequence from 0 to count-1
    - 2 args (start, count): Sequence starting at 'start' for 'count' iterations
    - 3 args (start, count, step): Custom start, count, and step value
 - @returns An iterable that generates numbers according to the parameters
- 
+
 - @example
  ```typescript
  // Infinite sequence: 0, 1, 2, 3, ...
  for (const n of iterate()) { }
- 
+
  // Count only: 0, 1, 2, 3, 4
  for (const n of iterate(5)) { }
- 
+
  // Start and count: 10, 11, 12, 13, 14
  for (const n of iterate(10, 5)) { }
- 
+
  // Start, count, and step: 0, 2, 4, 6, 8
  for (const n of iterate(0, 5, 2)) { }
  ```
@@ -920,22 +1026,31 @@ npm install evnty
 
  Converts a synchronous iterable to an asynchronous iterable.
  Wraps the sync iterator methods to return promises, enabling uniform async handling.
- 
+
 - @template T The type of values yielded by the iterator
 - @template TReturn The return type of the iterator
 - @template TNext The type of value that can be passed to next()
 - @param iterable A synchronous iterable to convert
 - @returns An async iterable that yields the same values as the input
- 
+
 - @example
  ```typescript
  const syncArray = [1, 2, 3, 4, 5];
  const asyncIterable = toAsyncIterable(syncArray);
- 
+
  for await (const value of asyncIterable) {
    console.log(value); // 1, 2, 3, 4, 5
  }
  ```
+ 
+### `mergeIterables(...iterables: AsyncIterable[]): AsyncIterable`
+
+ Merges multiple async iterables into a single stream.
+ Values are yielded as they become available from any source.
+ Completes when all sources complete; aborts all on error.
+- @template T - The value type yielded by all iterables
+- @param iterables - The async iterables to merge
+- @returns A merged async iterable
  
 
 ## Examples
@@ -1042,7 +1157,7 @@ for await (const data of processQueue) {
 ## License
 
 License [The MIT License](./LICENSE)
-Copyright (c) 2025 Ivan Zakharchanka
+Copyright (c) 2026 Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200

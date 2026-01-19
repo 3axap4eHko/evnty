@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import createEventDefault, { createEvent, merge, createInterval, Event, Unsubscribe, EventResult, EventHandler } from '../event';
+import { Sequence } from '../sequence';
 import { Callable } from '../callable';
 
 const processTick = () => new Promise(resolve => process.nextTick(resolve));
@@ -31,16 +32,10 @@ describe('Anonymous Event test suite', () => {
   });
 
   describe('EventResult', () => {
-    it('should create event result', async () => {
+    it('should support toStringTag, all() and settled()', async () => {
       const er = new EventResult([]);
       expect(`${er}`).toContain('EventResult');
-    });
-    it('should create event result', async () => {
-      const er = new EventResult([]);
       await expect(er.all()).resolves.toEqual([]);
-    });
-    it('should create event result', async () => {
-      const er = new EventResult([]);
       await expect(er.settled()).resolves.toEqual([]);
     });
   });
@@ -49,15 +44,9 @@ describe('Anonymous Event test suite', () => {
     expect(createEventDefault).toEqual(createEvent);
   });
 
-  it('Should be instantiable', () => {
+  it('Should be instantiable via constructor and factory', () => {
     expect(() => new Event()).not.toThrow();
-  });
-
-  it('Should be instantiable', () => {
     expect(() => createEvent<number>()).not.toThrow();
-  });
-
-  it('Should be instantiable', () => {
     expect(() => createEvent<string, string>()).not.toThrow();
   });
 
@@ -105,7 +94,7 @@ describe('Anonymous Event test suite', () => {
   it('Should remove existing event listener', async () => {
     const event = new Event();
     const spy = vi.fn();
-    event[HOOKS].push(spy);
+    event[HOOKS].on(spy);
 
     const listener = vi.fn();
     event.on(listener);
@@ -120,7 +109,7 @@ describe('Anonymous Event test suite', () => {
   it('Should remove all existing event listeners', async () => {
     const event = new Event();
     const spy = vi.fn();
-    event[HOOKS].push(spy);
+    event[HOOKS].on(spy);
     const listener = vi.fn();
     event.on(listener);
     event.on(listener);
@@ -128,9 +117,8 @@ describe('Anonymous Event test suite', () => {
     await event('test');
     expect(listener).not.toHaveBeenCalled();
     expect(spy).toHaveBeenNthCalledWith(1, listener, 0);
-    expect(spy).toHaveBeenNthCalledWith(2, listener, 0);
-    expect(spy).toHaveBeenNthCalledWith(3, listener, 1);
-    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy).toHaveBeenNthCalledWith(2, listener, 1);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it('Should not remove other event listeners', async () => {
@@ -203,6 +191,13 @@ describe('Anonymous Event test suite', () => {
     expect(settled).toEqual({ value: 'test', status: 'fulfilled' });
   });
 
+  it('Should settle a rejected event', async () => {
+    const event = new Event();
+    vi.spyOn(event, 'next').mockRejectedValueOnce('boom');
+    const settled = await event.settle();
+    expect(settled).toEqual({ reason: 'boom', status: 'rejected' });
+  });
+
   it('Should work as a promise', async () => {
     const event = new Event();
     process.nextTick(event, 'test');
@@ -236,29 +231,32 @@ describe('Anonymous Event test suite', () => {
     expect(listener).toHaveBeenNthCalledWith(6, false);
   });
 
-  it('Should create interval events', async () => {
+  it('Should dispose merged event and unsubscribe sources', () => {
+    const event1 = new Event<string>();
+    const event2 = new Event<string>();
+    const mergedEvent = merge(event1, event2);
+
+    expect(event1.size).toBe(1);
+    expect(event2.size).toBe(1);
+
+    mergedEvent[Symbol.dispose]();
+
+    expect(event1.size).toBe(0);
+    expect(event2.size).toBe(0);
+  });
+
+  it('Should create interval events and reject after dispose', async () => {
     const listener = vi.fn();
     const event = createInterval(10);
     event.on(listener);
     await event;
     expect(listener).toHaveBeenCalledWith(0);
     event.dispose();
-    const result = await Promise.race([new Promise((resolve) => setTimeout(resolve, 100, null)), event]);
-    expect(result).toEqual(null);
+    expect(event.disposed).toBe(true);
+    await expect(event.next()).rejects.toThrow('Event disposed');
   });
 
-  it('Should dismiss event listener', async () => {
-    const listener = vi.fn();
-    const event = createInterval(10);
-    event.on(listener);
-    await event;
-    expect(listener).toHaveBeenCalledWith(0);
-    event.dispose();
-    const result = await Promise.race([new Promise(process.nextTick).then(Boolean), event]);
-    expect(result).toEqual(true);
-  });
-
-  it('Should dismiss event pre finished', async () => {
+  it('Should dismiss event pre with async callback', async () => {
     const listener = vi.fn();
     const event = new Event<void>();
     const dismiss = event.on(listener);
@@ -271,7 +269,17 @@ describe('Anonymous Event test suite', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('Should dismiss event post finished', async () => {
+  it('Should dismiss event pre with sync callback', () => {
+    const listener = vi.fn();
+    const preCallback = vi.fn();
+    const event = new Event<void>();
+    const dismiss = event.on(listener);
+    dismiss.pre(preCallback)();
+    expect(preCallback).toHaveBeenCalled();
+    expect(event.has(listener)).toBe(false);
+  });
+
+  it('Should dismiss event post with async callback', async () => {
     const listener = vi.fn();
     const event = new Event<void>();
     const dismiss = event.on(listener);
@@ -282,6 +290,28 @@ describe('Anonymous Event test suite', () => {
     await nextTick;
     await event();
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('Should dismiss event post with sync callback', () => {
+    const listener = vi.fn();
+    const postCallback = vi.fn();
+    const event = new Event<void>();
+    const dismiss = event.on(listener);
+    dismiss.post(postCallback)();
+    expect(postCallback).toHaveBeenCalled();
+    expect(event.has(listener)).toBe(false);
+  });
+
+  it('Should chain post after async unsubscribe', async () => {
+    const order: string[] = [];
+    const asyncUnsubscribe = new Unsubscribe(async () => {
+      order.push('unsubscribe');
+    });
+    const chained = asyncUnsubscribe.post(() => {
+      order.push('post');
+    });
+    await chained();
+    expect(order).toEqual(['unsubscribe', 'post']);
   });
 
   it('Should dismiss event countdown', async () => {
@@ -340,6 +370,48 @@ describe('Anonymous Event test suite', () => {
     expect(listener).toHaveBeenCalledWith('test2');
     expect(listener).toHaveBeenCalledWith('test3');
     expect(listener).toHaveBeenCalledTimes(6);
+  });
+
+  it('Should return iterator fallback when return is missing', async () => {
+    const originalIterator = Sequence.prototype[Symbol.asyncIterator];
+    Sequence.prototype[Symbol.asyncIterator] = function () {
+      return {
+        next: async () => ({ value: undefined, done: true }),
+      } as AsyncIterator<unknown>;
+    };
+    const event = new Event<number>();
+    const iterator = event[Symbol.asyncIterator]();
+    const result = await iterator.return?.();
+    expect(result).toEqual({ value: undefined, done: true });
+    Sequence.prototype[Symbol.asyncIterator] = originalIterator;
+  });
+
+  it('Should reject pending promise when disposed', async () => {
+    const event = new Event<number>();
+    const promise = event.next();
+    event.dispose();
+    await expect(promise).rejects.toThrow('Event disposed');
+  });
+
+  it('Should unsubscribe once listener before it fires', async () => {
+    const event = new Event<number>();
+    const listener = vi.fn();
+    const unsubscribe = event.once(listener);
+    unsubscribe();
+    await event(42);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('Should not dispatch hook when once listener already registered', async () => {
+    const event = new Event<number>();
+    const hookSpy = vi.fn();
+    event[HOOKS].on(hookSpy);
+
+    const listener = vi.fn();
+    event.once(listener);
+    event.once(listener);
+
+    expect(hookSpy).toHaveBeenCalledTimes(1);
   });
 
 });

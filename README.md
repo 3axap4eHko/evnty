@@ -113,17 +113,17 @@ Traditional event handling in JavaScript/TypeScript has limitations:
 Evnty solves these problems by providing:
 - **Type-safe events** with full TypeScript inference
 - **Three specialized primitives** for different async patterns
-- **Rich functional operators** (map, filter, reduce, debounce, batch, etc.)
+- **Async iterator transformations** via `AsyncIteratorObject` (map, filter, reduce, expand, etc.)
 - **Composable abstractions** that work together seamlessly
 
 ## Features
 
 - **Async-First Design**: Built from the ground up for asynchronous event handling with full Promise support
-- **Functional Programming**: Rich set of operators including map, filter, reduce, debounce, batch, and expand for event stream transformations
+- **Iterator Transformations**: `AsyncIteratorObject` provides map, filter, reduce, take, drop, flatMap, and expand operators
 - **Type-Safe**: Full TypeScript support with strong typing and inference throughout the event pipeline
-- **Async Iteration**: Events can be consumed as async iterables using for-await-of loops
-- **Event Composition**: Merge, combine, and transform multiple event streams into new events
-- **Minimal Dependencies**: Lightweight with only essential dependencies for optimal bundle size
+- **Async Iteration**: Events, Signals, and Sequences can be consumed as async iterables using for-await-of loops
+- **Event Composition**: Merge multiple event streams into unified events
+- **Zero Dependencies**: Lightweight with no external dependencies for optimal bundle size
 - **Universal**: Works seamlessly in both browser and Node.js environments, including service workers
 
 ## Platform Support
@@ -176,10 +176,8 @@ userEvent.on(user => saveToCache(user));
 // Emit - all listeners are called
 userEvent({ id: 1, name: 'Alice' });
 
-// Functional transformations
-const adminEvent = userEvent
-  .filter(user => user.id < 100)
-  .map(user => ({ ...user, role: 'admin' }));
+// One-time listener
+userEvent.once(user => console.log('First user only:', user));
 
 // Async iteration
 for await (const user of userEvent) {

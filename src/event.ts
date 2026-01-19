@@ -1,24 +1,47 @@
-import { RingBuffer } from 'fastds';
 import { MaybePromise, Callback, Listener, HookListener, HookType, FilterFunction, Predicate, Mapper, Reducer } from './types.js';
 import { Callable, CallableAsyncIterator } from './callable.js';
 import { Sequence } from './sequence.js';
+import { ListenerRegistry } from './listener-registry.js';
+
+/**
+ * Type guard to check if a value is a PromiseLike (thenable).
+ * @internal
+ */
+const isThenable = (value: unknown): value is PromiseLike<unknown> =>
+  value !== null && typeof value === 'object' && typeof (value as PromiseLike<unknown>).then === 'function';
 
 /**
  * Represents an unsubscribe function that can be called to remove a listener.
- * Provides additional utilities for chaining and conditional unsubscription.
+ * Provides utilities for chaining callbacks and conditional unsubscription.
  *
- * @internal
+ * @example
+ * ```typescript
+ * const unsubscribe = event.on(listener);
+ *
+ * // Chain a callback before unsubscribing
+ * const withCleanup = unsubscribe.pre(() => console.log('Cleaning up...'));
+ *
+ * // Unsubscribe after 3 calls
+ * const limited = unsubscribe.countdown(3);
+ * ```
  */
 export class Unsubscribe extends Callable<[], MaybePromise<void>> {
   private _done = false;
 
+  /**
+   * Creates a new Unsubscribe instance.
+   * @param callback - The callback to execute when unsubscribing
+   */
   constructor(callback: Callback) {
-    super(async () => {
+    super(() => {
       this._done = true;
-      await callback();
+      return callback();
     });
   }
 
+  /**
+   * Indicates whether this unsubscribe has already been called.
+   */
   get done() {
     return this._done;
   }
@@ -30,9 +53,12 @@ export class Unsubscribe extends Callable<[], MaybePromise<void>> {
    * @returns {Unsubscribe} A new Unsubscribe instance.
    */
   pre(callback: Callback): Unsubscribe {
-    return new Unsubscribe(async () => {
-      await callback();
-      await this();
+    return new Unsubscribe((): MaybePromise<void> => {
+      const result = callback();
+      if (isThenable(result)) {
+        return result.then(() => this()) as PromiseLike<void>;
+      }
+      return this();
     });
   }
 
@@ -43,9 +69,12 @@ export class Unsubscribe extends Callable<[], MaybePromise<void>> {
    * @returns {Unsubscribe} A new Unsubscribe instance.
    */
   post(callback: Callback): Unsubscribe {
-    return new Unsubscribe(async () => {
-      await this();
-      await callback();
+    return new Unsubscribe((): MaybePromise<void> => {
+      const result = this();
+      if (isThenable(result)) {
+        return result.then(() => callback()) as PromiseLike<void>;
+      }
+      return callback();
     });
   }
 
@@ -56,9 +85,9 @@ export class Unsubscribe extends Callable<[], MaybePromise<void>> {
    * @returns {Unsubscribe} A new Unsubscribe instance.
    */
   countdown(count: number): Unsubscribe {
-    return new Unsubscribe(async () => {
+    return new Unsubscribe(() => {
       if (!--count) {
-        await this();
+        return this();
       }
     });
   }
@@ -128,17 +157,22 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
   /**
    * The ring buffer containing all registered listeners for the event.
    */
-  private listeners: RingBuffer<Listener<T, R>>;
+  private listeners: ListenerRegistry<[T], MaybePromise<R | void>>;
 
   /**
    * The ring buffer containing hook listeners that respond to listener lifecycle events.
    */
-  private hooks = new RingBuffer<HookListener<T, R>>();
+  private hooks = new ListenerRegistry<[listener: Listener<T, R> | undefined, type: HookType], void>();
 
   /**
    * Flag indicating whether this event has been disposed.
    */
   private _disposed = false;
+
+  /**
+   * Pending next() resolver waiting for the next emission.
+   */
+  private pending?: PromiseWithResolvers<T>;
 
   /**
    * A function that disposes of the event and its listeners.
@@ -158,9 +192,13 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   constructor(dispose?: Callback) {
-    const listeners = new RingBuffer<Listener<T, R>>();
+    const listeners = new ListenerRegistry<[T], R>();
     super((value: T): EventResult<void | R> => {
-      const results = listeners.toArray().map(async (listener) => listener(await value));
+      if (this.pending) {
+        this.pending.resolve(value);
+        this.pending = undefined;
+      }
+      const results = listeners.dispatch(value);
       return new EventResult(results);
     });
 
@@ -168,6 +206,10 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
 
     this.dispose = () => {
       this._disposed = true;
+      if (this.pending) {
+        this.pending.reject(new Error('Event disposed'));
+        this.pending = undefined;
+      }
       void this.clear();
       void dispose?.();
     };
@@ -180,7 +222,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * @type {number}
    */
   get size(): number {
-    return this.listeners.length;
+    return this.listeners.size;
   }
 
   /**
@@ -238,8 +280,8 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   off(listener: Listener<T, R>): this {
-    if (this.listeners.compact((l) => l !== listener) && this.hooks.length) {
-      [...this.hooks].forEach((hook) => hook(listener, HookType.Remove));
+    if (this.listeners.off(listener)) {
+      void this.hooks.dispatch(listener, HookType.Remove);
     }
     return this;
   }
@@ -259,9 +301,8 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   on(listener: Listener<T, R>): Unsubscribe {
-    this.listeners.push(listener);
-    if (this.hooks.length) {
-      [...this.hooks].forEach((hook) => hook(listener, HookType.Add));
+    if (this.listeners.on(listener)) {
+      void this.hooks.dispatch(listener, HookType.Add);
     }
     return new Unsubscribe(() => {
       void this.off(listener);
@@ -283,11 +324,12 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   once(listener: Listener<T, R>): Unsubscribe {
-    const oneTimeListener = (event: T) => {
-      void this.off(oneTimeListener);
-      return listener(event);
-    };
-    return this.on(oneTimeListener);
+    if (this.listeners.once(listener)) {
+      void this.hooks.dispatch(listener, HookType.Add);
+    }
+    return new Unsubscribe(() => {
+      void this.off(listener);
+    });
   }
 
   /**
@@ -304,9 +346,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    */
   clear(): this {
     this.listeners.clear();
-    if (this.hooks.length) {
-      [...this.hooks].forEach((hook) => hook(undefined, HookType.Remove));
-    }
+    void this.hooks.dispatch(undefined, HookType.Remove);
     return this;
   }
 
@@ -316,17 +356,17 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    *
    * @returns {Promise<T>} A promise that resolves with the next emitted event value.
    */
-  async next(): Promise<T> {
-    const { promise, resolve } = Promise.withResolvers<T>();
-    this.listeners.push(resolve);
-
-    return promise.finally(() => {
-      this.listeners.removeFirst(resolve);
-    });
+  next(): Promise<T> {
+    if (this._disposed) {
+      return Promise.reject(new Error('Event disposed'));
+    }
+    this.pending ??= Promise.withResolvers<T>();
+    return this.pending.promise;
   }
 
   /**
    * Waits for the event to settle, returning a `PromiseSettledResult`.
+   * Resolves even when the next listener rejects.
    *
    * @returns {Promise<PromiseSettledResult<T>>} A promise that resolves with the settled result.
    *
@@ -340,14 +380,17 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * }
    * ```
    */
-  async settle(): Promise<PromiseSettledResult<T>> {
-    return await Promise.allSettled([this.next()]).then(([settled]) => settled);
+  settle(): Promise<PromiseSettledResult<T>> {
+    return this.next()
+      .then((value) => ({ status: 'fulfilled', value }) as const)
+      .catch((reason: unknown) => ({ status: 'rejected', reason }) as const);
   }
 
   /**
    * Makes this event iterable using `for await...of` loops.
    *
    * @returns {AsyncIterator<T>} An async iterator that yields values as they are emitted by this event.
+   * The iterator unsubscribes and aborts internal queues when `return()` is called.
    *
    * ```typescript
    * // Assuming an event that emits numbers
@@ -368,15 +411,26 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
     const emitEvent = (value: T) => {
       sequence(value);
     };
-    this.listeners.push(emitEvent);
+    this.listeners.on(emitEvent);
     const hook: HookListener<T, R> = (target = emitEvent, action) => {
       if (target === emitEvent && action === HookType.Remove) {
         ctrl.abort('done');
-        this.listeners.removeFirst(emitEvent);
+        this.hooks.off(hook);
       }
     };
-    this.hooks.push(hook);
-    return sequence[Symbol.asyncIterator]();
+
+    this.hooks.on(hook);
+    const iterator = sequence[Symbol.asyncIterator]();
+
+    return {
+      next: (...args) => {
+        return iterator.next(...args);
+      },
+      return: async () => {
+        void this.off(emitEvent);
+        return iterator.return?.() ?? { value: undefined, done: true };
+      },
+    };
   }
 
   [Symbol.dispose](): void {
@@ -412,8 +466,15 @@ export type AllEventsResults<T extends Event<any, any>[]> = { [K in keyof T]: Ev
  * ```
  */
 export const merge = <Events extends Event<any, any>[]>(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>> => {
-  const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>();
-  events.forEach((event) => event.on(mergedEvent));
+  const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>(() => {
+    for (const event of events) {
+      event.off(mergedEvent);
+    }
+  });
+
+  for (const event of events) {
+    event.on(mergedEvent);
+  }
   return mergedEvent;
 };
 

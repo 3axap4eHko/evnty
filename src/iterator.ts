@@ -1,5 +1,5 @@
-import { toAsyncIterable, pipe } from './utils.js';
-import { Sequence } from './sequence.js';
+import { mergeIterables, toAsyncIterable, pipe } from './utils.js';
+import { AnyIterable } from './types.js';
 
 /**
  * A wrapper class providing functional operations on async iterables.
@@ -72,25 +72,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * ```
    */
   static merge<T>(...iterables: AsyncIterable<T, void, unknown>[]): AsyncIteratorObject<T, void, unknown> {
-    return new AsyncIteratorObject<T, void, unknown>({
-      [Symbol.asyncIterator]() {
-        const ctrl = new AbortController();
-        const sequence = new Sequence<T>(ctrl.signal);
-        let counter = iterables.length;
-        for (const iterable of iterables) {
-          queueMicrotask(async () => {
-            for await (const value of iterable) {
-              sequence(value);
-            }
-            if (--counter === 0) {
-              ctrl.abort();
-            }
-          });
-        }
-
-        return sequence[Symbol.asyncIterator]();
-      },
-    });
+    return new AsyncIteratorObject<T, void, unknown>(mergeIterables(...iterables));
   }
 
   #iterable: AsyncIterable<T, TReturn, TNext>;
@@ -110,9 +92,23 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param signal Optional AbortSignal to cancel the operation
    * @returns A new AsyncIteratorObject with transformed values
    */
-  pipe<U>(generatorFactory: () => (value: T) => AsyncIterable<U>, signal?: AbortSignal): AsyncIteratorObject<U, void, unknown> {
-    const generator = pipe<T, U>(this.#iterable, generatorFactory, signal);
+  pipe<U>(generatorFactory: () => (value: T) => AnyIterable<U, void, unknown>, signal?: AbortSignal): AsyncIteratorObject<U, void, unknown> {
+    const generator = pipe(this.#iterable, generatorFactory, signal);
     return new AsyncIteratorObject<U, void, unknown>(generator);
+  }
+
+  /**
+   * Resolves promise-like values from the source iterator.
+   * Useful for normalizing values before applying type-guard predicates.
+   *
+   * @returns A new AsyncIteratorObject yielding awaited values
+   */
+  awaited(): AsyncIteratorObject<Awaited<T>, void, unknown> {
+    return this.pipe(() => {
+      return async function* (value) {
+        yield await value;
+      };
+    });
   }
 
   /**
@@ -162,9 +158,9 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   filter<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown> {
     return this.pipe(() => {
       let index = 0;
-      return async function* (value) {
+      return function* (value) {
         if (predicate(value, index++)) {
-          yield await value;
+          yield value;
         }
       };
     });
@@ -175,17 +171,57 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param limit The maximum number of values to yield.
    */
   take(limit: number): AsyncIteratorObject<T, void, unknown> {
-    const ctrl = new AbortController();
-    return this.pipe(() => {
-      let index = 0;
-      return async function* (value) {
-        if (index++ < limit) {
-          yield await value;
-        } else {
-          ctrl.abort();
-        }
-      };
-    }, ctrl.signal);
+    if (limit <= 0) {
+      return new AsyncIteratorObject<T, void, unknown>({
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => ({ value: undefined, done: true }),
+          };
+        },
+      });
+    }
+
+    const iterable = this.#iterable;
+    return new AsyncIteratorObject<T, void, unknown>({
+      [Symbol.asyncIterator]() {
+        const iterator = iterable[Symbol.asyncIterator]();
+        let remaining = limit;
+        let finished = false;
+        const doneResult = { value: undefined, done: true } as IteratorResult<T, void>;
+
+        return {
+          next: async () => {
+            if (finished) {
+              return doneResult;
+            }
+            if (remaining <= 0) {
+              finished = true;
+              await iterator.return?.();
+              return doneResult;
+            }
+            const result = await iterator.next();
+            if (result.done) {
+              finished = true;
+              return result as IteratorResult<T>;
+            }
+            remaining -= 1;
+            return result as IteratorResult<T>;
+          },
+          return: async () => {
+            finished = true;
+            await iterator.return?.();
+            return doneResult;
+          },
+          throw: async (error?: unknown): Promise<IteratorResult<T, void>> => {
+            finished = true;
+            if (iterator.throw) {
+              await iterator.throw(error);
+            }
+            throw error;
+          },
+        };
+      },
+    });
   }
 
   /**
@@ -195,9 +231,9 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   drop(count: number): AsyncIteratorObject<T, void, unknown> {
     return this.pipe(() => {
       let index = 0;
-      return async function* (value) {
+      return function* (value) {
         if (index++ >= count) {
-          yield await value;
+          yield value;
         }
       };
     });
@@ -284,7 +320,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
       let index = 0;
       return async function* (value) {
         const values = await callbackfn(value, index++);
-        for await (const expanded of values) {
+        for (const expanded of values) {
           yield expanded;
         }
       };

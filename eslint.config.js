@@ -4,7 +4,7 @@ import { globalIgnores } from 'eslint/config';
 import prettier from 'eslint-plugin-prettier';
 
 export default tseslint.config(
-  globalIgnores(['**/docs', '**/build', '**/coverage', '**/node_modules', '**/scripts', '**/*.tmp.ts', '**/__tests__/*', '**/*.js', '**/*.cjs', '**/*.mjs']),
+  globalIgnores(['**/docs', '**/build', '**/coverage', '**/node_modules', '**/scripts', '**/*.tmp.ts', '**/__tests__/*', '**/__bench__/*', '**/*.js', '**/*.cjs', '**/*.mjs']),
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   {

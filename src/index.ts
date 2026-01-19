@@ -5,3 +5,4 @@ export * from './iterator.js';
 export * from './signal.js';
 export * from './sequence.js';
 export * from './event.js';
+export * from './listener-registry.js';

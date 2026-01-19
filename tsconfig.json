@@ -5,7 +5,8 @@
     "module": "NodeNext",
     "declaration": true,
     "esModuleInterop": true,
-    "allowJs": true,
+    "allowJs": false,
+    "skipLibCheck": true,
     "moduleResolution": "NodeNext",
     "lib": ["ESNext", "DOM"],
     "rootDir": "src",
@@ -16,7 +17,9 @@
   ],
   "exclude": [
     "**/__tests__",
+    "**/__bench__",
     "node_modules",
-    "**/*.tmp.ts"
+    "**/*.tmp.ts",
+    "build"
   ]
 }

@@ -1,11 +1,12 @@
-import { RingBuffer } from 'fastds';
 import { CallableAsyncIterator } from './callable.js';
 import { Signal } from './signal.js';
+import { RingBuffer } from './ring-buffer.js';
 
 /**
  * A sequence is a FIFO (First-In-First-Out) queue for async consumption.
  * Designed for single consumer with multiple producers pattern.
  * Values are queued and consumed in order, with backpressure support.
+ * Respects an optional AbortSignal: enqueue returns false when aborted; waits reject.
  *
  * Key characteristics:
  * - Single consumer - values are consumed once, in order
@@ -33,7 +34,7 @@ import { Signal } from './signal.js';
  */
 export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
   private queue: RingBuffer<T>;
-  private nextSignal: Signal<boolean>;
+  private nextSignal: Signal<void>;
   private sendSignal: Signal<void>;
 
   readonly [Symbol.toStringTag] = 'Sequence';
@@ -67,32 +68,45 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
   static merge<T>(target: Sequence<T>, ...sequences: Sequence<T>[]): void {
     for (const source of sequences) {
       queueMicrotask(async () => {
-        try {
-          for await (const value of source) {
-            target(value);
+        if (!target.aborted)
+          try {
+            for await (const value of source) {
+              if (!target(value)) {
+                return;
+              }
+            }
+          } catch {
+            // sequence is aborted
           }
-        } catch {
-          // sequence is aborted
-        }
       });
     }
   }
 
+  /**
+   * Creates a new Sequence instance.
+   * @param abortSignal - Optional AbortSignal to cancel pending operations
+   */
   constructor(private readonly abortSignal?: AbortSignal) {
     super((value: T) => {
       if (this.abortSignal?.aborted) {
-        this.nextSignal(false);
+        this.nextSignal();
         return false;
       } else {
         this.queue.push(value);
-        this.nextSignal(true);
+        this.nextSignal();
         return true;
       }
     });
     this.queue = new RingBuffer();
     this.nextSignal = new Signal(this.abortSignal);
     this.sendSignal = new Signal(this.abortSignal);
-    this.abortSignal?.addEventListener('abort', () => this.nextSignal(false), { once: true });
+  }
+
+  /**
+   * Indicates whether the associated AbortSignal has been triggered.
+   */
+  get aborted(): boolean {
+    return !!this.abortSignal?.aborted;
   }
 
   /**
@@ -159,6 +173,7 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * Called automatically when used with `using` declaration.
    */
   [Symbol.dispose](): void {
-    this.nextSignal(false);
+    this.sendSignal[Symbol.dispose]();
+    this.nextSignal[Symbol.dispose]();
   }
 }

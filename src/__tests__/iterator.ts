@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
 import { AsyncIteratorObject } from '../iterator';
-import { Sequence } from '../sequence';
 
 describe('AsyncIteratorObject', () => {
   describe('from', () => {
@@ -46,6 +45,15 @@ describe('AsyncIteratorObject', () => {
     expect(result).toEqual([2, 4, 6]);
   });
 
+  it('should await promise-like values', async () => {
+    const asyncIterator = AsyncIteratorObject.from([Promise.resolve(1), 2, Promise.resolve(3)]).awaited();
+    const result: number[] = [];
+    for await (const value of asyncIterator) {
+      result.push(value);
+    }
+    expect(result).toEqual([1, 2, 3]);
+  });
+
   it('should filter values', async () => {
     const asyncIterator = AsyncIteratorObject.from([1, 2, 3, 4]).filter((v) => v % 2 === 0);
     const result: number[] = [];
@@ -62,6 +70,125 @@ describe('AsyncIteratorObject', () => {
       result.push(value);
     }
     expect(result).toEqual([1, 2]);
+  });
+
+  it('should return empty iterator for take(0)', async () => {
+    const asyncIterator = AsyncIteratorObject.from([1, 2, 3]).take(0);
+    const result: number[] = [];
+    for await (const value of asyncIterator) {
+      result.push(value);
+    }
+    expect(result).toEqual([]);
+  });
+
+  it('should return done when calling next after take finished', async () => {
+    const asyncIterator = AsyncIteratorObject.from([1, 2]).take(1);
+    const iterator = asyncIterator[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.next();
+    const result = await iterator.next();
+    expect(result).toEqual({ value: undefined, done: true });
+  });
+
+  it('should not pull past the limit', async () => {
+    let nextCalls = 0;
+    let returnCalls = 0;
+    const source: AsyncIterable<number, void, unknown> = {
+      [Symbol.asyncIterator]() {
+        let i = 0;
+        return {
+          next: async () => {
+            nextCalls += 1;
+            if (i < 5) {
+              return { value: i++, done: false };
+            }
+            return { value: undefined, done: true };
+          },
+          return: async () => {
+            returnCalls += 1;
+            return { value: undefined, done: true };
+          },
+        };
+      },
+    };
+
+    const asyncIterator = new AsyncIteratorObject(source).take(2);
+    const result: number[] = [];
+    for await (const value of asyncIterator) {
+      result.push(value);
+    }
+    expect(result).toEqual([0, 1]);
+    expect(nextCalls).toBe(2);
+    expect(returnCalls).toBe(1);
+  });
+
+  it('should complete when source exhausted before limit', async () => {
+    const asyncIterator = AsyncIteratorObject.from([1, 2]).take(10);
+    const result: number[] = [];
+    for await (const value of asyncIterator) {
+      result.push(value);
+    }
+    expect(result).toEqual([1, 2]);
+  });
+
+  it('should handle take return() method', async () => {
+    let returnCalled = false;
+    const source: AsyncIterable<number, void, unknown> = {
+      [Symbol.asyncIterator]() {
+        let i = 0;
+        return {
+          next: async () => ({ value: i++, done: false }),
+          return: async () => {
+            returnCalled = true;
+            return { value: undefined, done: true };
+          },
+        };
+      },
+    };
+
+    const asyncIterator = new AsyncIteratorObject(source).take(10);
+    const iterator = asyncIterator[Symbol.asyncIterator]();
+    await iterator.next();
+    await iterator.return?.();
+    expect(returnCalled).toBe(true);
+  });
+
+  it('should handle take throw() method', async () => {
+    let throwCalled = false;
+    const source: AsyncIterable<number, void, unknown> = {
+      [Symbol.asyncIterator]() {
+        let i = 0;
+        return {
+          next: async () => ({ value: i++, done: false }),
+          throw: async (error: unknown) => {
+            throwCalled = true;
+            throw error;
+          },
+        };
+      },
+    };
+
+    const asyncIterator = new AsyncIteratorObject(source).take(10);
+    const iterator = asyncIterator[Symbol.asyncIterator]();
+    await iterator.next();
+    await expect(iterator.throw?.('error')).rejects.toBe('error');
+    expect(throwCalled).toBe(true);
+  });
+
+  it('should handle take throw() without inner throw', async () => {
+    const source: AsyncIterable<number, void, unknown> = {
+      [Symbol.asyncIterator]() {
+        let i = 0;
+        return {
+          next: async () => ({ value: i++, done: false }),
+        };
+      },
+    };
+
+    const asyncIterator = new AsyncIteratorObject(source).take(10);
+    const iterator = asyncIterator[Symbol.asyncIterator]();
+    await iterator.next();
+    await expect(iterator.throw?.('error')).rejects.toBe('error');
   });
 
   it('should drop the specified number of values', async () => {

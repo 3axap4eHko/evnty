@@ -1,4 +1,4 @@
-const { createEvent, merge, once } = require('evnty');
+const { createEvent, merge } = require('evnty');
 
 // Creates a click event
 const clickEvent = createEvent();
@@ -11,20 +11,18 @@ const handleKeyPress = ({ key }) => console.log('Key pressed', key);
 const unsubscribeKeyPress = keyPressEvent.on(handleKeyPress);
 
 // Merges click and key press events into input event
-const handleInput = (input) => console.log('Input', input);;
+const handleInput = (input) => console.log('Input', input);
 const inputEvent = merge(clickEvent, keyPressEvent);
 inputEvent.on(handleInput);
 
-// Filters a click event to only include left-click events.
-const handleLeftClick = () => console.log('Left button is clicked');
-const leftClickEvent = clickEvent.filter(({ button }) => button === 'left');
-leftClickEvent.on(handleLeftClick);
+// One-time listener for left clicks only
+clickEvent.once(({ button }) => {
+  if (button === 'left') {
+    console.log('First left click detected!');
+  }
+});
 
-// Will press Enter after one second
-setTimeout(keyPressEvent, 1000, { key: 'Enter' });
-// Waits once the first Enter key press event occurs
-await once(keyPressEvent.first(({ key }) => key === 'Enter'));
-
+// Emit some events
 keyPressEvent({ key: 'W' });
 keyPressEvent({ key: 'A' });
 keyPressEvent({ key: 'S' });
@@ -36,10 +34,9 @@ clickEvent({ button: 'middle' });
 
 // Unsubscribe click listener
 unsubscribeClick();
-// It does not log anything because of click listener is unsubscribed
-leftClickEvent.off(handleLeftClick);
 
-// Unsubscribe key press listener once first Esc key press occur
-unsubscribeKeyPress.after(() => once(keyPressEvent.first(({ key }) => key === 'Esc')));
-// Press Esc to unsubscribe key press listener
-keyPressEvent({ key: 'Esc' });
+// Unsubscribe with a post callback
+const cleanupUnsubscribe = unsubscribeKeyPress.post(() => {
+  console.log('Key press listener has been removed');
+});
+cleanupUnsubscribe();

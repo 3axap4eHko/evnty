@@ -1,5 +1,9 @@
 import { Fn, Promiseable } from './types.js';
+
 /**
+ * Makes subclasses callable like plain functions by returning the provided delegate
+ * with the subclass prototype applied. Instances can be invoked directly while
+ * retaining class semantics.
  * @internal
  */
 export interface Callable<T extends unknown[], R> {
@@ -25,6 +29,8 @@ export abstract class Callable<T, R> {
 }
 
 /**
+ * Promise-like callable base. Subclasses implement `next()`, and the Promise methods
+ * delegate to that, so instances can be awaited or chained while remaining callable.
  * @internal
  */
 export abstract class AsyncCallable<T, R> extends Callable<[T], R> implements Promiseable<T>, Promise<T> {
@@ -52,9 +58,14 @@ export abstract class AsyncCallable<T, R> extends Callable<[T], R> implements Pr
 }
 
 /**
+ * Callable async iterator base. Adds `for await` support and disposal on return
+ * while delegating iteration to `next()`. Subclasses become callable, awaitable,
+ * and async-iterable with a single `next()` implementation.
  * @internal
  */
-export abstract class CallableAsyncIterator<T, R> extends AsyncCallable<T, R> implements Promiseable<T>, Promise<T>, AsyncIterable<T>, Disposable {
+export abstract class CallableAsyncIterator<T, R> extends AsyncCallable<T, R> implements Promiseable<T>, Promise<T>, AsyncIterable<T> {
+  return?(): Promise<undefined>;
+
   [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
     return {
       next: async () => {
@@ -65,11 +76,10 @@ export abstract class CallableAsyncIterator<T, R> extends AsyncCallable<T, R> im
           return { value: undefined, done: true };
         }
       },
-      return: () => {
-        this[Symbol.dispose]();
-        return Promise.resolve({ value: undefined, done: true });
+      return: async () => {
+        await this.return?.();
+        return { value: undefined, done: true };
       },
     };
   }
-  abstract [Symbol.dispose](): void;
 }

@@ -52,6 +52,7 @@ describe('Sequence test suite', () => {
     const a = new Sequence<number>(ctrl.signal);
     const b = new Sequence<number>(ctrl.signal);
     Sequence.merge(sequence, a, b);
+
     expect(values.slice(0, values.length / 2).every(a)).toEqual(true);
     expect(a.size).toBe(values.length / 2);
     expect(values.slice(values.length / 2).every(b)).toEqual(true);
@@ -75,12 +76,20 @@ describe('Sequence test suite', () => {
     expect(result.sort()).toEqual(values);
   });
 
+  it('Should change aborted state', async () => {
+    const ctrl = new AbortController();
+    const sequence = new Sequence(ctrl.signal);
+    expect(sequence.aborted).toBe(false);
+    ctrl.abort();
+    expect(sequence.aborted).toBe(true);
+  });
+
   it('Should implement Promise', async () => {
     const ctrl = new AbortController();
     const sequence = new Sequence(ctrl.signal);
 
     sequence('then');
-    const thenMock = vi.fn(v => v);
+    const thenMock = vi.fn((v) => v);
     await expect(sequence.then(thenMock)).resolves.toEqual('then');
     expect(thenMock).toHaveBeenCalledTimes(1);
     ctrl.abort('error');
@@ -203,12 +212,51 @@ describe('Sequence test suite', () => {
       async *[Symbol.asyncIterator]() {
         yield 1;
         throw new Error('test error');
-      }
+      },
     } as Sequence<number>;
-    
+
     Sequence.merge(target, source);
-    
+
     await expect(target).resolves.toEqual(1);
     ctrl.abort();
+  });
+
+  it('Should stop merging when target already aborted', async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const target = new Sequence<number>(ctrl.signal);
+    const source = new Sequence<number>();
+
+    Sequence.merge(target, source);
+    source(1);
+
+    // Give microtasks a turn; nothing should be enqueued
+    await Promise.resolve();
+    expect(target.size).toBe(0);
+  });
+
+  it('Should stop merging when target aborted during iteration', async () => {
+    const targetCtrl = new AbortController();
+    const target = new Sequence<number>(targetCtrl.signal);
+    const sourceCtrl = new AbortController();
+    const source = new Sequence<number>(sourceCtrl.signal);
+
+    Sequence.merge(target, source);
+
+    await setTimeout(0);
+    source(1);
+    await setTimeout(0);
+    expect(target.size).toBe(1);
+
+    targetCtrl.abort();
+    source(2);
+    await setTimeout(0);
+    expect(target.size).toBe(1);
+    sourceCtrl.abort();
+  });
+
+  it('Should dispose sequence signals', () => {
+    const sequence = new Sequence<number>();
+    expect(() => sequence[Symbol.dispose]()).not.toThrow();
   });
 });
