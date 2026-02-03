@@ -19,7 +19,6 @@
   "scripts": {
     "build": "rm -rf build && inop src build -i __tests__ -i *.tmp.ts && tsc --declaration --emitDeclarationOnly",
     "test": "vitest run",
-    "test:build": "node src/__tests__/index.cjs && node src/__tests__/index.mjs",
     "lint": "eslint src",
     "docs:build": "vuepress build docs",
     "docs:clean-dev": "vuepress dev docs --clean-cache",

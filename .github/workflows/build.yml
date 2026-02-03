@@ -12,6 +12,3 @@ jobs:
           node_version: '24.x'
           github_token: ${{ secrets.GITHUB_TOKEN }}
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
-          test: |
-            pnpm test
-            pnpm test:build

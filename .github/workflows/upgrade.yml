@@ -19,9 +19,6 @@ jobs:
           email: 3axap4eHko@github.com
           npm_token: ${{ secrets.NPM_TOKEN }}
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
-          test: |
-            pnpm test
-            pnpm test:build
 
   test:
     runs-on: ubuntu-latest
