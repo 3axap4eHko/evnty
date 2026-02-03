@@ -1,9 +1,9 @@
-import { vi } from 'vitest';
+import { vi, describe, expect, it } from 'vitest';
 import { Signal } from '../signal';
 
 const scheduleSignal = <T>(signal: Signal<T>, value: T, expected: boolean) => {
   process.nextTick((value: T) => {
-    expect(signal(value)).toEqual(expected);
+    expect(signal.emit(value)).toEqual(expected);
   }, value);
 };
 
@@ -34,18 +34,28 @@ describe('Signal test suite', () => {
     const ctrl = new AbortController();
     const signal = new Signal<string>(ctrl.signal);
     ctrl.abort('error');
-    expect(signal('test')).toEqual(false);
+    expect(signal.emit('test')).toEqual(false);
+  });
+
+  it('Should be disposed when created with already-aborted signal', async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const signal = new Signal<number>(ctrl.signal);
+
+    expect(signal.disposed).toBe(true);
+    expect(signal.emit(42)).toBe(false);
+    await expect(signal.receive()).rejects.toThrow('Disposed');
   });
 
   it('Should skip sending when no waiters', () => {
     const signal = new Signal<string>();
-    expect(signal('test')).toEqual(false);
+    expect(signal.emit('test')).toEqual(false);
   });
 
   it('Should return the same promise for multiple next calls', async () => {
     const signal = new Signal<string>();
-    const first = signal.next();
-    const second = signal.next();
+    const first = signal.receive();
+    const second = signal.receive();
     expect(first).toBe(second);
     scheduleSignal(signal, 'test', true);
     await expect(first).resolves.toEqual('test');
@@ -55,7 +65,7 @@ describe('Signal test suite', () => {
     const ctrl = new AbortController();
     const signal = new Signal<string>(ctrl.signal);
     process.nextTick(() => ctrl.abort('stop'));
-    await expect(signal.then(Boolean)).rejects.toEqual('stop');
+    await expect(signal.then(Boolean)).rejects.toThrow('Disposed');
   });
 
   it('Should implement Promise', async () => {
@@ -69,7 +79,7 @@ describe('Signal test suite', () => {
     ctrl.abort('error');
 
     thenMock.mockClear();
-    await expect(signal.then(thenMock)).rejects.toEqual('error');
+    await expect(signal.then(thenMock)).rejects.toThrow('Disposed');
     expect(thenMock).toHaveBeenCalledTimes(0);
 
     const catchMock = vi.fn().mockReturnValue('catch');
@@ -77,7 +87,7 @@ describe('Signal test suite', () => {
     expect(catchMock).toHaveBeenCalledTimes(1);
 
     const finallyMock = vi.fn();
-    await expect(signal.finally(finallyMock)).rejects.toEqual('error');
+    await expect(signal.finally(finallyMock)).rejects.toThrow('Disposed');
     expect(finallyMock).toHaveBeenCalledTimes(1);
   });
 
@@ -97,7 +107,7 @@ describe('Signal test suite', () => {
     }
     expect(i).toEqual(3);
     scheduleSignal(signal, i, false);
-    await expect(signal.then(Boolean)).rejects.toEqual('done');
+    await expect(signal.then(Boolean)).rejects.toThrow('Disposed');
   });
 
   it('Should break signals iteration', async () => {
@@ -133,7 +143,7 @@ describe('Signal test suite', () => {
     await expect(target).resolves.toEqual(1);
   });
 
-  it('Should handle merge with aborted target signal', async () => {
+  it('Should handle merge with disposed target signal', async () => {
     const ctrl = new AbortController();
     const target = new Signal<number>(ctrl.signal);
     const source = new Signal<number>();
@@ -144,19 +154,19 @@ describe('Signal test suite', () => {
     scheduleSignal(source, 42, false);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(target.aborted).toBe(true);
+    expect(target.disposed).toBe(true);
   });
 
-  it('Should handle aborted property without abort signal', async () => {
+  it('Should handle disposed property without abort signal', async () => {
     const signal = new Signal<number>();
-    expect(signal.aborted).toBe(false);
+    expect(signal.disposed).toBe(false);
 
     scheduleSignal(signal, 123, true);
     await expect(signal).resolves.toEqual(123);
-    expect(signal.aborted).toBe(false);
+    expect(signal.disposed).toBe(false);
   });
 
-  it('Should stop merge when target aborted during iteration', async () => {
+  it('Should stop merge when target disposed during iteration', async () => {
     const ctrl = new AbortController();
     const target = new Signal<number>(ctrl.signal);
     const sourceCtrl = new AbortController();
@@ -170,7 +180,7 @@ describe('Signal test suite', () => {
     ctrl.abort();
     scheduleSignal(source, 2, true);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(target.aborted).toBe(true);
+    expect(target.disposed).toBe(true);
     sourceCtrl.abort();
   });
 
@@ -180,8 +190,15 @@ describe('Signal test suite', () => {
 
     signal[Symbol.dispose]();
 
-    expect(signal.aborted).toBe(false);
+    expect(signal.disposed).toBe(true);
     ctrl.abort();
-    expect(signal.aborted).toBe(true);
+    expect(signal.disposed).toBe(true);
+  });
+
+  it('Should handle events via handleEvent method', async () => {
+    const signal = new Signal<number>();
+    const promise = signal.receive();
+    signal.handleEvent(42);
+    await expect(promise).resolves.toEqual(42);
   });
 });

@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     include: ['src/**/__tests__/*.{js,ts}'],
     exclude: ['src/__tests__/example.js'],
+    execArgv: ['--expose-gc'],
     coverage: {
       enabled: !!process.env.CI,
       provider: 'v8',

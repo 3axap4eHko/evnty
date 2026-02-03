@@ -1,4 +1,4 @@
-import { CallableAsyncIterator } from './callable.js';
+import { Async } from './async.js';
 
 /**
  * A signal is a broadcast async primitive for coordinating between producers and consumers.
@@ -18,8 +18,8 @@ import { CallableAsyncIterator } from './callable.js';
  * const signal = new Signal<string>();
  *
  * // Multiple consumers wait for the same value
- * const promise1 = signal.next();
- * const promise2 = signal.next();
+ * const promise1 = signal.receive();
+ * const promise2 = signal.receive();
  *
  * // Send a value - both consumers receive it
  * signal('Hello World');
@@ -28,9 +28,8 @@ import { CallableAsyncIterator } from './callable.js';
  * console.log(value1 === value2); // true - both got 'Hello World'
  * ```
  */
-export class Signal<T> extends CallableAsyncIterator<T, boolean> {
-  private rx?: PromiseWithResolvers<T>;
-  private abortHandler?: () => void;
+export class Signal<T> extends Async<T, boolean> {
+  #rx?: PromiseWithResolvers<T>;
 
   readonly [Symbol.toStringTag] = 'Signal';
 
@@ -60,19 +59,20 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * ```
    */
   static merge<T>(target: Signal<T>, ...signals: Signal<T>[]): void {
-    if (target.aborted) {
+    if (target.disposed) {
       return;
     }
     for (const source of signals) {
       void (async () => {
         try {
+          const sink = target.sink;
           for await (const value of source) {
-            if (!target(value) && target.aborted) {
+            if (!sink(value) && target.disposed) {
               return;
             }
           }
         } catch {
-          // ignore aborted signal
+          // ignore disposed signal
         }
       })();
     }
@@ -92,35 +92,21 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * controller.abort('Operation cancelled');
    * ```
    */
-  constructor(private readonly abortSignal?: AbortSignal) {
-    super((value: T) => {
-      if (this.abortSignal?.aborted) {
-        return false;
-      }
-
-      if (this.rx) {
-        this.rx.resolve(value);
-        this.rx = undefined;
-        return true;
-      }
-
-      return false;
-    });
-
-    if (this.abortSignal) {
-      this.abortHandler = () => {
-        this.rx?.reject(this.abortSignal!.reason);
-        this.rx = undefined;
-      };
-      this.abortSignal.addEventListener('abort', this.abortHandler, { once: true });
-    }
+  constructor(abortSignal?: AbortSignal) {
+    super(abortSignal);
   }
 
   /**
-   * Indicates whether the associated AbortSignal has been triggered.
+   *
    */
-  get aborted(): boolean {
-    return !!this.abortSignal?.aborted;
+  emit(value: T): boolean {
+    if (this.#rx && !this.disposed) {
+      this.#rx.resolve(value);
+      this.#rx = undefined;
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -133,7 +119,7 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * const signal = new Signal<string>();
    *
    * // Wait for a value
-   * const valuePromise = signal.next();
+   * const valuePromise = signal.receive();
    *
    * // Send a value from elsewhere
    * signal('Hello');
@@ -141,26 +127,18 @@ export class Signal<T> extends CallableAsyncIterator<T, boolean> {
    * const value = await valuePromise; // 'Hello'
    * ```
    */
-  next(): Promise<T> {
-    if (this.abortSignal?.aborted) {
-      return Promise.reject(this.abortSignal.reason);
+  receive(): Promise<T> {
+    if (this.disposed) {
+      return Promise.reject(new Error('Disposed'));
     }
-    if (!this.rx) {
-      this.rx = Promise.withResolvers<T>();
+    if (!this.#rx) {
+      this.#rx = Promise.withResolvers<T>();
     }
-    return this.rx.promise;
+    return this.#rx.promise;
   }
 
-  /**
-   * Disposes of the signal, cleaning up any pending promise resolvers.
-   * This method is called automatically when the signal is used with a `using` declaration.
-   */
-  [Symbol.dispose](): void {
-    if (this.abortHandler && this.abortSignal) {
-      this.abortSignal.removeEventListener('abort', this.abortHandler);
-      this.abortHandler = undefined;
-    }
-    this.rx?.reject(new Error('Disposed'));
-    this.rx = undefined;
+  dispose(): void {
+    this.#rx?.reject(new Error('Disposed'));
+    this.#rx = undefined;
   }
 }

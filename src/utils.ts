@@ -2,11 +2,25 @@ import { Sequence } from './sequence.js';
 import { AnyIterator, AnyIterable, MaybePromise } from './types.js';
 
 /**
+ * @internal
  * A no-operation function. Useful as a default callback or placeholder.
  */
 export const noop = () => {};
 
 /**
+ * @internal
+ * Returns the minimum value from an iterable, or a fallback if empty.
+ */
+export function min(values: Iterable<number>, fallback: number): number {
+  let result = Infinity;
+  for (const value of values) {
+    if (value < result) result = value;
+  }
+  return result === Infinity ? fallback : result;
+}
+
+/**
+ * @internal
  * Indicates which iterator method triggered a mapping operation.
  */
 export enum MapIteratorType {
@@ -19,6 +33,7 @@ export enum MapIteratorType {
 }
 
 /**
+ * @internal
  * A mapping function for transforming iterator results.
  * @template T - The input value type
  * @template U - The output value type
@@ -29,6 +44,7 @@ export interface MapNext<T, U, TReturn> {
 }
 
 /**
+ * @internal
  * Wraps an iterator with a mapping function applied to each result.
  * @template U - The output value type
  * @template T - The input value type
@@ -50,6 +66,10 @@ export const mapIterator = <U, T, TReturn, TNext>(iterator: AnyIterator<T, TRetu
       const result = await iterator.return!(...args);
       return map(result, MapIteratorType.RETURN);
     };
+  } else {
+    subIterator.return = async (value: TReturn) => {
+      return map({ done: true, value }, MapIteratorType.RETURN);
+    };
   }
   if (iterator.throw) {
     subIterator.throw = async (...args: [] | [unknown]) => {
@@ -62,65 +82,61 @@ export const mapIterator = <U, T, TReturn, TNext>(iterator: AnyIterator<T, TRetu
 };
 
 /**
- * Wraps an async iterator with abort signal support.
- * When the signal is aborted, iteration terminates gracefully.
+ * Wraps an async iterable with abort signal support.
+ * Each iteration creates a fresh iterator with scoped abort handling.
+ * Listener is added at iteration start and removed on completion/abort/return/throw.
+ *
  * @template T - The yielded value type
  * @template TReturn - The return value type
  * @template TNext - The type passed to next()
+ * @param iterable - The source async iterable to wrap
+ * @param signal - AbortSignal to cancel iteration
+ * @returns An async iterable with abort support
+ *
+ * @example
+ * ```typescript
+ * const controller = new AbortController();
+ * const source = async function*() { yield 1; yield 2; yield 3; };
+ *
+ * for await (const value of abortableIterable(source(), controller.signal)) {
+ *   console.log(value);
+ *   if (value === 2) controller.abort();
+ * }
+ * ```
  */
-export class AbortableIterator<T, TReturn = unknown, TNext = unknown> {
-  #iterator: AsyncIterator<T, TReturn, TNext>;
-  #abort?: {
-    signal: AbortSignal;
-    promise: Promise<IteratorResult<T, TReturn>>;
-    abort: () => void;
-  };
+export function abortableIterable<T, TReturn, TNext>(iterable: AsyncIterable<T, TReturn, TNext>, signal: AbortSignal): AsyncIterable<T, TReturn, TNext> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<T, TReturn, TNext> {
+      const iterator = iterable[Symbol.asyncIterator]();
+      const { promise, resolve } = Promise.withResolvers<void>();
+      const onAbort = () => resolve();
 
-  constructor(iterator: AsyncIterator<T, TReturn, TNext>, signal?: AbortSignal) {
-    this.#iterator = iterator;
-
-    if (signal) {
-      const { promise, resolve } = Promise.withResolvers<IteratorResult<T, TReturn>>();
-      const abort = () => resolve((iterator.return?.() ?? Promise.resolve()).then(() => ({ done: true, value: undefined }) as IteratorResult<T, TReturn>));
-      this.#abort = {
-        promise,
-        signal,
-        abort,
-      };
       if (signal.aborted) {
-        abort();
+        onAbort();
       } else {
-        signal.addEventListener('abort', abort, { once: true });
+        signal.addEventListener('abort', onAbort);
       }
-    }
-  }
 
-  next(...args: [] | [TNext]): Promise<IteratorResult<T, TReturn>> {
-    if (this.#abort?.signal.aborted) {
-      return this.#abort.promise;
-    }
-    if (this.#abort) {
-      return Promise.race([this.#abort.promise, this.#iterator.next(...args)]);
-    }
-    return this.#iterator.next(...args);
-  }
+      const race = [promise, undefined] as unknown as [Promise<void>, Promise<IteratorResult<T, TReturn>>];
 
-  return(value?: TReturn): Promise<IteratorResult<T, TReturn>> {
-    this.#abort?.signal.removeEventListener('abort', this.#abort.abort);
-    return this.#iterator.return?.(value) ?? Promise.resolve({ done: true, value: value as TReturn });
-  }
-
-  throw?(error: unknown): Promise<IteratorResult<T, TReturn>> {
-    if (this.#abort?.signal.aborted) {
-      return Promise.reject(this.#abort.signal.reason);
-    }
-    this.#abort?.signal.removeEventListener('abort', this.#abort.abort);
-    return this.#iterator.throw?.(error) ?? Promise.reject(error);
-  }
-
-  [Symbol.asyncIterator](): AsyncIterator<T, TReturn, TNext> {
-    return this;
-  }
+      return {
+        async next(...args: [] | [TNext]): Promise<IteratorResult<T, TReturn>> {
+          race[1] = iterator.next(...args);
+          const result = await Promise.race(race);
+          if (result === undefined) {
+            signal.removeEventListener('abort', onAbort);
+            return { done: true, value: undefined as TReturn };
+          }
+          if (result.done) signal.removeEventListener('abort', onAbort);
+          return result;
+        },
+        async return(value?: TReturn): Promise<IteratorResult<T, TReturn>> {
+          signal.removeEventListener('abort', onAbort);
+          return iterator.return?.(value) ?? { done: true, value: value as TReturn };
+        },
+      };
+    },
+  };
 }
 
 /**
@@ -268,6 +284,7 @@ export const toAsyncIterable = <T, TReturn, TNext>(iterable: Iterable<T, TReturn
 };
 
 /**
+ * @internal
  * Pipes values from an async iterable through a generator transformation.
  * Applies a generator function to each value, yielding all resulting values.
  * Supports cancellation via AbortSignal for early termination.
@@ -298,38 +315,30 @@ const isAsyncIterable = <T, TReturn, TNext>(value: AnyIterable<T, TReturn, TNext
   return typeof (value as AsyncIterable<T, TReturn, TNext>)[Symbol.asyncIterator] === 'function';
 };
 
+/**
+ * @internal
+ */
 export async function* pipe<T, U>(
   iterable: AsyncIterable<T>,
   generatorFactory: () => (value: T) => AnyIterable<U, void, unknown>,
   signal?: AbortSignal,
 ): AsyncGenerator<Awaited<U>, void, unknown> {
-  const iterator = new AbortableIterator(iterable[Symbol.asyncIterator](), signal);
+  const source = signal ? abortableIterable(iterable, signal) : iterable;
   const generator = generatorFactory();
 
-  try {
-    while (true) {
-      const source = await iterator.next();
-      if (source.done) break;
+  for await (const value of source) {
+    const produced = generator(value);
+    const subIterable = isAsyncIterable(produced) ? produced : toAsyncIterable(produced);
+    const abortableSub = signal ? abortableIterable(subIterable, signal) : subIterable;
 
-      const produced = generator(source.value);
-      const subIterable = isAsyncIterable(produced) ? produced : toAsyncIterable(produced);
-      const subIterator = new AbortableIterator(subIterable[Symbol.asyncIterator](), signal);
-      try {
-        while (true) {
-          const target = await subIterator.next();
-          if (target.done) break;
-          yield target.value;
-        }
-      } finally {
-        await subIterator.return?.().catch(noop);
-      }
+    for await (const subValue of abortableSub) {
+      yield subValue;
     }
-  } finally {
-    await iterator.return?.().catch(noop);
   }
 }
 
 /**
+ * @internal
  * Merges multiple async iterables into a single stream.
  * Values are yielded as they become available from any source.
  * Completes when all sources complete; aborts all on error.
@@ -352,22 +361,14 @@ export const mergeIterables = <T>(...iterables: AsyncIterable<T, void, unknown>[
       let remaining = iterables.length;
 
       const pump = async (iterable: AsyncIterable<T, void, unknown>) => {
-        const iterator = iterable[Symbol.asyncIterator]();
-        const abortable = new AbortableIterator(iterator, ctrl.signal);
         try {
-          for await (const value of abortable) {
-            if (!sequence(value)) {
+          for await (const value of abortableIterable(iterable, ctrl.signal)) {
+            if (!sequence.emit(value)) {
               break;
             }
           }
         } catch (error) {
-          let abortReason = error;
-          try {
-            await iterator.return?.();
-          } catch (returnError) {
-            abortReason = new AggregateError([error, returnError]);
-          }
-          ctrl.abort(abortReason);
+          ctrl.abort(error);
         } finally {
           remaining -= 1;
           if (remaining === 0 && !ctrl.signal.aborted) {
@@ -383,7 +384,7 @@ export const mergeIterables = <T>(...iterables: AsyncIterable<T, void, unknown>[
       return {
         next: async () => {
           try {
-            const value = await sequence.next();
+            const value = await sequence.receive();
             return { value, done: false };
           } catch {
             if (ctrl.signal.aborted && ctrl.signal.reason === exit) {

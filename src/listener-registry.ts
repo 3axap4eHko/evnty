@@ -1,6 +1,8 @@
-import { Fn, MaybePromise } from './types.js';
+import { Action, Fn, MaybePromise } from './types.js';
+import { err, DispatchResultItem } from './dispatch-result.js';
 
 /**
+ * @internal
  * A lightweight registry for managing listener functions with stable dispatch order.
  *
  * Key characteristics:
@@ -24,8 +26,16 @@ import { Fn, MaybePromise } from './types.js';
  * registry.dispatch(2);            // no listeners called
  * ```
  */
+interface ListenerEntry {
+  once: boolean;
+  onRemove?: Action;
+}
+
+/**
+ * @internal
+ */
 export class ListenerRegistry<P extends unknown[], R> {
-  #listeners = new Map<Fn<P, R>, boolean>();
+  #listeners = new Map<Fn<P, R>, ListenerEntry>();
   #snapshot: Fn<P, R>[] | null = null;
 
   readonly [Symbol.toStringTag] = 'ListenerRegistry';
@@ -57,23 +67,27 @@ export class ListenerRegistry<P extends unknown[], R> {
    * @returns `true` if removed, `false` if it was not registered.
    */
   off(listener: Fn<P, R>): boolean {
-    if (!this.#listeners.delete(listener)) {
+    const entry = this.#listeners.get(listener);
+    if (!entry) {
       return false;
     }
+    this.#listeners.delete(listener);
     this.#snapshot = null;
+    entry.onRemove?.();
     return true;
   }
 
   /**
    * Registers a listener if not already present.
    *
+   * @param onRemove Optional callback invoked when this listener is removed.
    * @returns `true` if added, `false` if it was already registered.
    */
-  on(listener: Fn<P, R>): boolean {
+  on(listener: Fn<P, R>, onRemove?: Action): boolean {
     if (this.has(listener)) {
       return false;
     }
-    this.#listeners.set(listener, false);
+    this.#listeners.set(listener, { once: false, onRemove });
     this.#snapshot = null;
     return true;
   }
@@ -81,21 +95,25 @@ export class ListenerRegistry<P extends unknown[], R> {
   /**
    * Registers a listener that will automatically unregister after its next dispatch.
    *
+   * @param onRemove Optional callback invoked when this listener is removed.
    * @returns `true` if added, `false` if it was already registered.
    */
-  once(listener: Fn<P, R>): boolean {
-    const result = this.on(listener);
-    if (result) {
-      this.#listeners.set(listener, true);
+  once(listener: Fn<P, R>, onRemove?: Action): boolean {
+    if (this.has(listener)) {
+      return false;
     }
-
-    return result;
+    this.#listeners.set(listener, { once: true, onRemove });
+    this.#snapshot = null;
+    return true;
   }
 
   /**
    * Removes all listeners and clears the dispatch snapshot.
    */
   clear(): void {
+    for (const entry of this.#listeners.values()) {
+      entry.onRemove?.();
+    }
     this.#listeners.clear();
     this.#snapshot = null;
   }
@@ -108,7 +126,7 @@ export class ListenerRegistry<P extends unknown[], R> {
    * @param values Arguments forwarded to each listener.
    * @returns Array of listener results or promises, one per listener.
    */
-  dispatch(...values: P): Array<MaybePromise<R | void>> {
+  dispatch(...values: P): DispatchResultItem<R | void>[] {
     const listeners = this.#listeners;
     if (listeners.size === 0) {
       return [];
@@ -127,11 +145,11 @@ export class ListenerRegistry<P extends unknown[], R> {
     if (ordered.length === 0) {
       return [];
     }
-    const results = new Array<MaybePromise<R | void>>(ordered.length);
+    const results = new Array<DispatchResultItem<R | void>>(ordered.length);
     const argCount = values.length;
     for (let index = 0; index < ordered.length; index++) {
       const fn = ordered[index];
-      if (listeners.get(fn)) {
+      if (listeners.get(fn)?.once) {
         this.off(fn);
       }
       const invoke = fn as (...args: unknown[]) => MaybePromise<R | void>;
@@ -146,23 +164,15 @@ export class ListenerRegistry<P extends unknown[], R> {
           case 2:
             results[index] = invoke(values[0], values[1]);
             break;
-          case 3:
-            results[index] = invoke(values[0], values[1], values[2]);
-            break;
-          case 4:
-            results[index] = invoke(values[0], values[1], values[2], values[3]);
-            break;
-          case 5:
-            results[index] = invoke(values[0], values[1], values[2], values[3], values[4]);
-            break;
           default:
             results[index] = invoke(...values);
             break;
         }
       } catch (error) {
-        results[index] = Promise.reject(error);
+        results[index] = err(error);
       }
     }
+
     return results;
   }
 }

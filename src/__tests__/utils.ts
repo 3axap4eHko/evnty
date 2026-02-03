@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { iterate, setTimeoutAsync, toAsyncIterable, pipe, mapIterator, AbortableIterator, noop, mergeIterables } from '../utils';
+import { iterate, setTimeoutAsync, toAsyncIterable, pipe, mapIterator, noop, mergeIterables, abortableIterable } from '../utils';
 
 describe('Utils test suite', () => {
 
@@ -226,39 +226,130 @@ describe('Utils test suite', () => {
       await mapped.next();
       expect(mapper).toHaveBeenCalledTimes(1);
     });
+
+    it('provides return fallback when iterator lacks return', async () => {
+      const base: AsyncIterator<number, string> = {
+        next: vi.fn().mockResolvedValue({ value: 1, done: false }),
+      };
+      const mapper = vi.fn((result) => result);
+      const mapped = mapIterator(base, mapper);
+      const result = await mapped.return?.('done');
+      expect(mapper).toHaveBeenCalledWith({ done: true, value: 'done' }, expect.any(Number));
+      expect(result).toEqual({ done: true, value: 'done' });
+    });
   });
 
-  describe('AbortableIterator', () => {
-    it('rejects throw when already aborted', async () => {
+  describe('abortableIterable', () => {
+    it('yields all values when not aborted', async () => {
       const ctrl = new AbortController();
-      ctrl.abort('reason');
-      const inner: AsyncIterator<number> = {
-        next: vi.fn(),
-        throw: vi.fn(),
-      };
-      const abortable = new AbortableIterator(inner, ctrl.signal);
-
-      await expect(abortable.throw?.('err')).rejects.toBe('reason');
+      async function* source() {
+        yield 1;
+        yield 2;
+        yield 3;
+      }
+      const values: number[] = [];
+      for await (const value of abortableIterable(source(), ctrl.signal)) {
+        values.push(value);
+      }
+      expect(values).toEqual([1, 2, 3]);
     });
 
-    it('rejects throw fallback when not aborted', async () => {
+    it('stops iteration when aborted', async () => {
       const ctrl = new AbortController();
-      const inner: AsyncIterator<number> = {
-        next: vi.fn(),
+      async function* source() {
+        yield 1;
+        yield 2;
+        yield 3;
+      }
+      const values: number[] = [];
+      for await (const value of abortableIterable(source(), ctrl.signal)) {
+        values.push(value);
+        if (value === 2) ctrl.abort();
+      }
+      expect(values).toEqual([1, 2]);
+    });
+
+    it('yields nothing when already aborted', async () => {
+      const ctrl = new AbortController();
+      ctrl.abort();
+      async function* source() {
+        yield 1;
+        yield 2;
+      }
+      const values: number[] = [];
+      for await (const value of abortableIterable(source(), ctrl.signal)) {
+        values.push(value);
+      }
+      expect(values).toEqual([]);
+    });
+
+    it('cleans up listener on natural completion', async () => {
+      const ctrl = new AbortController();
+      const signal = ctrl.signal;
+      let listenerCount = 0;
+      const originalAdd = signal.addEventListener.bind(signal);
+      const originalRemove = signal.removeEventListener.bind(signal);
+      signal.addEventListener = (...args: Parameters<typeof originalAdd>) => {
+        listenerCount++;
+        return originalAdd(...args);
       };
-      const abortable = new AbortableIterator(inner, ctrl.signal);
-      await expect(abortable.throw?.('err')).rejects.toBe('err');
+      signal.removeEventListener = (...args: Parameters<typeof originalRemove>) => {
+        listenerCount--;
+        return originalRemove(...args);
+      };
+
+      async function* source() {
+        yield 1;
+        yield 2;
+      }
+      for await (const _ of abortableIterable(source(), signal)) {
+        // consume
+      }
+      expect(listenerCount).toBe(0);
     });
 
-    it('returns itself as async iterator', () => {
-      const abortable = new AbortableIterator({ next: vi.fn() });
-      expect(abortable[Symbol.asyncIterator]()).toBe(abortable);
+    it('cleans up listener on return()', async () => {
+      const ctrl = new AbortController();
+      const signal = ctrl.signal;
+      let listenerCount = 0;
+      const originalAdd = signal.addEventListener.bind(signal);
+      const originalRemove = signal.removeEventListener.bind(signal);
+      signal.addEventListener = (...args: Parameters<typeof originalAdd>) => {
+        listenerCount++;
+        return originalAdd(...args);
+      };
+      signal.removeEventListener = (...args: Parameters<typeof originalRemove>) => {
+        listenerCount--;
+        return originalRemove(...args);
+      };
+
+      async function* source() {
+        yield 1;
+        yield 2;
+        yield 3;
+      }
+      for await (const value of abortableIterable(source(), signal)) {
+        if (value === 1) break;
+      }
+      expect(listenerCount).toBe(0);
     });
 
-    it('returns fallback when inner return missing', async () => {
-      const abortable = new AbortableIterator({ next: vi.fn() });
-      const result = await abortable.return();
-      expect(result).toEqual({ done: true, value: undefined });
+    it('delegates return() to inner iterator', async () => {
+      const ctrl = new AbortController();
+      const returnFn = vi.fn().mockResolvedValue({ done: true, value: 'returned' });
+      const source: AsyncIterable<number> = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: vi.fn().mockResolvedValue({ value: 1, done: false }),
+            return: returnFn,
+          };
+        },
+      };
+      const iterator = abortableIterable(source, ctrl.signal)[Symbol.asyncIterator]();
+      await iterator.next();
+      const result = await iterator.return?.('foo');
+      expect(returnFn).toHaveBeenCalledWith('foo');
+      expect(result).toEqual({ done: true, value: 'returned' });
     });
   });
 
@@ -283,33 +374,6 @@ describe('Utils test suite', () => {
       const merged = mergeIterables(source);
       const iterator = merged[Symbol.asyncIterator]();
       await expect(iterator.next()).rejects.toBe(err);
-    });
-
-    it('throws AggregateError when source and return both throw', async () => {
-      const iterError = new Error('iteration error');
-      const returnError = new Error('return error');
-      const source = {
-        [Symbol.asyncIterator]() {
-          return {
-            next: () => Promise.reject(iterError),
-            return: () => Promise.reject(returnError),
-          };
-        },
-      };
-      const merged = mergeIterables(source);
-      const iterator = merged[Symbol.asyncIterator]();
-
-      let caughtError: unknown;
-      try {
-        await iterator.next();
-        expect.fail('Expected iterator.next() to reject');
-      } catch (e) {
-        caughtError = e;
-      }
-
-      expect(caughtError).toBeInstanceOf(AggregateError);
-      expect((caughtError as AggregateError).errors).toContain(iterError);
-      expect((caughtError as AggregateError).errors).toContain(returnError);
     });
 
     it('aborts on source error before any abort', async () => {

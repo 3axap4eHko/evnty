@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ListenerRegistry } from '../listener-registry.js';
+import { unwrap, isOk, isErr, err } from '../dispatch-result.js';
 
 const noop = () => {};
 
@@ -119,7 +120,7 @@ describe('ListenerRegistry', () => {
     registry.on(safe);
     registry.on(failing);
 
-    const settled = await Promise.allSettled(registry.dispatch());
+    const settled = await Promise.allSettled(unwrap(registry.dispatch()));
 
     expect(settled.some((r) => r.status === 'fulfilled' && r.value === 'ok')).toBe(true);
     const rejection = settled.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
@@ -142,6 +143,15 @@ describe('ListenerRegistry', () => {
   it('returns false when trying to remove a missing listener', () => {
     const registry = new ListenerRegistry<[], void>();
     expect(registry.off(noop)).toBe(false);
+  });
+
+  it('dispatches with 2 arguments', () => {
+    const registry = new ListenerRegistry<[number, string], string>();
+    const listener = vi.fn((a: number, b: string) => `${a}-${b}`);
+    registry.on(listener);
+    const [result] = registry.dispatch(1, 'two');
+    expect(result).toBe('1-two');
+    expect(listener).toHaveBeenCalledWith(1, 'two');
   });
 
   it('dispatches with 3 arguments', () => {
@@ -209,5 +219,30 @@ describe('ListenerRegistry', () => {
       Map.prototype.set = originalSet;
       Map.prototype.keys = originalKeys;
     }
+  });
+});
+
+describe('dispatch-result helpers', () => {
+  it('isOk returns true for non-error values', () => {
+    expect(isOk('value')).toBe(true);
+    expect(isOk(42)).toBe(true);
+    expect(isOk(null)).toBe(true);
+    expect(isOk(undefined)).toBe(true);
+    expect(isOk({})).toBe(true);
+  });
+
+  it('isOk returns false for ResultError', () => {
+    expect(isOk(err(new Error('test')))).toBe(false);
+  });
+
+  it('isErr returns true for ResultError', () => {
+    expect(isErr(err(new Error('test')))).toBe(true);
+  });
+
+  it('isErr returns false for non-error values', () => {
+    expect(isErr('value')).toBe(false);
+    expect(isErr(42)).toBe(false);
+    expect(isErr(null)).toBe(false);
+    expect(isErr(undefined)).toBe(false);
   });
 });

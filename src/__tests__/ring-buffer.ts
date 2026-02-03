@@ -152,3 +152,10 @@ it('should convert to array', () => {
   expect([...q]).toEqual(range(10));
 });
 
+it('should return undefined when peeking out of bounds', () => {
+  const q = RingBuffer.from(range(3));
+  expect(q.peek(-1)).toBeUndefined();
+  expect(q.peek(3)).toBeUndefined();
+  expect(q.peek(100)).toBeUndefined();
+});
+

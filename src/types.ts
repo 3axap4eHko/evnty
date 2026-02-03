@@ -1,3 +1,7 @@
+export interface Action {
+  (): void;
+}
+
 /**
  * Generic function type with typed arguments and return value.
  * @template A - Tuple of argument types
@@ -8,10 +12,10 @@ export interface Fn<A extends unknown[], R> {
 }
 
 /**
- * A value that may be a Promise, PromiseLike, or a plain value.
+ * A value that may be a PromiseLike or a plain value.
  * @template T - The underlying value type
  */
-export type MaybePromise<T> = Promise<T> | PromiseLike<T> | T;
+export type MaybePromise<T> = T | PromiseLike<T>;
 
 /**
  * Union of sync and async iterable types.
@@ -40,25 +44,12 @@ export interface Callback<R = void> extends Fn<[], MaybePromise<R>> {}
  * @template T - The event payload type
  * @template R - The return type (defaults to unknown)
  */
-export interface Listener<T, R = unknown> extends Fn<[T], MaybePromise<R | void>> {}
+export interface Listener<T, R = unknown> extends Fn<[T], R | void> {}
 
-/**
- * Indicates whether a listener was added or removed.
- */
-export enum HookType {
-  /** Listener was added */
-  Add,
-  /** Listener was removed */
-  Remove,
-}
+export interface Emitter<T, R> {
+  readonly sink: Fn<[T], R>;
 
-/**
- * A hook function that observes listener lifecycle events.
- * @template T - The event payload type
- * @template R - The listener return type
- */
-export interface HookListener<T, R> {
-  (listener: Listener<T, R> | undefined, type: HookType): void;
+  emit(value: T): R;
 }
 
 /**
@@ -138,9 +129,9 @@ export interface Expander<T, R> {
 }
 
 /**
- * An object that provides a next() method returning a promise.
+ * An object that provides a receive() method returning a promise.
  * @template T - The resolved value type
  */
 export interface Promiseable<T> {
-  next(): Promise<T>;
+  receive(): Promise<T>;
 }

@@ -1,136 +1,32 @@
-import { MaybePromise, Callback, Listener, HookListener, HookType, FilterFunction, Predicate, Mapper, Reducer } from './types.js';
-import { Callable, CallableAsyncIterator } from './callable.js';
-import { Sequence } from './sequence.js';
+import { Callback, Listener, FilterFunction, Predicate, Mapper, Reducer, Action, Fn, Emitter, MaybePromise, Promiseable } from './types.js';
+import { Disposer } from './async.js';
+import { Signal } from './signal.js';
 import { ListenerRegistry } from './listener-registry.js';
+import { DispatchResult } from './dispatch-result.js';
+
+export type Unsubscribe = Action;
 
 /**
- * Type guard to check if a value is a PromiseLike (thenable).
  * @internal
  */
-const isThenable = (value: unknown): value is PromiseLike<unknown> =>
-  value !== null && typeof value === 'object' && typeof (value as PromiseLike<unknown>).then === 'function';
+export class EventIterator<T> implements AsyncIterator<T, void, void> {
+  #signal: Signal<T>;
 
-/**
- * Represents an unsubscribe function that can be called to remove a listener.
- * Provides utilities for chaining callbacks and conditional unsubscription.
- *
- * @example
- * ```typescript
- * const unsubscribe = event.on(listener);
- *
- * // Chain a callback before unsubscribing
- * const withCleanup = unsubscribe.pre(() => console.log('Cleaning up...'));
- *
- * // Unsubscribe after 3 calls
- * const limited = unsubscribe.countdown(3);
- * ```
- */
-export class Unsubscribe extends Callable<[], MaybePromise<void>> {
-  private _done = false;
-
-  /**
-   * Creates a new Unsubscribe instance.
-   * @param callback - The callback to execute when unsubscribing
-   */
-  constructor(callback: Callback) {
-    super(() => {
-      this._done = true;
-      return callback();
-    });
+  constructor(signal: Signal<T>) {
+    this.#signal = signal;
   }
 
-  /**
-   * Indicates whether this unsubscribe has already been called.
-   */
-  get done() {
-    return this._done;
+  async next(): Promise<IteratorResult<T, void>> {
+    try {
+      const value = await this.#signal.receive();
+      return { value, done: false };
+    } catch {
+      return { value: undefined, done: true };
+    }
   }
 
-  /**
-   * Creates a new unsubscribe function that executes the given callback before this unsubscribe.
-   *
-   * @param callback - The callback to execute before unsubscribing.
-   * @returns {Unsubscribe} A new Unsubscribe instance.
-   */
-  pre(callback: Callback): Unsubscribe {
-    return new Unsubscribe((): MaybePromise<void> => {
-      const result = callback();
-      if (isThenable(result)) {
-        return result.then(() => this()) as PromiseLike<void>;
-      }
-      return this();
-    });
-  }
-
-  /**
-   * Creates a new unsubscribe function that executes the given callback after this unsubscribe.
-   *
-   * @param callback - The callback to execute after unsubscribing.
-   * @returns {Unsubscribe} A new Unsubscribe instance.
-   */
-  post(callback: Callback): Unsubscribe {
-    return new Unsubscribe((): MaybePromise<void> => {
-      const result = this();
-      if (isThenable(result)) {
-        return result.then(() => callback()) as PromiseLike<void>;
-      }
-      return callback();
-    });
-  }
-
-  /**
-   * Creates a new unsubscribe function that only executes after being called a specified number of times.
-   *
-   * @param count - The number of times this must be called before actually unsubscribing.
-   * @returns {Unsubscribe} A new Unsubscribe instance.
-   */
-  countdown(count: number): Unsubscribe {
-    return new Unsubscribe(() => {
-      if (!--count) {
-        return this();
-      }
-    });
-  }
-}
-
-/**
- * Wraps an array of values or promises (typically listener results) and provides batch resolution.
- *
- * @template T
- */
-export class EventResult<T> implements PromiseLike<T[]> {
-  #results: MaybePromise<T>[];
-
-  readonly [Symbol.toStringTag] = 'EventResult';
-  /**
-   * @param results - An array of values or Promise-returning listener calls.
-   */
-  constructor(results: MaybePromise<T>[]) {
-    this.#results = results;
-  }
-
-  then<TResult1 = T, TResult2 = never>(
-    onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
-  ): PromiseLike<TResult1 | TResult2> {
-    return this.all().then(onfulfilled, onrejected);
-  }
-
-  /**
-   * Resolves all listener results, rejecting if any promise rejects.
-   *
-   * @returns {Promise<T[]>} A promise that fulfills with an array of all resolved values.
-   */
-  all(): Promise<T[]> {
-    return Promise.all(this.#results);
-  }
-  /**
-   * Waits for all listener results to settle, regardless of fulfillment or rejection.
-   *
-   * @returns {Promise<PromiseSettledResult<T>[]>} A promise that fulfills with an array of each result's settled status and value/reason.
-   */
-  settled(): Promise<PromiseSettledResult<T>[]> {
-    return Promise.allSettled(this.#results);
+  async return(): Promise<IteratorResult<T, void>> {
+    return { value: undefined, done: true };
   }
 }
 
@@ -153,33 +49,15 @@ export class EventResult<T> implements PromiseLike<T[]> {
  * @template T - The type of value emitted to listeners (event payload)
  * @template R - The return type of listener functions
  */
-export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, EventResult<void | R>> {
-  /**
-   * The ring buffer containing all registered listeners for the event.
-   */
-  private listeners: ListenerRegistry<[T], MaybePromise<R | void>>;
-
-  /**
-   * The ring buffer containing hook listeners that respond to listener lifecycle events.
-   */
-  private hooks = new ListenerRegistry<[listener: Listener<T, R> | undefined, type: HookType], void>();
-
-  /**
-   * Flag indicating whether this event has been disposed.
-   */
-  private _disposed = false;
-
-  /**
-   * Pending next() resolver waiting for the next emission.
-   */
-  private pending?: PromiseWithResolvers<T>;
-
-  /**
-   * A function that disposes of the event and its listeners.
-   */
-  readonly dispose: Callback;
+export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResult<void | R>>, Promiseable<T>, Promise<T>, Disposable, AsyncIterable<T> {
+  #listeners = new ListenerRegistry<[T], R | void>();
+  #signal = new Signal<T>();
+  #disposer: Disposer;
+  #disposeCallback?: Callback;
+  #sink?: Fn<[T], DispatchResult<void | R>>;
 
   readonly [Symbol.toStringTag] = 'Event';
+
   /**
    * Creates a new event.
    *
@@ -192,27 +70,36 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   constructor(dispose?: Callback) {
-    const listeners = new ListenerRegistry<[T], R>();
-    super((value: T): EventResult<void | R> => {
-      if (this.pending) {
-        this.pending.resolve(value);
-        this.pending = undefined;
-      }
-      const results = listeners.dispatch(value);
-      return new EventResult(results);
-    });
+    this.#disposer = new Disposer(this);
+    this.#disposeCallback = dispose;
+  }
 
-    this.listeners = listeners;
+  /**
+   * Checks if the event has been disposed.
+   */
+  get disposed(): boolean {
+    return this.#disposer.disposed;
+  }
 
-    this.dispose = () => {
-      this._disposed = true;
-      if (this.pending) {
-        this.pending.reject(new Error('Event disposed'));
-        this.pending = undefined;
-      }
-      void this.clear();
-      void dispose?.();
-    };
+  /**
+   * Returns a bound emit function for use as a callback.
+   * Useful for passing to other APIs that expect a function.
+   *
+   * ```typescript
+   * const event = new Event<string>();
+   * someApi.onMessage(event.sink);
+   * ```
+   */
+  get sink(): Fn<[T], DispatchResult<void | R>> {
+    return (this.#sink ??= this.emit.bind(this));
+  }
+
+  /**
+   * DOM EventListener interface compatibility.
+   * Allows the event to be used directly with addEventListener.
+   */
+  handleEvent(event: T): void {
+    this.emit(event);
   }
 
   /**
@@ -222,16 +109,26 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * @type {number}
    */
   get size(): number {
-    return this.listeners.size;
+    return this.#listeners.size;
   }
 
   /**
-   * Checks if the event has been disposed.
+   * Emits a value to all registered listeners.
+   * Each listener is called with the value and their return values are collected.
    *
-   * @returns {boolean} `true` if the event has been disposed; otherwise, `false`.
+   * @param value - The value to emit to all listeners.
+   * @returns {DispatchResult<void | R>} A result object containing all listener return values.
+   *
+   * ```typescript
+   * const event = new Event<string, number>();
+   * event.on(str => str.length);
+   * const result = event.emit('hello');
+   * await result.all(); // [5]
+   * ```
    */
-  get disposed(): boolean {
-    return this._disposed;
+  emit(value: T): DispatchResult<void | R> {
+    this.#signal.emit(value);
+    return new DispatchResult(this.#listeners.dispatch(value));
   }
 
   /**
@@ -248,7 +145,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   lacks(listener: Listener<T, R>): boolean {
-    return !this.listeners.has(listener);
+    return !this.#listeners.has(listener);
   }
 
   /**
@@ -265,7 +162,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   has(listener: Listener<T, R>): boolean {
-    return this.listeners.has(listener);
+    return this.#listeners.has(listener);
   }
 
   /**
@@ -280,9 +177,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   off(listener: Listener<T, R>): this {
-    if (this.listeners.off(listener)) {
-      void this.hooks.dispatch(listener, HookType.Remove);
-    }
+    this.#listeners.off(listener);
     return this;
   }
 
@@ -301,12 +196,8 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   on(listener: Listener<T, R>): Unsubscribe {
-    if (this.listeners.on(listener)) {
-      void this.hooks.dispatch(listener, HookType.Add);
-    }
-    return new Unsubscribe(() => {
-      void this.off(listener);
-    });
+    this.#listeners.on(listener);
+    return () => void this.off(listener);
   }
 
   /**
@@ -324,12 +215,8 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   once(listener: Listener<T, R>): Unsubscribe {
-    if (this.listeners.once(listener)) {
-      void this.hooks.dispatch(listener, HookType.Add);
-    }
-    return new Unsubscribe(() => {
-      void this.off(listener);
-    });
+    this.#listeners.once(listener);
+    return () => void this.off(listener);
   }
 
   /**
@@ -345,8 +232,7 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   clear(): this {
-    this.listeners.clear();
-    void this.hooks.dispatch(undefined, HookType.Remove);
+    this.#listeners.clear();
     return this;
   }
 
@@ -356,12 +242,23 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    *
    * @returns {Promise<T>} A promise that resolves with the next emitted event value.
    */
-  next(): Promise<T> {
-    if (this._disposed) {
+  receive(): Promise<T> {
+    if (this.disposed) {
       return Promise.reject(new Error('Event disposed'));
     }
-    this.pending ??= Promise.withResolvers<T>();
-    return this.pending.promise;
+    return this.#signal.receive();
+  }
+
+  then<OK = T, ERR = never>(onfulfilled?: Fn<[T], MaybePromise<OK>> | null, onrejected?: Fn<[unknown], MaybePromise<ERR>> | null): Promise<OK | ERR> {
+    return this.receive().then(onfulfilled, onrejected);
+  }
+
+  catch<ERR = never>(onrejected?: Fn<[unknown], MaybePromise<ERR>> | null): Promise<T | ERR> {
+    return this.receive().catch(onrejected);
+  }
+
+  finally(onfinally?: Action | null): Promise<T> {
+    return this.receive().finally(onfinally);
   }
 
   /**
@@ -381,60 +278,25 @@ export class Event<T = unknown, R = unknown> extends CallableAsyncIterator<T, Ev
    * ```
    */
   settle(): Promise<PromiseSettledResult<T>> {
-    return this.next()
-      .then((value) => ({ status: 'fulfilled', value }) as const)
-      .catch((reason: unknown) => ({ status: 'rejected', reason }) as const);
+    return this.receive().then(
+      (value) => ({ status: 'fulfilled', value }) as const,
+      (reason: unknown) => ({ status: 'rejected', reason }) as const,
+    );
   }
 
-  /**
-   * Makes this event iterable using `for await...of` loops.
-   *
-   * @returns {AsyncIterator<T>} An async iterator that yields values as they are emitted by this event.
-   * The iterator unsubscribes and aborts internal queues when `return()` is called.
-   *
-   * ```typescript
-   * // Assuming an event that emits numbers
-   * const numberEvent = new Event<number>();
-   * (async () => {
-   *   for await (const num of numberEvent) {
-   *     console.log('Number:', num);
-   *   }
-   * })();
-   * await numberEvent(1);
-   * await numberEvent(2);
-   * await numberEvent(3);
-   * ```
-   */
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    const ctrl = new AbortController();
-    const sequence = new Sequence<T>(ctrl.signal);
-    const emitEvent = (value: T) => {
-      sequence(value);
-    };
-    this.listeners.on(emitEvent);
-    const hook: HookListener<T, R> = (target = emitEvent, action) => {
-      if (target === emitEvent && action === HookType.Remove) {
-        ctrl.abort('done');
-        this.hooks.off(hook);
-      }
-    };
+  [Symbol.asyncIterator](): AsyncIterator<T, void, void> {
+    return new EventIterator(this.#signal);
+  }
 
-    this.hooks.on(hook);
-    const iterator = sequence[Symbol.asyncIterator]();
-
-    return {
-      next: (...args) => {
-        return iterator.next(...args);
-      },
-      return: async () => {
-        void this.off(emitEvent);
-        return iterator.return?.() ?? { value: undefined, done: true };
-      },
-    };
+  dispose(): void {
+    this[Symbol.dispose]();
   }
 
   [Symbol.dispose](): void {
-    void this.dispose();
+    this.#disposer.handleEvent();
+    this.#signal[Symbol.dispose]();
+    this.#listeners.clear();
+    void this.#disposeCallback?.();
   }
 }
 
@@ -468,12 +330,12 @@ export type AllEventsResults<T extends Event<any, any>[]> = { [K in keyof T]: Ev
 export const merge = <Events extends Event<any, any>[]>(...events: Events): Event<AllEventsParameters<Events>, AllEventsResults<Events>> => {
   const mergedEvent = new Event<AllEventsParameters<Events>, AllEventsResults<Events>>(() => {
     for (const event of events) {
-      event.off(mergedEvent);
+      event.off(mergedEvent.sink);
     }
   });
 
   for (const event of events) {
-    event.on(mergedEvent);
+    event.on(mergedEvent.sink);
   }
   return mergedEvent;
 };
@@ -499,7 +361,7 @@ export const createInterval = <R = unknown>(interval: number): Event<number, R> 
   let counter = 0;
   const intervalEvent = new Event<number, R>(() => clearInterval(timerId));
   const timerId: ReturnType<typeof setInterval> = setInterval(() => {
-    void intervalEvent(counter++);
+    intervalEvent.emit(counter++);
   }, interval);
   return intervalEvent;
 };

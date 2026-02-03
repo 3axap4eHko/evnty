@@ -24,86 +24,86 @@ Async-first, reactive event handling library for complex event flows with three 
 - [Platform Support](#platform-support)
 - [Installing](#installing)
 - [API](#api)
-  - [`Unsubscribe`](#unsubscribe)
-    - [`unsubscribe.constructor(callback: Callback)`](#unsubscribeconstructorcallback-callback)
-    - [`unsubscribe.done()`](#unsubscribedone)
-    - [`unsubscribe.pre(callback: Callback): Unsubscribe`](#unsubscribeprecallback-callback-unsubscribe)
-    - [`unsubscribe.post(callback: Callback): Unsubscribe`](#unsubscribepostcallback-callback-unsubscribe)
-    - [`unsubscribe.countdown(count: number): Unsubscribe`](#unsubscribecountdowncount-number-unsubscribe)
-  - [`EventResult`](#eventresult)
-    - [`eventresult.constructor(results: MaybePromise[])`](#eventresultconstructorresults-maybepromise)
-    - [`eventresult.then(onfulfilled, onrejected): PromiseLike`](#eventresultthenonfulfilled-onrejected-promiselike)
-    - [`eventresult.all(): Promise`](#eventresultall-promise)
-    - [`eventresult.settled(): Promise`](#eventresultsettled-promise)
+  - [`ConsumerHandle`](#consumerhandle)
+    - [`ConsumerHandle.cursor: number`](#consumerhandlecursor-number)
+    - [`ConsumerHandle[Symbol.dispose](): void`](#consumerhandlesymboldispose-void)
+  - [`Broadcast`](#broadcast)
+    - [`Broadcast.disposed: boolean`](#broadcastdisposed-boolean)
+    - [`Broadcast.sink: Fn`](#broadcastsink-fn)
+    - [`Broadcast.handleEvent(event: T): void`](#broadcasthandleeventevent-t-void)
+    - [`Broadcast.size: number`](#broadcastsize-number)
+    - [`Broadcast.emit(value: T): boolean`](#broadcastemitvalue-t-boolean)
+    - [`Broadcast.receive(): Promise`](#broadcastreceive-promise)
+    - [`Broadcast.then(onfulfilled?: Fn | null, onrejected?: Fn | null): Promise`](#broadcastthenonfulfilled-fn--null-onrejected-fn--null-promise)
+    - [`Broadcast.catch(onrejected?: Fn | null): Promise`](#broadcastcatchonrejected-fn--null-promise)
+    - [`Broadcast.finally(onfinally?: Action | null): Promise`](#broadcastfinallyonfinally-action--null-promise)
+    - [`Broadcast.join(): ConsumerHandle`](#broadcastjoin-consumerhandle)
+    - [`Broadcast.getCursor(handle: ConsumerHandle): number`](#broadcastgetcursorhandle-consumerhandle-number)
+    - [`Broadcast.leave(handle: ConsumerHandle): void`](#broadcastleavehandle-consumerhandle-void)
+    - [`Broadcast.consume(handle: ConsumerHandle): T`](#broadcastconsumehandle-consumerhandle-t)
+    - [`Broadcast.readable(handle: ConsumerHandle): boolean`](#broadcastreadablehandle-consumerhandle-boolean)
+    - [`Broadcast[Symbol.asyncIterator](): AsyncIterator`](#broadcastsymbolasynciterator-asynciterator)
+    - [`Broadcast.dispose(): void`](#broadcastdispose-void)
+    - [`Broadcast[Symbol.dispose](): void`](#broadcastsymboldispose-void)
+  - [`DispatchResult`](#dispatchresult)
+    - [`DispatchResult.then(onfulfilled?: Fn | null, onrejected?: Fn | null): PromiseLike`](#dispatchresultthenonfulfilled-fn--null-onrejected-fn--null-promiselike)
+    - [`DispatchResult.all(): Promise`](#dispatchresultall-promise)
+    - [`DispatchResult.settled(): Promise`](#dispatchresultsettled-promise)
   - [`Event`](#event)
-    - [`event.constructor(dispose?: Callback)`](#eventconstructordispose-callback)
-    - [`event.size(): number`](#eventsize-number)
-    - [`event.disposed(): boolean`](#eventdisposed-boolean)
-    - [`event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
-    - [`event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
-    - [`event.off(listener: Listener): this`](#eventofflistener-listener-this)
-    - [`event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
-    - [`event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
-    - [`event.clear(): this`](#eventclear-this)
-    - [`event.next(): Promise`](#eventnext-promise)
-    - [`event.settle(): Promise`](#eventsettle-promise)
-    - [`event.Symbol.asyncIterator(): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
-    - [`event.Symbol.dispose(): void`](#eventsymboldispose-void)
+    - [`Event.disposed: boolean`](#eventdisposed-boolean)
+    - [`Event.sink: Fn`](#eventsink-fn)
+    - [`Event.handleEvent(event: T): void`](#eventhandleeventevent-t-void)
+    - [`Event.size: number`](#eventsize-number)
+    - [`Event.emit(value: T): DispatchResult`](#eventemitvalue-t-dispatchresult)
+    - [`Event.lacks(listener: Listener): boolean`](#eventlackslistener-listener-boolean)
+    - [`Event.has(listener: Listener): boolean`](#eventhaslistener-listener-boolean)
+    - [`Event.off(listener: Listener): this`](#eventofflistener-listener-this)
+    - [`Event.on(listener: Listener): Unsubscribe`](#eventonlistener-listener-unsubscribe)
+    - [`Event.once(listener: Listener): Unsubscribe`](#eventoncelistener-listener-unsubscribe)
+    - [`Event.clear(): this`](#eventclear-this)
+    - [`Event.receive(): Promise`](#eventreceive-promise)
+    - [`Event.then(onfulfilled?: Fn | null, onrejected?: Fn | null): Promise`](#eventthenonfulfilled-fn--null-onrejected-fn--null-promise)
+    - [`Event.catch(onrejected?: Fn | null): Promise`](#eventcatchonrejected-fn--null-promise)
+    - [`Event.finally(onfinally?: Action | null): Promise`](#eventfinallyonfinally-action--null-promise)
+    - [`Event.settle(): Promise`](#eventsettle-promise)
+    - [`Event[Symbol.asyncIterator](): AsyncIterator`](#eventsymbolasynciterator-asynciterator)
+    - [`Event.dispose(): void`](#eventdispose-void)
+    - [`Event[Symbol.dispose](): void`](#eventsymboldispose-void)
   - [`merge(...events: Events): Event`](#mergeevents-events-event)
   - [`createInterval(interval: number): Event`](#createintervalinterval-number-event)
   - [`createEvent(): Event`](#createevent-event)
   - [`AsyncIteratorObject`](#asynciteratorobject)
-    - [`asynciteratorobject.from(iterable: Iterable): AsyncIteratorObject`](#asynciteratorobjectfromiterable-iterable-asynciteratorobject)
-    - [`asynciteratorobject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`](#asynciteratorobjectmergeiterables-asynciterable-asynciteratorobject)
-    - [`asynciteratorobject.constructor(iterable: AsyncIterable)`](#asynciteratorobjectconstructoriterable-asynciterable)
-    - [`asynciteratorobject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`](#asynciteratorobjectpipegeneratorfactory-signal-abortsignal-asynciteratorobject)
-    - [`asynciteratorobject.awaited(): AsyncIteratorObject`](#asynciteratorobjectawaited-asynciteratorobject)
-    - [`asynciteratorobject.map(callbackfn): AsyncIteratorObject`](#asynciteratorobjectmapcallbackfn-asynciteratorobject)
-    - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
-    - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
-    - [`asynciteratorobject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
-    - [`asynciteratorobject.take(limit: number): AsyncIteratorObject`](#asynciteratorobjecttakelimit-number-asynciteratorobject)
-    - [`asynciteratorobject.drop(count: number): AsyncIteratorObject`](#asynciteratorobjectdropcount-number-asynciteratorobject)
-    - [`asynciteratorobject.flatMap(callback): AsyncIteratorObject`](#asynciteratorobjectflatmapcallback-asynciteratorobject)
-    - [`asynciteratorobject.reduce(callbackfn): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-asynciteratorobject)
-    - [`asynciteratorobject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-initialvalue-r-asynciteratorobject)
-    - [`asynciteratorobject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-args-unknown-asynciteratorobject)
-    - [`asynciteratorobject.expand(callbackfn): AsyncIteratorObject`](#asynciteratorobjectexpandcallbackfn-asynciteratorobject)
-    - [`asynciteratorobject.Symbol.asyncIterator()`](#asynciteratorobjectsymbolasynciterator)
-  - [`ListenerRegistry`](#listenerregistry)
-    - [`listenerregistry.size(): number`](#listenerregistrysize-number)
-    - [`listenerregistry.has(listener: Fn): boolean`](#listenerregistryhaslistener-fn-boolean)
-    - [`listenerregistry.lacks(listener: Fn): boolean`](#listenerregistrylackslistener-fn-boolean)
-    - [`listenerregistry.off(listener: Fn): boolean`](#listenerregistryofflistener-fn-boolean)
-    - [`listenerregistry.on(listener: Fn): boolean`](#listenerregistryonlistener-fn-boolean)
-    - [`listenerregistry.once(listener: Fn): boolean`](#listenerregistryoncelistener-fn-boolean)
-    - [`listenerregistry.clear(): void`](#listenerregistryclear-void)
-    - [`listenerregistry.dispatch(...values: P): Array`](#listenerregistrydispatchvalues-p-array)
+    - [`AsyncIteratorObject.from(iterable: Iterable): AsyncIteratorObject`](#asynciteratorobjectfromiterable-iterable-asynciteratorobject)
+    - [`AsyncIteratorObject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`](#asynciteratorobjectmergeiterables-asynciterable-asynciteratorobject)
+    - [`AsyncIteratorObject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`](#asynciteratorobjectpipegeneratorfactory-signal-abortsignal-asynciteratorobject)
+    - [`AsyncIteratorObject.awaited(): AsyncIteratorObject`](#asynciteratorobjectawaited-asynciteratorobject)
+    - [`AsyncIteratorObject.map(callbackfn): AsyncIteratorObject`](#asynciteratorobjectmapcallbackfn-asynciteratorobject)
+    - [`AsyncIteratorObject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`AsyncIteratorObject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`AsyncIteratorObject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`AsyncIteratorObject.take(limit: number): AsyncIteratorObject`](#asynciteratorobjecttakelimit-number-asynciteratorobject)
+    - [`AsyncIteratorObject.drop(count: number): AsyncIteratorObject`](#asynciteratorobjectdropcount-number-asynciteratorobject)
+    - [`AsyncIteratorObject.flatMap(callback): AsyncIteratorObject`](#asynciteratorobjectflatmapcallback-asynciteratorobject)
+    - [`AsyncIteratorObject.reduce(callbackfn): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-asynciteratorobject)
+    - [`AsyncIteratorObject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-initialvalue-r-asynciteratorobject)
+    - [`AsyncIteratorObject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-args-unknown-asynciteratorobject)
+    - [`AsyncIteratorObject.expand(callbackfn): AsyncIteratorObject`](#asynciteratorobjectexpandcallbackfn-asynciteratorobject)
+    - [`AsyncIteratorObject[Symbol.asyncIterator]()`](#asynciteratorobjectsymbolasynciterator)
   - [`Sequence`](#sequence)
-    - [`sequence.merge(target: Sequence, ...sequences: Sequence[]): void`](#sequencemergetarget-sequence-sequences-sequence-void)
-    - [`sequence.constructor(private readonly abortSignal?: AbortSignal)`](#sequenceconstructorprivate-readonly-abortsignal-abortsignal)
-    - [`sequence.aborted(): boolean`](#sequenceaborted-boolean)
-    - [`sequence.size(): number`](#sequencesize-number)
-    - [`sequence.reserve(capacity: number): Promise`](#sequencereservecapacity-number-promise)
-    - [`sequence.next(): Promise`](#sequencenext-promise)
-    - [`sequence.Symbol.dispose(): void`](#sequencesymboldispose-void)
+    - [`Sequence.merge(target: Sequence, ...sequences: Sequence[]): void`](#sequencemergetarget-sequence-sequences-sequence-void)
+    - [`Sequence.size: number`](#sequencesize-number)
+    - [`Sequence.reserve(capacity: number): Promise`](#sequencereservecapacity-number-promise)
+    - [`Sequence.emit(value: T): boolean`](#sequenceemitvalue-t-boolean)
+    - [`Sequence.receive(): Promise`](#sequencereceive-promise)
+    - [`Sequence.dispose(): void`](#sequencedispose-void)
   - [`Signal`](#signal)
-    - [`signal.merge(target: Signal, ...signals: Signal[]): void`](#signalmergetarget-signal-signals-signal-void)
-    - [`signal.constructor(private readonly abortSignal?: AbortSignal)`](#signalconstructorprivate-readonly-abortsignal-abortsignal)
-    - [`signal.aborted(): boolean`](#signalaborted-boolean)
-    - [`signal.next(): Promise`](#signalnext-promise)
-    - [`signal.Symbol.dispose(): void`](#signalsymboldispose-void)
-  - [`AbortableIterator`](#abortableiterator)
-    - [`abortableiterator.constructor(iterator: AsyncIterator, signal?: AbortSignal)`](#abortableiteratorconstructoriterator-asynciterator-signal-abortsignal)
-    - [`abortableiterator.next(...args: [] | [TNext]): Promise`](#abortableiteratornextargs---tnext-promise)
-    - [`abortableiterator.return(value?: TReturn): Promise`](#abortableiteratorreturnvalue-treturn-promise)
-    - [`abortableiterator.throw(error: unknown): Promise`](#abortableiteratorthrowerror-unknown-promise)
-    - [`abortableiterator.Symbol.asyncIterator(): AsyncIterator`](#abortableiteratorsymbolasynciterator-asynciterator)
-  - [`noop()`](#noop)
-  - [`mapIterator(iterator: AnyIterator, map: MapNext): AsyncIterator`](#mapiteratoriterator-anyiterator-map-mapnext-asynciterator)
+    - [`Signal.merge(target: Signal, ...signals: Signal[]): void`](#signalmergetarget-signal-signals-signal-void)
+    - [`Signal.emit(value: T): boolean`](#signalemitvalue-t-boolean)
+    - [`Signal.receive(): Promise`](#signalreceive-promise)
+    - [`Signal.dispose(): void`](#signaldispose-void)
+  - [`abortableIterable(iterable: AsyncIterable, signal: AbortSignal): AsyncIterable`](#abortableiterableiterable-asynciterable-signal-abortsignal-asynciterable)
   - [`iterate(startOrCount?: number, countWhenTwoArgs?: number, step: number = 1): Iterable`](#iteratestartorcount-number-countwhentwoargs-number-step-number--1-iterable)
   - [`toAsyncIterable(iterable: Iterable): AsyncIterable`](#toasynciterableiterable-iterable-asynciterable)
-  - [`mergeIterables(...iterables: AsyncIterable[]): AsyncIterable`](#mergeiterablesiterables-asynciterable-asynciterable)
 - [Examples](#examples)
 - [License](#license)
 
@@ -340,76 +340,163 @@ for await (const data of processQueue) {
 
 ## API
 
-### `Unsubscribe`
+### `ConsumerHandle`
 
- Represents an unsubscribe function that can be called to remove a listener.
- Provides utilities for chaining callbacks and conditional unsubscription.
+ A handle representing a consumer's position in a Broadcast.
+ Returned by `Broadcast.join()` and used to consume values.
+ Implements Disposable for automatic cleanup via `using` keyword.
 
-- @example
  ```typescript
- const unsubscribe = event.on(listener);
-
- // Chain a callback before unsubscribing
- const withCleanup = unsubscribe.pre(() => console.log('Cleaning up...'));
-
- // Unsubscribe after 3 calls
- const limited = unsubscribe.countdown(3);
+ const broadcast = new Broadcast<number>();
+ using handle = broadcast.join();
+ broadcast.emit(42);
+ const value = broadcast.consume(handle); // 42
  ```
  
 
-#### `unsubscribe.constructor(callback: Callback)`
+#### `ConsumerHandle.cursor: number`
 
- Creates a new Unsubscribe instance.
-- @param callback - The callback to execute when unsubscribing
+ The current position of this consumer in the buffer.
    
-#### `unsubscribe.done()`
+#### `ConsumerHandle[Symbol.dispose](): void`
 
- Indicates whether this unsubscribe has already been called.
+ Leaves the broadcast, releasing this consumer's position.
    
-#### `unsubscribe.pre(callback: Callback): Unsubscribe`
+### `Broadcast`
 
- Creates a new unsubscribe function that executes the given callback before this unsubscribe.
+ A multi-consumer FIFO queue where each consumer maintains its own read position.
+ Values are buffered and each consumer can read them independently at their own pace.
+ The buffer automatically compacts when all consumers have read past a position.
 
-- @param callback - The callback to execute before unsubscribing.
-- @returns `{Unsubscribe}` A new Unsubscribe instance.
+ Key characteristics:
+ - Multiple consumers - each gets their own cursor position
+ - Buffered delivery - values are stored until all consumers read them
+ - Late joiners only see values emitted after joining
+ - Automatic cleanup via FinalizationRegistry when handles are garbage collected
+
+ Differs from:
+ - Event: Broadcast buffers values, Event does not
+ - Sequence: Broadcast supports multiple consumers, Sequence is single-consumer
+ - Signal: Broadcast buffers values, Signal only notifies current waiters
+
+- @template T - The type of values in the broadcast
+
+ ```typescript
+ const broadcast = new Broadcast<number>();
+
+ const handle1 = broadcast.join();
+ const handle2 = broadcast.join();
+
+ broadcast.emit(1);
+ broadcast.emit(2);
+
+ broadcast.consume(handle1); // 1
+ broadcast.consume(handle2); // 1
+ broadcast.consume(handle1); // 2
+ ```
+ 
+
+#### `Broadcast.disposed: boolean`
+
+ Checks if the broadcast has been disposed.
    
-#### `unsubscribe.post(callback: Callback): Unsubscribe`
+#### `Broadcast.sink: Fn`
 
- Creates a new unsubscribe function that executes the given callback after this unsubscribe.
-
-- @param callback - The callback to execute after unsubscribing.
-- @returns `{Unsubscribe}` A new Unsubscribe instance.
+ Returns a bound emit function for use as a callback.
    
-#### `unsubscribe.countdown(count: number): Unsubscribe`
+#### `Broadcast.handleEvent(event: T): void`
 
- Creates a new unsubscribe function that only executes after being called a specified number of times.
-
-- @param count - The number of times this must be called before actually unsubscribing.
-- @returns `{Unsubscribe}` A new Unsubscribe instance.
+ DOM EventListener interface compatibility.
    
-### `EventResult`
+#### `Broadcast.size: number`
+
+ The number of active consumers.
+   
+#### `Broadcast.emit(value: T): boolean`
+
+ Emits a value to all consumers. The value is buffered for consumption.
+
+- @param value - The value to emit.
+- @returns `{boolean}` `true` if there were waiters for the signal, `false` otherwise.
+   
+#### `Broadcast.receive(): Promise`
+
+ Waits for the next emitted value without joining as a consumer.
+ Does not buffer - only receives values emitted after calling.
+
+- @returns `{Promise<T>}` A promise that resolves with the next emitted value.
+   
+#### `Broadcast.then(onfulfilled?: Fn | null, onrejected?: Fn | null): Promise`
+#### `Broadcast.catch(onrejected?: Fn | null): Promise`
+#### `Broadcast.finally(onfinally?: Action | null): Promise`
+#### `Broadcast.join(): ConsumerHandle`
+
+ Joins the broadcast as a consumer. Returns a handle used to consume values.
+ The consumer starts at the current buffer position and will only see
+ values emitted after joining.
+
+- @returns `{ConsumerHandle<T>}` A handle for consuming values.
+
+ ```typescript
+ const handle = broadcast.join();
+ // Use handle with consume(), readable(), leave()
+ ```
+   
+#### `Broadcast.getCursor(handle: ConsumerHandle): number`
+
+ Gets the current cursor position for a consumer handle.
+
+- @param handle - The consumer handle.
+- @returns `{number}` The cursor position.
+- @throws `{Error}` If the handle is invalid (already left or never joined).
+   
+#### `Broadcast.leave(handle: ConsumerHandle): void`
+
+ Removes a consumer from the broadcast. The handle becomes invalid after this call.
+ Idempotent - calling multiple times has no effect.
+
+- @param handle - The consumer handle to remove.
+   
+#### `Broadcast.consume(handle: ConsumerHandle): T`
+
+ Consumes and returns the next value for a consumer.
+ Advances the consumer's cursor position.
+
+- @param handle - The consumer handle.
+- @returns `{T}` The next value in the buffer for this consumer.
+- @throws `{Error}` If the handle is invalid.
+
+ ```typescript
+ if (broadcast.readable(handle)) {
+   const value = broadcast.consume(handle);
+ }
+ ```
+   
+#### `Broadcast.readable(handle: ConsumerHandle): boolean`
+
+ Checks if there are values available for a consumer to read.
+
+- @param handle - The consumer handle.
+- @returns `{boolean}` `true` if there are unread values, `false` otherwise.
+   
+#### `Broadcast[Symbol.asyncIterator](): AsyncIterator`
+#### `Broadcast.dispose(): void`
+#### `Broadcast[Symbol.dispose](): void`
+### `DispatchResult`
 
  Wraps an array of values or promises (typically listener results) and provides batch resolution.
 
 - @template T
  
 
-#### `eventresult.constructor(results: MaybePromise[])`
+#### `DispatchResult.then(onfulfilled?: Fn | null, onrejected?: Fn | null): PromiseLike`
+#### `DispatchResult.all(): Promise`
 
-- @param results - An array of values or Promise-returning listener calls.
+ Resolves all listener results, rejecting if any promise rejects or any ResultError exists.
    
-#### `eventresult.then(onfulfilled, onrejected): PromiseLike`
-#### `eventresult.all(): Promise`
-
- Resolves all listener results, rejecting if any promise rejects.
-
-- @returns `{Promise<T[]>}` A promise that fulfills with an array of all resolved values.
-   
-#### `eventresult.settled(): Promise`
+#### `DispatchResult.settled(): Promise`
 
  Waits for all listener results to settle, regardless of fulfillment or rejection.
-
-- @returns `{Promise<PromiseSettledResult<T>[]>}` A promise that fulfills with an array of each result's settled status and value/reason.
    
 ### `Event`
 
@@ -432,32 +519,48 @@ for await (const data of processQueue) {
 - @template R - The return type of listener functions
  
 
-#### `event.constructor(dispose?: Callback)`
+#### `Event.disposed: boolean`
 
- Creates a new event.
+ Checks if the event has been disposed.
+   
+#### `Event.sink: Fn`
 
-- @param dispose - A function to call on the event disposal.
+ Returns a bound emit function for use as a callback.
+ Useful for passing to other APIs that expect a function.
 
  ```typescript
- // Create a click event.
- const clickEvent = new Event<[x: number, y: number], void>();
- clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
+ const event = new Event<string>();
+ someApi.onMessage(event.sink);
  ```
    
-#### `event.size(): number`
+#### `Event.handleEvent(event: T): void`
+
+ DOM EventListener interface compatibility.
+ Allows the event to be used directly with addEventListener.
+   
+#### `Event.size: number`
 
  The number of listeners for the event.
 
 - @readonly
 - @type `{number}`
    
-#### `event.disposed(): boolean`
+#### `Event.emit(value: T): DispatchResult`
 
- Checks if the event has been disposed.
+ Emits a value to all registered listeners.
+ Each listener is called with the value and their return values are collected.
 
-- @returns `{boolean}` `true` if the event has been disposed; otherwise, `false`.
+- @param value - The value to emit to all listeners.
+- @returns `{DispatchResult<void | R>}` A result object containing all listener return values.
+
+ ```typescript
+ const event = new Event<string, number>();
+ event.on(str => str.length);
+ const result = event.emit('hello');
+ await result.all(); // [5]
+ ```
    
-#### `event.lacks(listener: Listener): boolean`
+#### `Event.lacks(listener: Listener): boolean`
 
  Checks if the given listener is NOT registered for this event.
 
@@ -471,7 +574,7 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `event.has(listener: Listener): boolean`
+#### `Event.has(listener: Listener): boolean`
 
  Checks if the given listener is registered for this event.
 
@@ -485,7 +588,7 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `event.off(listener: Listener): this`
+#### `Event.off(listener: Listener): this`
 
  Removes a specific listener from this event.
 
@@ -497,7 +600,7 @@ for await (const data of processQueue) {
  event.off(myListener);
  ```
    
-#### `event.on(listener: Listener): Unsubscribe`
+#### `Event.on(listener: Listener): Unsubscribe`
 
  Registers a listener that gets triggered whenever the event is emitted.
  This is the primary method for adding event handlers that will react to the event being triggered.
@@ -512,7 +615,7 @@ for await (const data of processQueue) {
  });
  ```
    
-#### `event.once(listener: Listener): Unsubscribe`
+#### `Event.once(listener: Listener): Unsubscribe`
 
  Adds a listener that will be called only once the next time the event is emitted.
  This method is useful for one-time notifications or single-trigger scenarios.
@@ -527,7 +630,7 @@ for await (const data of processQueue) {
  });
  ```
    
-#### `event.clear(): this`
+#### `Event.clear(): this`
 
  Removes all listeners from the event, effectively resetting it. This is useful when you need to
  cleanly dispose of all event handlers to prevent memory leaks or unwanted triggers after certain conditions.
@@ -540,14 +643,17 @@ for await (const data of processQueue) {
  myEvent.clear(); // Clears all listeners
  ```
    
-#### `event.next(): Promise`
+#### `Event.receive(): Promise`
 
  Waits for the next event emission and returns the emitted value.
  This method allows the event to be used as a promise that resolves with the next emitted value.
 
 - @returns `{Promise<T>}` A promise that resolves with the next emitted event value.
    
-#### `event.settle(): Promise`
+#### `Event.then(onfulfilled?: Fn | null, onrejected?: Fn | null): Promise`
+#### `Event.catch(onrejected?: Fn | null): Promise`
+#### `Event.finally(onfinally?: Action | null): Promise`
+#### `Event.settle(): Promise`
 
  Waits for the event to settle, returning a `PromiseSettledResult`.
  Resolves even when the next listener rejects.
@@ -564,27 +670,9 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `event.Symbol.asyncIterator(): AsyncIterator`
-
- Makes this event iterable using `for await...of` loops.
-
-- @returns `{AsyncIterator<T>}` An async iterator that yields values as they are emitted by this event.
- The iterator unsubscribes and aborts internal queues when `return()` is called.
-
- ```typescript
- // Assuming an event that emits numbers
- const numberEvent = new Event<number>();
- (async () => {
-   for await (const num of numberEvent) {
-     console.log('Number:', num);
-   }
- })();
- await numberEvent(1);
- await numberEvent(2);
- await numberEvent(3);
- ```
-   
-#### `event.Symbol.dispose(): void`
+#### `Event[Symbol.asyncIterator](): AsyncIterator`
+#### `Event.dispose(): void`
+#### `Event[Symbol.dispose](): void`
 ### `merge(...events: Events): Event`
 
  Merges multiple events into a single event. This function takes any number of `Event` instances
@@ -676,7 +764,7 @@ for await (const data of processQueue) {
  ```
  
 
-#### `asynciteratorobject.from(iterable: Iterable): AsyncIteratorObject`
+#### `AsyncIteratorObject.from(iterable: Iterable): AsyncIteratorObject`
 
  A wrapper class providing functional operations on async iterables.
  Enables lazy evaluation and chainable transformations on async data streams.
@@ -721,7 +809,7 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `asynciteratorobject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`
+#### `AsyncIteratorObject.merge(...iterables: AsyncIterable[]): AsyncIteratorObject`
 
  Merges multiple async iterables into a single stream.
  Values from all sources are interleaved as they become available.
@@ -741,8 +829,7 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `asynciteratorobject.constructor(iterable: AsyncIterable)`
-#### `asynciteratorobject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`
+#### `AsyncIteratorObject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`
 
  Low-level transformation method using generator functions.
  Allows custom async transformations by providing a generator factory.
@@ -752,14 +839,14 @@ for await (const data of processQueue) {
 - @param signal Optional AbortSignal to cancel the operation
 - @returns A new AsyncIteratorObject with transformed values
    
-#### `asynciteratorobject.awaited(): AsyncIteratorObject`
+#### `AsyncIteratorObject.awaited(): AsyncIteratorObject`
 
  Resolves promise-like values from the source iterator.
  Useful for normalizing values before applying type-guard predicates.
 
 - @returns A new AsyncIteratorObject yielding awaited values
    
-#### `asynciteratorobject.map(callbackfn): AsyncIteratorObject`
+#### `AsyncIteratorObject.map(callbackfn): AsyncIteratorObject`
 
  Transforms each value using a mapping function.
  The callback can be synchronous or return a promise.
@@ -776,9 +863,9 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `asynciteratorobject.filter(predicate): AsyncIteratorObject`
-#### `asynciteratorobject.filter(predicate): AsyncIteratorObject`
-#### `asynciteratorobject.filter(predicate): AsyncIteratorObject`
+#### `AsyncIteratorObject.filter(predicate): AsyncIteratorObject`
+#### `AsyncIteratorObject.filter(predicate): AsyncIteratorObject`
+#### `AsyncIteratorObject.filter(predicate): AsyncIteratorObject`
 
  Filters values based on a predicate function.
  Only values for which the predicate returns truthy are yielded.
@@ -798,24 +885,24 @@ for await (const data of processQueue) {
    
 
 
-#### `asynciteratorobject.take(limit: number): AsyncIteratorObject`
+#### `AsyncIteratorObject.take(limit: number): AsyncIteratorObject`
 
  Creates an iterator whose values are the values from this iterator, stopping once the provided limit is reached.
 - @param limit The maximum number of values to yield.
    
-#### `asynciteratorobject.drop(count: number): AsyncIteratorObject`
+#### `AsyncIteratorObject.drop(count: number): AsyncIteratorObject`
 
  Creates an iterator whose values are the values from this iterator after skipping the provided count.
 - @param count The number of values to drop.
    
-#### `asynciteratorobject.flatMap(callback): AsyncIteratorObject`
+#### `AsyncIteratorObject.flatMap(callback): AsyncIteratorObject`
 
  Creates an iterator whose values are the result of applying the callback to the values from this iterator and then flattening the resulting iterators or iterables.
 - @param callback A function that accepts up to two arguments to be used to transform values from the underlying iterator into new iterators or iterables to be flattened into the result.
    
-#### `asynciteratorobject.reduce(callbackfn): AsyncIteratorObject`
-#### `asynciteratorobject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`
-#### `asynciteratorobject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`
+#### `AsyncIteratorObject.reduce(callbackfn): AsyncIteratorObject`
+#### `AsyncIteratorObject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`
+#### `AsyncIteratorObject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`
 
  Creates an iterator of accumulated values by applying a reducer function.
  Unlike Array.reduce, this returns an iterator that yields each intermediate accumulated value,
@@ -836,7 +923,7 @@ for await (const data of processQueue) {
    
 
 
-#### `asynciteratorobject.expand(callbackfn): AsyncIteratorObject`
+#### `AsyncIteratorObject.expand(callbackfn): AsyncIteratorObject`
 
  Transforms each value into multiple values using an expander function.
  Each input value is expanded into zero or more output values.
@@ -854,76 +941,7 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `asynciteratorobject.Symbol.asyncIterator()`
-### `ListenerRegistry`
-
- A lightweight registry for managing listener functions with stable dispatch order.
-
- Key characteristics:
- - O(1) add/remove/has using an internal Map
- - Snapshot-based dispatch to avoid reallocating arrays when the set is unchanged
- - Supports one-time listeners via `once`
- - Returns booleans for idempotent add/remove operations
-
-- @template P Tuple of argument types passed to listeners
-- @template R Return type of listeners
-
-- @example
- ```typescript
- const registry = new ListenerRegistry<[number], void>();
- const listener = (value: number) => console.log(value);
-
- registry.on(listener);           // true
- registry.on(listener);           // false (already registered)
- registry.dispatch(1);            // calls listener
- registry.off(listener);          // true
- registry.dispatch(2);            // no listeners called
- ```
- 
-
-#### `listenerregistry.size(): number`
-
- The number of listeners currently registered.
-   
-#### `listenerregistry.has(listener: Fn): boolean`
-
- Checks whether the listener is currently registered.
-   
-#### `listenerregistry.lacks(listener: Fn): boolean`
-
- Convenience inverse of `has`.
-   
-#### `listenerregistry.off(listener: Fn): boolean`
-
- Removes a listener if present.
-
-- @returns `true` if removed, `false` if it was not registered.
-   
-#### `listenerregistry.on(listener: Fn): boolean`
-
- Registers a listener if not already present.
-
-- @returns `true` if added, `false` if it was already registered.
-   
-#### `listenerregistry.once(listener: Fn): boolean`
-
- Registers a listener that will automatically unregister after its next dispatch.
-
-- @returns `true` if added, `false` if it was already registered.
-   
-#### `listenerregistry.clear(): void`
-
- Removes all listeners and clears the dispatch snapshot.
-   
-#### `listenerregistry.dispatch(...values: P): Array`
-
- Dispatches to all listeners in snapshot order.
- One-time listeners are removed before invocation.
- Exceptions are captured as rejected promises so dispatch continues.
-
-- @param values Arguments forwarded to each listener.
-- @returns Array of listener results or promises, one per listener.
-   
+#### `AsyncIteratorObject[Symbol.asyncIterator]()`
 ### `Sequence`
 
  A sequence is a FIFO (First-In-First-Out) queue for async consumption.
@@ -950,13 +968,13 @@ for await (const data of processQueue) {
  tasks('task3');
 
  // Consumer: Process tasks in order
- const task1 = await tasks.next(); // 'task1'
- const task2 = await tasks.next(); // 'task2'
- const task3 = await tasks.next(); // 'task3'
+ const task1 = await tasks.receive(); // 'task1'
+ const task2 = await tasks.receive(); // 'task2'
+ const task3 = await tasks.receive(); // 'task3'
  ```
  
 
-#### `sequence.merge(target: Sequence, ...sequences: Sequence[]): void`
+#### `Sequence.merge(target: Sequence, ...sequences: Sequence[]): void`
 
  Merges multiple source sequences into a target sequence.
  Values from all sources are forwarded to the target sequence.
@@ -980,25 +998,16 @@ for await (const data of processQueue) {
  source1(3);
 
  // Consumer gets values as they arrive
- await target.next(); // Could be 1, 2, or 3 depending on timing
+ await target.receive(); // Could be 1, 2, or 3 depending on timing
  ```
    
-#### `sequence.constructor(private readonly abortSignal?: AbortSignal)`
-
- Creates a new Sequence instance.
-- @param abortSignal - Optional AbortSignal to cancel pending operations
-   
-#### `sequence.aborted(): boolean`
-
- Indicates whether the associated AbortSignal has been triggered.
-   
-#### `sequence.size(): number`
+#### `Sequence.size: number`
 
  Returns the number of values currently queued.
 
 - @returns The current queue size
    
-#### `sequence.reserve(capacity: number): Promise`
+#### `Sequence.reserve(capacity: number): Promise`
 
  Waits until the queue size drops to or below the specified capacity.
  Useful for implementing backpressure - producers can wait before adding more items.
@@ -1015,7 +1024,8 @@ for await (const data of processQueue) {
  sequence('new item'); // Safe to add, queue has space
  ```
    
-#### `sequence.next(): Promise`
+#### `Sequence.emit(value: T): boolean`
+#### `Sequence.receive(): Promise`
 
  Consumes and returns the next value from the queue.
  If the queue is empty, waits for a value to be added.
@@ -1027,7 +1037,7 @@ for await (const data of processQueue) {
  const sequence = new Sequence<number>();
 
  // Consumer waits for values
- const valuePromise = sequence.next();
+ const valuePromise = sequence.receive();
 
  // Producer adds value
  sequence(42);
@@ -1036,7 +1046,7 @@ for await (const data of processQueue) {
  const value = await valuePromise; // 42
  ```
    
-#### `sequence.Symbol.dispose(): void`
+#### `Sequence.dispose(): void`
 
  Disposes of the sequence, signaling any waiting consumers.
  Called automatically when used with `using` declaration.
@@ -1060,8 +1070,8 @@ for await (const data of processQueue) {
  const signal = new Signal<string>();
 
  // Multiple consumers wait for the same value
- const promise1 = signal.next();
- const promise2 = signal.next();
+ const promise1 = signal.receive();
+ const promise2 = signal.receive();
 
  // Send a value - both consumers receive it
  signal('Hello World');
@@ -1071,7 +1081,7 @@ for await (const data of processQueue) {
  ```
  
 
-#### `signal.merge(target: Signal, ...signals: Signal[]): void`
+#### `Signal.merge(target: Signal, ...signals: Signal[]): void`
 
  Merges multiple source signals into a target signal.
  Values from any source signal are forwarded to the target signal.
@@ -1097,26 +1107,9 @@ for await (const data of processQueue) {
  const value = await target; // 'Hello'
  ```
    
-#### `signal.constructor(private readonly abortSignal?: AbortSignal)`
-
- Creates a new Signal instance.
-
-- @param abortSignal An optional AbortSignal that can be used to cancel the signal operation.
-
- ```typescript
- // Create a signal with abort capability
- const controller = new AbortController();
- const signal = new Signal<number>(controller.signal);
-
- // Signal can be cancelled
- controller.abort('Operation cancelled');
- ```
+#### `Signal.emit(value: T): boolean`
    
-#### `signal.aborted(): boolean`
-
- Indicates whether the associated AbortSignal has been triggered.
-   
-#### `signal.next(): Promise`
+#### `Signal.receive(): Promise`
 
  Waits for the next value to be sent to this signal. If the signal has been aborted,
  this method will reject with the abort reason.
@@ -1127,7 +1120,7 @@ for await (const data of processQueue) {
  const signal = new Signal<string>();
 
  // Wait for a value
- const valuePromise = signal.next();
+ const valuePromise = signal.receive();
 
  // Send a value from elsewhere
  signal('Hello');
@@ -1135,39 +1128,30 @@ for await (const data of processQueue) {
  const value = await valuePromise; // 'Hello'
  ```
    
-#### `signal.Symbol.dispose(): void`
+#### `Signal.dispose(): void`
+### `abortableIterable(iterable: AsyncIterable, signal: AbortSignal): AsyncIterable`
 
- Disposes of the signal, cleaning up any pending promise resolvers.
- This method is called automatically when the signal is used with a `using` declaration.
-   
-### `AbortableIterator`
+ Wraps an async iterable with abort signal support.
+ Each iteration creates a fresh iterator with scoped abort handling.
+ Listener is added at iteration start and removed on completion/abort/return/throw.
 
- Wraps an async iterator with abort signal support.
- When the signal is aborted, iteration terminates gracefully.
 - @template T - The yielded value type
 - @template TReturn - The return value type
 - @template TNext - The type passed to next()
- 
+- @param iterable - The source async iterable to wrap
+- @param signal - AbortSignal to cancel iteration
+- @returns An async iterable with abort support
 
-#### `abortableiterator.constructor(iterator: AsyncIterator, signal?: AbortSignal)`
-#### `abortableiterator.next(...args: [] | [TNext]): Promise`
-#### `abortableiterator.return(value?: TReturn): Promise`
-#### `abortableiterator.throw(error: unknown): Promise`
-#### `abortableiterator.Symbol.asyncIterator(): AsyncIterator`
-### `noop()`
+- @example
+ ```typescript
+ const controller = new AbortController();
+ const source = async function*() { yield 1; yield 2; yield 3; };
 
- A no-operation function. Useful as a default callback or placeholder.
- 
-### `mapIterator(iterator: AnyIterator, map: MapNext): AsyncIterator`
-
- Wraps an iterator with a mapping function applied to each result.
-- @template U - The output value type
-- @template T - The input value type
-- @template TReturn - The iterator return type
-- @template TNext - The type passed to next()
-- @param iterator - The source iterator to wrap
-- @param map - The mapping function to apply to each result
-- @returns An async iterator with mapped results
+ for await (const value of abortableIterable(source(), controller.signal)) {
+   console.log(value);
+   if (value === 2) controller.abort();
+ }
+ ```
  
 ### `iterate(startOrCount?: number, countWhenTwoArgs?: number, step: number = 1): Iterable`
 
@@ -1216,15 +1200,6 @@ for await (const data of processQueue) {
    console.log(value); // 1, 2, 3, 4, 5
  }
  ```
- 
-### `mergeIterables(...iterables: AsyncIterable[]): AsyncIterable`
-
- Merges multiple async iterables into a single stream.
- Values are yielded as they become available from any source.
- Completes when all sources complete; aborts all on error.
-- @template T - The value type yielded by all iterables
-- @param iterables - The async iterables to merge
-- @returns A merged async iterable
  
 
 ## License

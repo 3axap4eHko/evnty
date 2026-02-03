@@ -9,6 +9,7 @@ interface Member {
   args: string[]
   returnType: string;
   docs: string[];
+  kind: 'method' | 'get' | 'set';
 }
 
 interface Namespace {
@@ -83,6 +84,9 @@ class ASTVisitor {
       case AST_NODE_TYPES.VariableDeclaration: {
         this.visitVariableDeclaration(n.declaration);
       } break;
+      case AST_NODE_TYPES.FunctionDeclaration: {
+        this.visitFunctionDeclaration(n.declaration);
+      } break;
       default: {
         console.error(n.declaration?.type);
       };
@@ -114,12 +118,23 @@ class ASTVisitor {
         this.docs[0].members.get(name)?.push({
           ...this.getFunctionExpressionDoc(n.init),
           docs: this.getNodeComments(n),
+          kind: 'method',
         })
       } break;
     }
     this.setLastNode(n);
   }
   visitTSInterfaceDeclaration(n: TSESTree.TSInterfaceDeclaration) {
+    this.setLastNode(n);
+  }
+  visitFunctionDeclaration(n: TSESTree.FunctionDeclaration) {
+    const name = n.id?.name ?? '';
+    this.docs[0].members.set(name, []);
+    this.docs[0].members.get(name)?.push({
+      ...this.getFunctionExpressionDoc(n),
+      docs: this.getNodeComments(n),
+      kind: 'method',
+    });
     this.setLastNode(n);
   }
   visitClassDeclaration(n: TSESTree.ClassDeclaration) {
@@ -152,7 +167,7 @@ class ASTVisitor {
     this.setLastNode(n);
   }
 
-  getFunctionExpressionDoc(n: TSESTree.FunctionExpression | TSESTree.TSEmptyBodyFunctionExpression | TSESTree.ArrowFunctionExpression) {
+  getFunctionExpressionDoc(n: TSESTree.FunctionExpression | TSESTree.TSEmptyBodyFunctionExpression | TSESTree.ArrowFunctionExpression | TSESTree.FunctionDeclaration) {
     return {
       args: n.params.map(param => {
         try {
@@ -182,6 +197,10 @@ class ASTVisitor {
   }
 
   visitMethodDefinition(n: TSESTree.MethodDefinition) {
+    if (n.kind === 'constructor') {
+      this.setLastNode(n);
+      return;
+    }
     let name = ``;
     switch (n.key.type) {
       case AST_NODE_TYPES.Identifier: {
@@ -194,6 +213,9 @@ class ASTVisitor {
         if (n.key.property.type === AST_NODE_TYPES.Identifier) {
           name += `.${n.key.property.name}`;
         }
+        if (name.startsWith('Symbol.')) {
+          name = `[${name}]`;
+        }
       } break;
     }
     const members = this.docs[this.docs.length - 1].members;
@@ -203,6 +225,7 @@ class ASTVisitor {
     members.get(name)?.push({
       ...this.getFunctionExpressionDoc(n.value),
       docs: this.getNodeComments(n),
+      kind: n.kind === 'get' ? 'get' : n.kind === 'set' ? 'set' : 'method',
     });
     this.setLastNode(n);
   }
@@ -228,7 +251,7 @@ for (const file of files) {
 
   for (const doc of visitor.docs.filter(doc => doc.docs.every(doc => !doc.includes('@internal')))) {
     const level = doc.name === `` ? 0 : 1;
-    const header =  `#`.repeat(level + 2);
+    const header = `#`.repeat(level + 2);
     const padding = ` `.repeat(level * 2);
     const namespace = normalize(doc.name);
     if (level !== 0) {
@@ -244,9 +267,12 @@ for (const file of files) {
     for (const [name, members] of doc.members.entries()) {
       if (members.every(member => member.docs.every(doc => !doc.includes('@internal')))) {
         for (const member of members) {
-          let title = `${name}(${member.args.join(', ')})${member.returnType}`;
-          if (namespace) {
-            title = `${namespace}.${title}`;
+          let title = member.kind === 'get'
+            ? `${name}${member.returnType}`
+            : `${name}(${member.args.join(', ')})${member.returnType}`;
+          if (doc.name) {
+            const separator = name.startsWith('[') ? '' : '.';
+            title = `${doc.name}${separator}${title}`;
           }
           contents.push(`${padding}- [\`${title}\`](#${normalize(title)})`);
           docs.push(`${header}# \`${title}\``);

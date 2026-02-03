@@ -1,4 +1,4 @@
-import { CallableAsyncIterator } from './callable.js';
+import { Async } from './async.js';
 import { Signal } from './signal.js';
 import { RingBuffer } from './ring-buffer.js';
 
@@ -27,15 +27,15 @@ import { RingBuffer } from './ring-buffer.js';
  * tasks('task3');
  *
  * // Consumer: Process tasks in order
- * const task1 = await tasks.next(); // 'task1'
- * const task2 = await tasks.next(); // 'task2'
- * const task3 = await tasks.next(); // 'task3'
+ * const task1 = await tasks.receive(); // 'task1'
+ * const task2 = await tasks.receive(); // 'task2'
+ * const task3 = await tasks.receive(); // 'task3'
  * ```
  */
-export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
-  private queue: RingBuffer<T>;
-  private nextSignal: Signal<void>;
-  private sendSignal: Signal<void>;
+export class Sequence<T> extends Async<T, boolean> {
+  #queue: RingBuffer<T>;
+  #nextSignal: Signal<void>;
+  #sendSignal: Signal<void>;
 
   readonly [Symbol.toStringTag] = 'Sequence';
 
@@ -62,21 +62,22 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * source1(3);
    *
    * // Consumer gets values as they arrive
-   * await target.next(); // Could be 1, 2, or 3 depending on timing
+   * await target.receive(); // Could be 1, 2, or 3 depending on timing
    * ```
    */
   static merge<T>(target: Sequence<T>, ...sequences: Sequence<T>[]): void {
     for (const source of sequences) {
       queueMicrotask(async () => {
-        if (!target.aborted)
+        if (!target.disposed)
           try {
+            const sink = target.sink;
             for await (const value of source) {
-              if (!target(value)) {
+              if (!sink(value)) {
                 return;
               }
             }
           } catch {
-            // sequence is aborted
+            // sequence is disposed
           }
       });
     }
@@ -86,27 +87,11 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * Creates a new Sequence instance.
    * @param abortSignal - Optional AbortSignal to cancel pending operations
    */
-  constructor(private readonly abortSignal?: AbortSignal) {
-    super((value: T) => {
-      if (this.abortSignal?.aborted) {
-        this.nextSignal();
-        return false;
-      } else {
-        this.queue.push(value);
-        this.nextSignal();
-        return true;
-      }
-    });
-    this.queue = new RingBuffer();
-    this.nextSignal = new Signal(this.abortSignal);
-    this.sendSignal = new Signal(this.abortSignal);
-  }
-
-  /**
-   * Indicates whether the associated AbortSignal has been triggered.
-   */
-  get aborted(): boolean {
-    return !!this.abortSignal?.aborted;
+  constructor(abortSignal?: AbortSignal) {
+    super(abortSignal);
+    this.#queue = new RingBuffer();
+    this.#nextSignal = new Signal(abortSignal);
+    this.#sendSignal = new Signal(abortSignal);
   }
 
   /**
@@ -115,7 +100,7 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * @returns The current queue size
    */
   get size(): number {
-    return this.queue.length;
+    return this.#queue.length;
   }
 
   /**
@@ -135,9 +120,18 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * ```
    */
   async reserve(capacity: number): Promise<void> {
-    while (this.queue.length > capacity) {
-      await this.sendSignal;
+    while (this.#queue.length > capacity) {
+      await this.#sendSignal;
     }
+  }
+
+  emit(value: T): boolean {
+    const ok = !this.disposed;
+    if (ok) {
+      this.#queue.push(value);
+    }
+    this.#nextSignal.emit();
+    return ok;
   }
 
   /**
@@ -151,7 +145,7 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * const sequence = new Sequence<number>();
    *
    * // Consumer waits for values
-   * const valuePromise = sequence.next();
+   * const valuePromise = sequence.receive();
    *
    * // Producer adds value
    * sequence(42);
@@ -160,20 +154,20 @@ export class Sequence<T> extends CallableAsyncIterator<T, boolean> {
    * const value = await valuePromise; // 42
    * ```
    */
-  async next(): Promise<T> {
-    while (!this.queue.length) {
-      await this.nextSignal;
+  async receive(): Promise<T> {
+    while (!this.#queue.length) {
+      await this.#nextSignal;
     }
-    this.sendSignal();
-    return this.queue.shift()!;
+    this.#sendSignal.emit();
+    return this.#queue.shift()!;
   }
 
   /**
    * Disposes of the sequence, signaling any waiting consumers.
    * Called automatically when used with `using` declaration.
    */
-  [Symbol.dispose](): void {
-    this.sendSignal[Symbol.dispose]();
-    this.nextSignal[Symbol.dispose]();
+  dispose(): void {
+    this.#sendSignal.dispose();
+    this.#nextSignal.dispose();
   }
 }

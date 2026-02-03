@@ -10,6 +10,7 @@ export class RingBuffer<T> {
   #tail = 0;
   #mask: number;
   #length = 0;
+  #shiftCount = 0;
 
   readonly [Symbol.toStringTag] = 'RingBuffer';
 
@@ -45,6 +46,22 @@ export class RingBuffer<T> {
    */
   get length(): number {
     return this.#length;
+  }
+
+  /**
+   * Logical position of the buffer's left edge (total items ever shifted).
+   * Monotonically increasing - useful for cursor-based consumers.
+   */
+  get left(): number {
+    return this.#shiftCount;
+  }
+
+  /**
+   * Logical position of the buffer's right edge (left + length).
+   * Represents the next logical index for push.
+   */
+  get right(): number {
+    return this.#shiftCount + this.#length;
   }
 
   /**
@@ -120,6 +137,25 @@ export class RingBuffer<T> {
   }
 
   /**
+   * Returns the value at the given index without removing it.
+   * Index 0 is the head, index length-1 is the tail.
+   */
+  peek(index: number): T | undefined {
+    if (index < 0 || index >= this.#length) {
+      return undefined;
+    }
+    return this.#buffer[(this.#head + index) & this.#mask];
+  }
+
+  /**
+   * Returns the value at the given logical index without removing it.
+   * Logical index is based on total push/shift history (cursor-friendly).
+   */
+  peekAt(logicalIndex: number): T | undefined {
+    return this.peek(logicalIndex - this.#shiftCount);
+  }
+
+  /**
    * Removes and returns the value at the head, or undefined if empty.
    */
   shift(): T | undefined {
@@ -130,7 +166,22 @@ export class RingBuffer<T> {
     this.#buffer[this.#head] = undefined;
     this.#head = (this.#head + 1) & this.#mask;
     this.#length--;
+    this.#shiftCount++;
     return value;
+  }
+
+  /**
+   * Removes n values from the head.
+   */
+  shiftN(n: number): number {
+    const count = Math.min(n, this.#length);
+    for (let i = 0; i < count; i++) {
+      this.#buffer[this.#head] = undefined;
+      this.#head = (this.#head + 1) & this.#mask;
+    }
+    this.#length -= count;
+    this.#shiftCount += count;
+    return count;
   }
 
   /**
@@ -157,6 +208,7 @@ export class RingBuffer<T> {
     this.#head = 0;
     this.#tail = 0;
     this.#length = 0;
+    this.#shiftCount = 0;
     this.#mask = capacity - 1;
     return this;
   }
