@@ -12,7 +12,7 @@
   },
   "files": [
     "build",
-    "src/index.ts",
+    "src/*.ts",
     "src/__tests__/example.js"
   ],
   "sideEffects": false,
