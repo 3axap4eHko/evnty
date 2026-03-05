@@ -27,7 +27,7 @@
     "docs:gen": "node ./scripts/docgen.ts src/*.ts",
     "docs:update-package": "pnpm dlx vp-update",
     "bench": "overtake src/__bench__/event.ts",
-    "prepare": "husky"
+    "prepare": "git config core.hooksPath .githooks"
   },
   "repository": {
     "type": "git",
@@ -78,7 +78,6 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "evnty": "^5.0.0",
-    "husky": "^9.1.7",
     "inop": "^0.9.0",
     "overtake": "1.3.2",
     "prettier": "^3.8.1",
