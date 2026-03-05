@@ -263,7 +263,6 @@ for await (const data of processQueue) {
 ## License
 
 License [The MIT License](./LICENSE)
-Copyright (c) 2025 Ivan Zakharchanka
 
 [npm-url]: https://www.npmjs.com/package/evnty
 [downloads-image]: https://img.shields.io/npm/dw/evnty.svg?maxAge=43200
