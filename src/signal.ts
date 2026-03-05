@@ -1,31 +1,20 @@
 import { Async } from './async.js';
 
 /**
- * A signal is a broadcast async primitive for coordinating between producers and consumers.
- * When a value is sent, ALL waiting consumers receive the same value (broadcast pattern).
- * Signals can be reused - each call to next() creates a new promise for the next value.
- *
- * Key characteristics:
- * - Multiple consumers can wait simultaneously
- * - All waiting consumers receive the same value when sent
- * - Reusable - can send multiple values over time
- * - Supports async iteration for continuous value streaming
+ * Promise-based async coordination primitive.
+ * `emit()` resolves the pending `receive()` promise (shared across callers).
+ * Reusable - after each emission a new round of `receive()` calls can be made.
+ * Disposable via `[Symbol.dispose]()` or an optional AbortSignal.
  *
  * @template T The type of value that this signal carries.
  *
+ * @example
  * ```typescript
- * // Create a signal for string values
  * const signal = new Signal<string>();
  *
- * // Multiple consumers wait for the same value
- * const promise1 = signal.receive();
- * const promise2 = signal.receive();
- *
- * // Send a value - both consumers receive it
- * signal('Hello World');
- *
- * const [value1, value2] = await Promise.all([promise1, promise2]);
- * console.log(value1 === value2); // true - both got 'Hello World'
+ * const promise = signal.receive();
+ * signal.emit('hello');
+ * await promise; // 'hello'
  * ```
  */
 export class Signal<T> extends Async<T, boolean> {
@@ -35,15 +24,16 @@ export class Signal<T> extends Async<T, boolean> {
 
   /**
    * Merges multiple source signals into a target signal.
-   * Values from any source signal are forwarded to the target signal.
-   * The merge continues until the target signal is aborted.
+   * Values from any source signal are emitted to the target signal.
+   * The merge continues until the target signal is disposed.
    *
-   * Note: When the target is aborted, iteration stops after the next value
-   * from each source. For immediate cleanup, abort source signals directly.
+   * Note: When the target is disposed, iteration stops after the next value
+   * from each source. For immediate cleanup, dispose source signals directly.
    *
    * @param target The signal that will receive values from all sources
    * @param signals The source signals to merge from
    *
+   * @example
    * ```typescript
    * // Create a target signal and source signals
    * const target = new Signal<string>();
@@ -54,8 +44,9 @@ export class Signal<T> extends Async<T, boolean> {
    * Signal.merge(target, source1, source2);
    *
    * // Values from any source appear in target
-   * source1('Hello');
-   * const value = await target; // 'Hello'
+   * const promise = target.receive();
+   * source1.emit('Hello');
+   * const value = await promise; // 'Hello'
    * ```
    */
   static merge<T>(target: Signal<T>, ...signals: Signal<T>[]): void {
@@ -83,6 +74,7 @@ export class Signal<T> extends Async<T, boolean> {
    *
    * @param abortSignal An optional AbortSignal that can be used to cancel the signal operation.
    *
+   * @example
    * ```typescript
    * // Create a signal with abort capability
    * const controller = new AbortController();
@@ -97,24 +89,25 @@ export class Signal<T> extends Async<T, boolean> {
   }
 
   /**
+   * Sends a value to the waiting receiver, if any.
    *
+   * @param value - The value to send.
+   * @returns `true` if the value was emitted.
    */
   emit(value: T): boolean {
-    if (this.#rx && !this.disposed) {
-      this.#rx.resolve(value);
-      this.#rx = undefined;
-      return true;
-    }
-
-    return false;
+    if (!this.#rx) return false;
+    this.#rx.resolve(value);
+    this.#rx = undefined;
+    return true;
   }
 
   /**
-   * Waits for the next value to be sent to this signal. If the signal has been aborted,
-   * this method will reject with the abort reason.
+   * Waits for the next value to be sent to this signal. If the signal has been aborted
+   * or disposed, this method rejects with Error('Disposed').
    *
    * @returns A promise that resolves with the next value sent to the signal.
    *
+   * @example
    * ```typescript
    * const signal = new Signal<string>();
    *
@@ -122,7 +115,7 @@ export class Signal<T> extends Async<T, boolean> {
    * const valuePromise = signal.receive();
    *
    * // Send a value from elsewhere
-   * signal('Hello');
+   * signal.emit('Hello');
    *
    * const value = await valuePromise; // 'Hello'
    * ```
@@ -131,9 +124,7 @@ export class Signal<T> extends Async<T, boolean> {
     if (this.disposed) {
       return Promise.reject(new Error('Disposed'));
     }
-    if (!this.#rx) {
-      this.#rx = Promise.withResolvers<T>();
-    }
+    this.#rx ??= Promise.withResolvers<T>();
     return this.#rx.promise;
   }
 

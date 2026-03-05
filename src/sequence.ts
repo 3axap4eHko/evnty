@@ -6,7 +6,7 @@ import { RingBuffer } from './ring-buffer.js';
  * A sequence is a FIFO (First-In-First-Out) queue for async consumption.
  * Designed for single consumer with multiple producers pattern.
  * Values are queued and consumed in order, with backpressure support.
- * Respects an optional AbortSignal: enqueue returns false when aborted; waits reject.
+ * Respects an optional AbortSignal: emit() returns false when aborted; waits reject.
  *
  * Key characteristics:
  * - Single consumer - values are consumed once, in order
@@ -17,14 +17,15 @@ import { RingBuffer } from './ring-buffer.js';
  *
  * @template T The type of values in the sequence.
  *
+ * @example
  * ```typescript
  * // Create a sequence for processing tasks
  * const tasks = new Sequence<string>();
  *
  * // Producer: Add tasks to the queue
- * tasks('task1');
- * tasks('task2');
- * tasks('task3');
+ * tasks.emit('task1');
+ * tasks.emit('task2');
+ * tasks.emit('task3');
  *
  * // Consumer: Process tasks in order
  * const task1 = await tasks.receive(); // 'task1'
@@ -47,6 +48,7 @@ export class Sequence<T> extends Async<T, boolean> {
    * @param target The sequence that will receive values from all sources
    * @param sequences The source sequences to merge from
    *
+   * @example
    * ```typescript
    * // Create target and source sequences
    * const target = new Sequence<number>();
@@ -57,9 +59,9 @@ export class Sequence<T> extends Async<T, boolean> {
    * Sequence.merge(target, source1, source2);
    *
    * // Values from both sources appear in target
-   * source1(1);
-   * source2(2);
-   * source1(3);
+   * source1.emit(1);
+   * source2.emit(2);
+   * source1.emit(3);
    *
    * // Consumer gets values as they arrive
    * await target.receive(); // Could be 1, 2, or 3 depending on timing
@@ -110,13 +112,14 @@ export class Sequence<T> extends Async<T, boolean> {
    * @param capacity The maximum queue size to wait for
    * @returns A promise that resolves when the queue size is at or below capacity
    *
+   * @example
    * ```typescript
    * // Producer with backpressure control
    * const sequence = new Sequence<string>();
    *
    * // Wait if queue has more than 10 items
    * await sequence.reserve(10);
-   * sequence('new item'); // Safe to add, queue has space
+   * sequence.emit('new item'); // Safe to add, queue has space
    * ```
    */
   async reserve(capacity: number): Promise<void> {
@@ -125,6 +128,12 @@ export class Sequence<T> extends Async<T, boolean> {
     }
   }
 
+  /**
+   * Pushes a value onto the queue. Wakes any pending `receive()` waiter.
+   *
+   * @param value - The value to enqueue.
+   * @returns `true` if the sequence is still active.
+   */
   emit(value: T): boolean {
     const ok = !this.disposed;
     if (ok) {
@@ -138,9 +147,11 @@ export class Sequence<T> extends Async<T, boolean> {
    * Consumes and returns the next value from the queue.
    * If the queue is empty, waits for a value to be added.
    * Values are consumed in FIFO order.
+   * If the sequence has been aborted or disposed, this method rejects with Error('Disposed').
    *
    * @returns A promise that resolves with the next value
    *
+   * @example
    * ```typescript
    * const sequence = new Sequence<number>();
    *
@@ -148,7 +159,7 @@ export class Sequence<T> extends Async<T, boolean> {
    * const valuePromise = sequence.receive();
    *
    * // Producer adds value
-   * sequence(42);
+   * sequence.emit(42);
    *
    * // Consumer receives it
    * const value = await valuePromise; // 42
@@ -163,11 +174,11 @@ export class Sequence<T> extends Async<T, boolean> {
   }
 
   /**
-   * Disposes of the sequence, signaling any waiting consumers.
-   * Called automatically when used with `using` declaration.
+   * Disposes of the sequence, rejecting any pending `receive()` waiters.
+   * Called by `[Symbol.dispose]()` (inherited from Async) when using the `using` declaration.
    */
   dispose(): void {
-    this.#sendSignal.dispose();
-    this.#nextSignal.dispose();
+    this.#sendSignal[Symbol.dispose]();
+    this.#nextSignal[Symbol.dispose]();
   }
 }

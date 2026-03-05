@@ -42,7 +42,7 @@ clickEvent.on(({ x, y }) => console.log(`Click at ${x},${y}`));
 clickEvent.on(({ x, y }) => updateUI(x, y));
 
 // All listeners receive the value
-clickEvent({ x: 100, y: 200 });
+clickEvent.emit({ x: 100, y: 200 });
 ```
 
 **Use Event when:**
@@ -57,11 +57,11 @@ Signals are for coordinating async operations. When a value is sent, ALL waiting
 const signal = new Signal<string>();
 
 // Multiple consumers can wait
-const promise1 = signal.next();
-const promise2 = signal.next();
+const promise1 = signal.receive();
+const promise2 = signal.receive();
 
 // Send value - all waiting consumers receive it
-signal('data');
+signal.emit('data');
 const [result1, result2] = await Promise.all([promise1, promise2]);
 // result1 === 'data' && result2 === 'data'
 ```
@@ -78,9 +78,9 @@ Sequences are FIFO queues for single-consumer scenarios. Values are consumed in 
 const taskQueue = new Sequence<Task>();
 
 // Producer adds tasks
-taskQueue(task1);
-taskQueue(task2);
-taskQueue(task3);
+taskQueue.emit(task1);
+taskQueue.emit(task2);
+taskQueue.emit(task3);
 
 // Single consumer processes in order
 for await (const task of taskQueue) {
@@ -100,7 +100,7 @@ for await (const task of taskQueue) {
 | **Consumers** | Multiple persistent listeners | Multiple one-time receivers | Single consumer |
 | **Delivery** | All listeners called | All waiting get same value | Each value consumed once |
 | **Pattern** | Pub/Sub | Broadcast coordination | Queue/Stream |
-| **Persistence** | Listeners stay registered | Resolves once per `next()` | Values queued until consumed |
+| **Persistence** | Listeners stay registered | Resolves once per `receive()` | Values queued until consumed |
 
 ## Motivation
 
@@ -174,7 +174,7 @@ userEvent.on(user => updateUI(user));
 userEvent.on(user => saveToCache(user));
 
 // Emit - all listeners are called
-userEvent({ id: 1, name: 'Alice' });
+userEvent.emit({ id: 1, name: 'Alice' });
 
 // One-time listener
 userEvent.once(user => console.log('First user only:', user));
@@ -194,12 +194,12 @@ const dataSignal = new Signal<Buffer>();
 
 // Multiple operations wait for the same data
 async function processA() {
-  const data = await dataSignal.next();
+  const data = await dataSignal.receive();
   // Process data in way A
 }
 
 async function processB() {
-  const data = await dataSignal.next();
+  const data = await dataSignal.receive();
   // Process data in way B
 }
 
@@ -207,7 +207,7 @@ async function processB() {
 Promise.all([processA(), processB()]);
 
 // Both receive the same data when it arrives
-dataSignal(Buffer.from('shared data'));
+dataSignal.emit(Buffer.from('shared data'));
 ```
 
 ### Sequence - Task Queue
@@ -226,13 +226,13 @@ const taskQueue = new Sequence<() => Promise<void>>();
 })();
 
 // Multiple producers add tasks
-taskQueue(async () => fetchData());
-taskQueue(async () => processData());
-taskQueue(async () => saveResults());
+taskQueue.emit(async () => fetchData());
+taskQueue.emit(async () => processData());
+taskQueue.emit(async () => saveResults());
 
 // Backpressure control
 await taskQueue.reserve(10); // Wait until queue has ≤10 items
-taskQueue(async () => nonUrgentTask());
+taskQueue.emit(async () => nonUrgentTask());
 ```
 
 ### Combining Primitives
@@ -243,14 +243,14 @@ const responseSignal = new Signal<Response>();
 
 requestEvent.on(async (req) => {
   const response = await handleRequest(req);
-  responseSignal(response);
+  responseSignal.emit(response);
 });
 
 // Event + Sequence for buffered processing
 const dataEvent = createEvent<Data>();
 const processQueue = new Sequence<Data>();
 
-dataEvent.on(data => processQueue(data));
+dataEvent.on(data => processQueue.emit(data));
 
 // Process with controlled concurrency
 for await (const data of processQueue) {

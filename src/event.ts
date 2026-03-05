@@ -31,20 +31,14 @@ export class EventIterator<T> implements AsyncIterator<T, void, void> {
 }
 
 /**
- * A class representing a multi-listener event emitter with async support.
- * Events allow multiple listeners to react to emitted values, with each listener
- * potentially returning a result. All listeners are called for each emission.
- *
- * Key characteristics:
- * - Multiple listeners - all are called for each emission
- * - Listeners can return values collected in EventResult
- * - Supports async listeners and async iteration
- * - Provides lifecycle hooks for listener management
- * - Memory efficient using RingBuffer for storage
+ * Multi-listener event emitter with async support.
+ * All registered listeners are called for each emission, and their return
+ * values are collected in a DispatchResult. Supports async iteration and
+ * an `onDispose` callback for cleanup.
  *
  * Differs from:
- * - Signal: Events have multiple persistent listeners vs Signal's one-time resolution per consumer
- * - Sequence: Events broadcast to all listeners vs Sequence's single consumer queue
+ * - Signal: Event has persistent listeners; Signal is promise-based (receive per round)
+ * - Sequence: Event broadcasts to all listeners; Sequence is a single-consumer queue
  *
  * @template T - The type of value emitted to listeners (event payload)
  * @template R - The return type of listener functions
@@ -53,7 +47,7 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   #listeners = new ListenerRegistry<[T], R | void>();
   #signal = new Signal<T>();
   #disposer: Disposer;
-  #disposeCallback?: Callback;
+  #onDispose?: Callback;
   #sink?: Fn<[T], DispatchResult<void | R>>;
 
   readonly [Symbol.toStringTag] = 'Event';
@@ -61,30 +55,26 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   /**
    * Creates a new event.
    *
-   * @param dispose - A function to call on the event disposal.
+   * @param onDispose - A function to call on the event disposal.
    *
+   * @example
    * ```typescript
    * // Create a click event.
    * const clickEvent = new Event<[x: number, y: number], void>();
    * clickEvent.on(([x, y]) => console.log(`Clicked at ${x}, ${y}`));
+   * clickEvent.emit([10, 20]);
    * ```
    */
-  constructor(dispose?: Callback) {
+  constructor(onDispose?: Callback) {
+    this.#onDispose = onDispose;
     this.#disposer = new Disposer(this);
-    this.#disposeCallback = dispose;
-  }
-
-  /**
-   * Checks if the event has been disposed.
-   */
-  get disposed(): boolean {
-    return this.#disposer.disposed;
   }
 
   /**
    * Returns a bound emit function for use as a callback.
    * Useful for passing to other APIs that expect a function.
    *
+   * @example
    * ```typescript
    * const event = new Event<string>();
    * someApi.onMessage(event.sink);
@@ -104,9 +94,6 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
 
   /**
    * The number of listeners for the event.
-   *
-   * @readonly
-   * @type {number}
    */
   get size(): number {
     return this.#listeners.size;
@@ -117,8 +104,9 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
    * Each listener is called with the value and their return values are collected.
    *
    * @param value - The value to emit to all listeners.
-   * @returns {DispatchResult<void | R>} A result object containing all listener return values.
+   * @returns A DispatchResult containing all listener return values.
    *
+   * @example
    * ```typescript
    * const event = new Event<string, number>();
    * event.on(str => str.length);
@@ -135,8 +123,9 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
    * Checks if the given listener is NOT registered for this event.
    *
    * @param listener - The listener function to check against the registered listeners.
-   * @returns {boolean} `true` if the listener is not already registered; otherwise, `false`.
+   * @returns `true` if the listener is not already registered; otherwise, `false`.
    *
+   * @example
    * ```typescript
    * // Check if a listener is not already added
    * if (event.lacks(myListener)) {
@@ -152,8 +141,9 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
    * Checks if the given listener is registered for this event.
    *
    * @param listener - The listener function to check.
-   * @returns {boolean} `true` if the listener is currently registered; otherwise, `false`.
+   * @returns `true` if the listener is currently registered; otherwise, `false`.
    *
+   * @example
    * ```typescript
    * // Verify if a listener is registered
    * if (event.has(myListener)) {
@@ -169,8 +159,9 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
    * Removes a specific listener from this event.
    *
    * @param listener - The listener to remove.
-   * @returns {this} The event instance, allowing for method chaining.
+   * @returns The event instance for chaining.
    *
+   * @example
    * ```typescript
    * // Remove a listener
    * event.off(myListener);
@@ -182,14 +173,13 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   }
 
   /**
-   * Registers a listener that gets triggered whenever the event is emitted.
-   * This is the primary method for adding event handlers that will react to the event being triggered.
+   * Registers a listener that is called on every emission.
    *
    * @param listener - The function to call when the event occurs.
-   * @returns {Unsubscribe} An object that can be used to unsubscribe the listener, ensuring easy cleanup.
+   * @returns A function that removes this listener when called.
    *
+   * @example
    * ```typescript
-   * // Add a listener to an event
    * const unsubscribe = event.on((data) => {
    *   console.log('Event data:', data);
    * });
@@ -201,15 +191,14 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   }
 
   /**
-   * Adds a listener that will be called only once the next time the event is emitted.
-   * This method is useful for one-time notifications or single-trigger scenarios.
+   * Registers a listener that is called only once on the next emission, then auto-removed.
    *
    * @param listener - The listener to trigger once.
-   * @returns {Unsubscribe} An object that can be used to remove the listener if the event has not yet occurred.
+   * @returns A function that removes this listener when called (if it hasn't fired yet).
    *
+   * @example
    * ```typescript
-   * // Register a one-time listener
-   * const onceUnsubscribe = event.once((data) => {
+   * const cancel = event.once((data) => {
    *   console.log('Received data once:', data);
    * });
    * ```
@@ -220,16 +209,10 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   }
 
   /**
-   * Removes all listeners from the event, effectively resetting it. This is useful when you need to
-   * cleanly dispose of all event handlers to prevent memory leaks or unwanted triggers after certain conditions.
+   * Removes all listeners from the event.
+   * Does not dispose the event - new listeners can still be added after clearing.
    *
-   * @returns {this} The instance of the event, allowing for method chaining.
-   *
-   * ```typescript
-   * const myEvent = new Event();
-   * myEvent.on(data => console.log(data));
-   * myEvent.clear(); // Clears all listeners
-   * ```
+   * @returns The event instance for chaining.
    */
   clear(): this {
     this.#listeners.clear();
@@ -237,15 +220,11 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   }
 
   /**
-   * Waits for the next event emission and returns the emitted value.
-   * This method allows the event to be used as a promise that resolves with the next emitted value.
+   * Waits for the next emission and returns the emitted value.
    *
-   * @returns {Promise<T>} A promise that resolves with the next emitted event value.
+   * @returns A promise that resolves with the next emitted value.
    */
   receive(): Promise<T> {
-    if (this.disposed) {
-      return Promise.reject(new Error('Event disposed'));
-    }
     return this.#signal.receive();
   }
 
@@ -262,18 +241,18 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   }
 
   /**
-   * Waits for the event to settle, returning a `PromiseSettledResult`.
-   * Resolves even when the next listener rejects.
+   * Waits for the next emission via `receive()` and wraps the outcome in a
+   * `PromiseSettledResult` - always resolves, never rejects.
    *
-   * @returns {Promise<PromiseSettledResult<T>>} A promise that resolves with the settled result.
+   * @returns A promise that resolves with the settled result.
    *
    * @example
    * ```typescript
    * const result = await event.settle();
    * if (result.status === 'fulfilled') {
-   *   console.log('Event fulfilled with value:', result.value);
+   *   console.log('Value:', result.value);
    * } else {
-   *   console.error('Event rejected with reason:', result.reason);
+   *   console.error('Reason:', result.reason);
    * }
    * ```
    */
@@ -293,10 +272,11 @@ export class Event<T = unknown, R = unknown> implements Emitter<T, DispatchResul
   }
 
   [Symbol.dispose](): void {
-    this.#disposer.handleEvent();
-    this.#signal[Symbol.dispose]();
-    this.#listeners.clear();
-    void this.#disposeCallback?.();
+    if (this.#disposer[Symbol.dispose]()) {
+      this.#signal[Symbol.dispose]();
+      this.#listeners.clear();
+      void this.#onDispose?.();
+    }
   }
 }
 
@@ -309,18 +289,14 @@ export type AllEventsParameters<T extends Event<any, any>[]> = { [K in keyof T]:
 export type AllEventsResults<T extends Event<any, any>[]> = { [K in keyof T]: EventReturn<T[K]> }[number];
 
 /**
- * Merges multiple events into a single event. This function takes any number of `Event` instances
- * and returns a new `Event` that triggers whenever any of the input events trigger. The parameters
- * and results of the merged event are derived from the input events, providing a flexible way to
- * handle multiple sources of events in a unified manner.
+ * Merges multiple events into a single event that triggers whenever any source triggers.
+ * Disposing the merged event unsubscribes from all sources.
  *
- * @template Events - An array of `Event` instances.
- * @param events - A rest parameter that takes multiple events to be merged.
- * @returns {Event<AllEventsParameters<Events>, AllEventsResults<Events>>} Returns a new `Event` instance
- *           that triggers with the parameters and results of any of the merged input events.
+ * @param events - The events to merge.
+ * @returns A new Event that forwards emissions from all sources.
  *
+ * @example
  * ```typescript
- * // Merging mouse and keyboard events into a single event
  * const mouseEvent = createEvent<MouseEvent>();
  * const keyboardEvent = createEvent<KeyboardEvent>();
  * const inputEvent = merge(mouseEvent, keyboardEvent);
@@ -341,18 +317,14 @@ export const merge = <Events extends Event<any, any>[]>(...events: Events): Even
 };
 
 /**
- * Creates a periodic event that triggers at a specified interval. The event will automatically emit
- * an incrementing counter value each time it triggers, starting from zero. This function is useful
- * for creating time-based triggers within an application, such as updating UI elements, polling,
- * or any other timed operation.
+ * Creates a periodic event that emits an incrementing counter (starting from 0) at a fixed interval.
+ * Disposing the event clears the interval.
  *
- * @template R - The return type of the event handler function, defaulting to `void`.
- * @param interval - The interval in milliseconds at which the event should trigger.
- * @returns {Event<number, R>} An `Event` instance that triggers at the specified interval,
- *           emitting an incrementing counter value.
+ * @param interval - The interval in milliseconds.
+ * @returns An Event that triggers at the specified interval.
  *
+ * @example
  * ```typescript
- * // Creating an interval event that logs a message every second
  * const tickEvent = createInterval(1000);
  * tickEvent.on(tickNumber => console.log('Tick:', tickNumber));
  * ```
@@ -368,23 +340,18 @@ export const createInterval = <R = unknown>(interval: number): Event<number, R> 
 
 /**
  * Creates a new Event instance for multi-listener event handling.
- * This is the primary way to create events in the library.
  *
- * @template T - The type of value emitted to listeners (event payload)
- * @template R - The return type of listener functions (collected in EventResult)
- * @returns {Event<T, R>} A new Event instance ready for listener registration
- *
+ * @example
  * ```typescript
- * // Create an event that accepts a string payload
  * const messageEvent = createEvent<string>();
  * messageEvent.on(msg => console.log('Received:', msg));
- * messageEvent('Hello'); // All listeners receive 'Hello'
+ * messageEvent.emit('Hello'); // All listeners receive 'Hello'
  *
- * // Create an event where listeners return values
+ * // Listeners can return values, collected via DispatchResult
  * const validateEvent = createEvent<string, boolean>();
  * validateEvent.on(str => str.length > 0);
  * validateEvent.on(str => str.length < 100);
- * const results = await validateEvent('test'); // EventResult with [true, true]
+ * const results = await validateEvent.emit('test').all(); // [true, true]
  * ```
  */
 export const createEvent = <T = unknown, R = unknown>(): Event<T, R> => new Event<T, R>();

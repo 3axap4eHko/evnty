@@ -9,6 +9,7 @@ import { Action, Fn, Emitter, MaybePromise, Promiseable } from './types.js';
  * Returned by `Broadcast.join()` and used to consume values.
  * Implements Disposable for automatic cleanup via `using` keyword.
  *
+ * @example
  * ```typescript
  * const broadcast = new Broadcast<number>();
  * using handle = broadcast.join();
@@ -54,10 +55,13 @@ export class BroadcastIterator<T> implements AsyncIterator<T, void, void> {
 
   async next(): Promise<IteratorResult<T, void>> {
     try {
-      while (!this.#broadcast.readable(this.#handle)) {
+      while (true) {
+        const result = this.#broadcast.tryConsume(this.#handle);
+        if (!result.done) {
+          return { value: result.value, done: false };
+        }
         await this.#signal.receive();
       }
-      return { value: this.#broadcast.consume(this.#handle), done: false };
     } catch {
       return { value: undefined, done: true };
     }
@@ -87,6 +91,7 @@ export class BroadcastIterator<T> implements AsyncIterator<T, void, void> {
  *
  * @template T - The type of values in the broadcast
  *
+ * @example
  * ```typescript
  * const broadcast = new Broadcast<number>();
  *
@@ -111,6 +116,7 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
   #handles = new WeakMap<ConsumerHandle<T>, number>();
   #minCursor = 0;
 
+  // Stryker disable all: FinalizationRegistry callback only testable via GC, excluded from mutation testing
   #registry = new FinalizationRegistry<number>((id) => {
     const cursor = this.#cursors.get(id)!;
     this.#cursors.delete(id);
@@ -121,18 +127,12 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
       if (shift > 0) this.#buffer.shiftN(shift);
     }
   });
+  // Stryker restore all
 
   readonly [Symbol.toStringTag] = 'Broadcast';
 
   constructor() {
     this.#disposer = new Disposer(this);
-  }
-
-  /**
-   * Checks if the broadcast has been disposed.
-   */
-  get disposed(): boolean {
-    return this.#disposer.disposed;
   }
 
   /**
@@ -160,23 +160,24 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
    * Emits a value to all consumers. The value is buffered for consumption.
    *
    * @param value - The value to emit.
-   * @returns {boolean} `true` if there were waiters for the signal, `false` otherwise.
+   * @returns `true` if the value was emitted.
    */
   emit(value: T): boolean {
+    if (this.#disposer.disposed) {
+      return false;
+    }
     this.#buffer.push(value);
-    return this.#signal.emit(value);
+    this.#signal.emit(value);
+    return true;
   }
 
   /**
    * Waits for the next emitted value without joining as a consumer.
    * Does not buffer - only receives values emitted after calling.
    *
-   * @returns {Promise<T>} A promise that resolves with the next emitted value.
+   * @returns A promise that resolves with the next emitted value.
    */
   receive(): Promise<T> {
-    if (this.disposed) {
-      return Promise.reject(new Error('Broadcast disposed'));
-    }
     return this.#signal.receive();
   }
 
@@ -197,14 +198,14 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
    * The consumer starts at the current buffer position and will only see
    * values emitted after joining.
    *
-   * @returns {ConsumerHandle<T>} A handle for consuming values.
-   *
+   * @example
    * ```typescript
    * const handle = broadcast.join();
    * // Use handle with consume(), readable(), leave()
    * ```
    */
   join(): ConsumerHandle<T> {
+    // Stryker disable next-line UpdateOperator: IDs only need uniqueness, direction is irrelevant
     const id = this.#nextId++;
     const cursor = this.#buffer.right;
     const handle = new ConsumerHandle<T>(this);
@@ -212,9 +213,11 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
     this.#handles.set(handle, id);
     this.#cursors.set(id, cursor);
 
+    // Stryker disable all: minCursor is an optimization hint; tryConsume recalculates on use
     if (this.#cursors.size === 1 || cursor < this.#minCursor) {
       this.#minCursor = cursor;
     }
+    // Stryker restore all
 
     this.#registry.register(handle, id, handle);
     return handle;
@@ -224,13 +227,16 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
    * Gets the current cursor position for a consumer handle.
    *
    * @param handle - The consumer handle.
-   * @returns {number} The cursor position.
-   * @throws {Error} If the handle is invalid (already left or never joined).
+   * @returns The cursor position.
+   * @throws If the handle is invalid (already left or never joined).
    */
   getCursor(handle: ConsumerHandle<T>): number {
     const id = this.#handles.get(handle);
+    // Stryker disable next-line ConditionalExpression: second cursor check catches invalid handles
     if (id === undefined) throw new Error('Invalid handle');
-    return this.#cursors.get(id)!;
+    const cursor = this.#cursors.get(id);
+    if (cursor === undefined) throw new Error('Invalid handle');
+    return cursor;
   }
 
   /**
@@ -241,6 +247,7 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
    */
   leave(handle: ConsumerHandle<T>): void {
     const id = this.#handles.get(handle);
+    // Stryker disable next-line ConditionalExpression,EqualityOperator: subsequent ops are safe with undefined id
     if (id === undefined) return;
 
     const cursor = this.#cursors.get(id)!;
@@ -248,11 +255,13 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
     this.#cursors.delete(id);
     this.#registry.unregister(handle);
 
+    // Stryker disable all: compaction condition is optimization; buffer reads are correct regardless
     if (cursor === this.#minCursor) {
       this.#minCursor = min(this.#cursors.values(), this.#buffer.right);
       const shift = this.#minCursor - this.#buffer.left;
       if (shift > 0) this.#buffer.shiftN(shift);
     }
+    // Stryker restore all
   }
 
   /**
@@ -260,9 +269,9 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
    * Advances the consumer's cursor position.
    *
    * @param handle - The consumer handle.
-   * @returns {T} The next value in the buffer for this consumer.
-   * @throws {Error} If the handle is invalid.
+   * @throws If no value is available or the handle is invalid.
    *
+   * @example
    * ```typescript
    * if (broadcast.readable(handle)) {
    *   const value = broadcast.consume(handle);
@@ -270,26 +279,51 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
    * ```
    */
   consume(handle: ConsumerHandle<T>): T {
-    const cursor = this.getCursor(handle);
-    const id = this.#handles.get(handle)!;
-    const value = this.#buffer.peekAt(cursor)!;
+    const result = this.tryConsume(handle);
+    if (result.done) {
+      throw new Error('No value available');
+    }
+    return result.value;
+  }
 
+  /**
+   * Attempts to consume the next value for a consumer.
+   * Returns `{ done: true }` when no value is currently available.
+   *
+   * @param handle - The consumer handle.
+   * @returns The next value, or `{ done: true }` when nothing is available.
+   * @throws If the handle is invalid.
+   */
+  tryConsume(handle: ConsumerHandle<T>): IteratorResult<T, void> {
+    const id = this.#handles.get(handle);
+    // Stryker disable next-line ConditionalExpression: second cursor check catches invalid handles
+    if (id === undefined) throw new Error('Invalid handle');
+
+    const cursor = this.#cursors.get(id);
+    if (cursor === undefined) throw new Error('Invalid handle');
+    if (cursor >= this.#buffer.right) {
+      return { value: undefined, done: true };
+    }
+
+    const value = this.#buffer.peekAt(cursor)!;
     this.#cursors.set(id, cursor + 1);
 
+    // Stryker disable all: compaction condition is optimization; buffer reads are correct regardless
     if (cursor === this.#minCursor) {
       this.#minCursor = min(this.#cursors.values(), this.#buffer.right);
       const shift = this.#minCursor - this.#buffer.left;
       if (shift > 0) this.#buffer.shiftN(shift);
     }
+    // Stryker restore all
 
-    return value;
+    return { value, done: false };
   }
 
   /**
    * Checks if there are values available for a consumer to read.
    *
    * @param handle - The consumer handle.
-   * @returns {boolean} `true` if there are unread values, `false` otherwise.
+   * @returns `true` if there are unread values, `false` otherwise.
    */
   readable(handle: ConsumerHandle<T>): boolean {
     return this.getCursor(handle) < this.#buffer.right;
@@ -304,9 +338,11 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
   }
 
   [Symbol.dispose](): void {
-    this.#disposer.handleEvent();
-    this.#signal[Symbol.dispose]();
-    this.#buffer.clear();
-    this.#cursors.clear();
+    // Stryker disable next-line ConditionalExpression: double-dispose re-clears empty collections, no observable effect
+    if (this.#disposer[Symbol.dispose]()) {
+      this.#signal[Symbol.dispose]();
+      this.#buffer.clear();
+      this.#cursors.clear();
+    }
   }
 }

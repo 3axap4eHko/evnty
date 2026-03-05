@@ -1,4 +1,5 @@
 import { vi, describe, expect, it } from 'vitest';
+import { test as fcTest, fc } from '@fast-check/vitest';
 import { Signal } from '../signal';
 
 const scheduleSignal = <T>(signal: Signal<T>, value: T, expected: boolean) => {
@@ -14,6 +15,7 @@ describe('Signal test suite', () => {
   });
 
   it('should merge signals', async () => {
+    expect.assertions(4);
     const signal = new Signal<string>();
     using a = new Signal<string>();
     using b = new Signal<string>();
@@ -25,6 +27,7 @@ describe('Signal test suite', () => {
   });
 
   it('Should send a signal', async () => {
+    expect.assertions(2);
     const signal = new Signal<string>();
     scheduleSignal(signal, 'test', true);
     await expect(signal).resolves.toEqual('test');
@@ -42,7 +45,6 @@ describe('Signal test suite', () => {
     ctrl.abort();
     const signal = new Signal<number>(ctrl.signal);
 
-    expect(signal.disposed).toBe(true);
     expect(signal.emit(42)).toBe(false);
     await expect(signal.receive()).rejects.toThrow('Disposed');
   });
@@ -53,6 +55,7 @@ describe('Signal test suite', () => {
   });
 
   it('Should return the same promise for multiple next calls', async () => {
+    expect.assertions(3);
     const signal = new Signal<string>();
     const first = signal.receive();
     const second = signal.receive();
@@ -69,6 +72,7 @@ describe('Signal test suite', () => {
   });
 
   it('Should implement Promise', async () => {
+    expect.assertions(9);
     const ctrl = new AbortController();
     const signal = new Signal<string>(ctrl.signal);
     scheduleSignal(signal, 'test', true);
@@ -92,6 +96,7 @@ describe('Signal test suite', () => {
   });
 
   it('Should abort signals iteration', async () => {
+    expect.assertions(8);
     const ctrl = new AbortController();
     const signal = new Signal<number>(ctrl.signal);
 
@@ -111,6 +116,7 @@ describe('Signal test suite', () => {
   });
 
   it('Should break signals iteration', async () => {
+    expect.assertions(10);
     const ctrl = new AbortController();
     const signal = new Signal<number>(ctrl.signal);
 
@@ -144,6 +150,7 @@ describe('Signal test suite', () => {
   });
 
   it('Should handle merge with disposed target signal', async () => {
+    expect.assertions(1);
     const ctrl = new AbortController();
     const target = new Signal<number>(ctrl.signal);
     const source = new Signal<number>();
@@ -154,19 +161,18 @@ describe('Signal test suite', () => {
     scheduleSignal(source, 42, false);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(target.disposed).toBe(true);
   });
 
-  it('Should handle disposed property without abort signal', async () => {
+  it('Should work without abort signal', async () => {
+    expect.assertions(2);
     const signal = new Signal<number>();
-    expect(signal.disposed).toBe(false);
 
     scheduleSignal(signal, 123, true);
     await expect(signal).resolves.toEqual(123);
-    expect(signal.disposed).toBe(false);
   });
 
   it('Should stop merge when target disposed during iteration', async () => {
+    expect.assertions(3);
     const ctrl = new AbortController();
     const target = new Signal<number>(ctrl.signal);
     const sourceCtrl = new AbortController();
@@ -180,7 +186,6 @@ describe('Signal test suite', () => {
     ctrl.abort();
     scheduleSignal(source, 2, true);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(target.disposed).toBe(true);
     sourceCtrl.abort();
   });
 
@@ -189,10 +194,7 @@ describe('Signal test suite', () => {
     const signal = new Signal<number>(ctrl.signal);
 
     signal[Symbol.dispose]();
-
-    expect(signal.disposed).toBe(true);
-    ctrl.abort();
-    expect(signal.disposed).toBe(true);
+    expect(() => ctrl.abort()).not.toThrow();
   });
 
   it('Should handle events via handleEvent method', async () => {
@@ -200,5 +202,72 @@ describe('Signal test suite', () => {
     const promise = signal.receive();
     signal.handleEvent(42);
     await expect(promise).resolves.toEqual(42);
+  });
+
+  it('Should be idempotent on double dispose', () => {
+    const signal = new Signal<number>();
+    signal[Symbol.dispose]();
+    expect(() => signal[Symbol.dispose]()).not.toThrow();
+  });
+
+  it('Should return done result from return()', async () => {
+    const signal = new Signal<number>();
+    const result = await signal.return();
+    expect(result).toEqual({ value: undefined, done: true });
+  });
+
+  it('Should continue merge when no waiter but target alive', async () => {
+    const target = new Signal<number>();
+    const source = new Signal<number>();
+
+    Signal.merge(target, source);
+
+    source.emit(1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const promise = target.receive();
+    process.nextTick(() => source.emit(2));
+
+    await expect(promise).resolves.toBe(2);
+  });
+
+  it('Should stop merge when target disposed during iteration', async () => {
+    const ctrl = new AbortController();
+    const target = new Signal<number>(ctrl.signal);
+    const source = new Signal<number>();
+
+    Signal.merge(target, source);
+
+    const p = target.receive();
+    source.emit(1);
+    await p;
+
+    ctrl.abort();
+
+    source.emit(2);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(source.emit(3)).toBe(false);
+  });
+
+  fcTest.prop([fc.anything()])('emit returns false without waiter, true with waiter', async (value) => {
+    const signal = new Signal<unknown>();
+    expect(signal.emit(value)).toBe(false);
+    const promise = signal.receive();
+    expect(signal.emit(value)).toBe(true);
+    await expect(promise).resolves.toBe(value);
+  });
+
+  fcTest.prop([fc.anything()])('receive resolves with emitted value', async (value) => {
+    const signal = new Signal<unknown>();
+    const promise = signal.receive();
+    signal.emit(value);
+    await expect(promise).resolves.toBe(value);
+  });
+
+  fcTest.prop([fc.anything()])('emit returns false after dispose', (value) => {
+    const signal = new Signal<unknown>();
+    signal[Symbol.dispose]();
+    expect(signal.emit(value)).toBe(false);
   });
 });

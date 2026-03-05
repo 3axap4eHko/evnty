@@ -28,7 +28,6 @@ Async-first, reactive event handling library for complex event flows with three 
     - [`ConsumerHandle.cursor: number`](#consumerhandlecursor-number)
     - [`ConsumerHandle[Symbol.dispose](): void`](#consumerhandlesymboldispose-void)
   - [`Broadcast`](#broadcast)
-    - [`Broadcast.disposed: boolean`](#broadcastdisposed-boolean)
     - [`Broadcast.sink: Fn`](#broadcastsink-fn)
     - [`Broadcast.handleEvent(event: T): void`](#broadcasthandleeventevent-t-void)
     - [`Broadcast.size: number`](#broadcastsize-number)
@@ -41,16 +40,16 @@ Async-first, reactive event handling library for complex event flows with three 
     - [`Broadcast.getCursor(handle: ConsumerHandle): number`](#broadcastgetcursorhandle-consumerhandle-number)
     - [`Broadcast.leave(handle: ConsumerHandle): void`](#broadcastleavehandle-consumerhandle-void)
     - [`Broadcast.consume(handle: ConsumerHandle): T`](#broadcastconsumehandle-consumerhandle-t)
+    - [`Broadcast.tryConsume(handle: ConsumerHandle): IteratorResult`](#broadcasttryconsumehandle-consumerhandle-iteratorresult)
     - [`Broadcast.readable(handle: ConsumerHandle): boolean`](#broadcastreadablehandle-consumerhandle-boolean)
     - [`Broadcast[Symbol.asyncIterator](): AsyncIterator`](#broadcastsymbolasynciterator-asynciterator)
     - [`Broadcast.dispose(): void`](#broadcastdispose-void)
     - [`Broadcast[Symbol.dispose](): void`](#broadcastsymboldispose-void)
   - [`DispatchResult`](#dispatchresult)
     - [`DispatchResult.then(onfulfilled?: Fn | null, onrejected?: Fn | null): PromiseLike`](#dispatchresultthenonfulfilled-fn--null-onrejected-fn--null-promiselike)
-    - [`DispatchResult.all(): Promise`](#dispatchresultall-promise)
-    - [`DispatchResult.settled(): Promise`](#dispatchresultsettled-promise)
+    - [`DispatchResult.all(): T[] | Promise`](#dispatchresultall-t--promise)
+    - [`DispatchResult.settled(): PromiseSettledResult[] | Promise`](#dispatchresultsettled-promisesettledresult--promise)
   - [`Event`](#event)
-    - [`Event.disposed: boolean`](#eventdisposed-boolean)
     - [`Event.sink: Fn`](#eventsink-fn)
     - [`Event.handleEvent(event: T): void`](#eventhandleeventevent-t-void)
     - [`Event.size: number`](#eventsize-number)
@@ -81,14 +80,21 @@ Async-first, reactive event handling library for complex event flows with three 
     - [`AsyncIteratorObject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
     - [`AsyncIteratorObject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
     - [`AsyncIteratorObject.filter(predicate): AsyncIteratorObject`](#asynciteratorobjectfilterpredicate-asynciteratorobject)
+    - [`AsyncIteratorObject.filterMap(callbackfn): AsyncIteratorObject`](#asynciteratorobjectfiltermapcallbackfn-asynciteratorobject)
+    - [`AsyncIteratorObject.inspect(callbackfn): AsyncIteratorObject`](#asynciteratorobjectinspectcallbackfn-asynciteratorobject)
+    - [`AsyncIteratorObject.enumerate(start: number = 0): AsyncIteratorObject`](#asynciteratorobjectenumeratestart-number--0-asynciteratorobject)
     - [`AsyncIteratorObject.take(limit: number): AsyncIteratorObject`](#asynciteratorobjecttakelimit-number-asynciteratorobject)
+    - [`AsyncIteratorObject.takeWhile(predicate): AsyncIteratorObject`](#asynciteratorobjecttakewhilepredicate-asynciteratorobject)
+    - [`AsyncIteratorObject.takeWhile(predicate): AsyncIteratorObject`](#asynciteratorobjecttakewhilepredicate-asynciteratorobject)
+    - [`AsyncIteratorObject.takeWhile(predicate): AsyncIteratorObject`](#asynciteratorobjecttakewhilepredicate-asynciteratorobject)
     - [`AsyncIteratorObject.drop(count: number): AsyncIteratorObject`](#asynciteratorobjectdropcount-number-asynciteratorobject)
+    - [`AsyncIteratorObject.dropWhile(predicate): AsyncIteratorObject`](#asynciteratorobjectdropwhilepredicate-asynciteratorobject)
     - [`AsyncIteratorObject.flatMap(callback): AsyncIteratorObject`](#asynciteratorobjectflatmapcallback-asynciteratorobject)
     - [`AsyncIteratorObject.reduce(callbackfn): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-asynciteratorobject)
     - [`AsyncIteratorObject.reduce(callbackfn, initialValue: R): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-initialvalue-r-asynciteratorobject)
     - [`AsyncIteratorObject.reduce(callbackfn, ...args: unknown[]): AsyncIteratorObject`](#asynciteratorobjectreducecallbackfn-args-unknown-asynciteratorobject)
     - [`AsyncIteratorObject.expand(callbackfn): AsyncIteratorObject`](#asynciteratorobjectexpandcallbackfn-asynciteratorobject)
-    - [`AsyncIteratorObject[Symbol.asyncIterator]()`](#asynciteratorobjectsymbolasynciterator)
+    - [`AsyncIteratorObject[Symbol.asyncIterator](): AsyncIterator`](#asynciteratorobjectsymbolasynciterator-asynciterator)
   - [`Sequence`](#sequence)
     - [`Sequence.merge(target: Sequence, ...sequences: Sequence[]): void`](#sequencemergetarget-sequence-sequences-sequence-void)
     - [`Sequence.size: number`](#sequencesize-number)
@@ -122,7 +128,7 @@ clickEvent.on(({ x, y }) => console.log(`Click at ${x},${y}`));
 clickEvent.on(({ x, y }) => updateUI(x, y));
 
 // All listeners receive the value
-clickEvent({ x: 100, y: 200 });
+clickEvent.emit({ x: 100, y: 200 });
 ```
 
 **Use Event when:**
@@ -137,11 +143,11 @@ Signals are for coordinating async operations. When a value is sent, ALL waiting
 const signal = new Signal<string>();
 
 // Multiple consumers can wait
-const promise1 = signal.next();
-const promise2 = signal.next();
+const promise1 = signal.receive();
+const promise2 = signal.receive();
 
 // Send value - all waiting consumers receive it
-signal('data');
+signal.emit('data');
 const [result1, result2] = await Promise.all([promise1, promise2]);
 // result1 === 'data' && result2 === 'data'
 ```
@@ -158,9 +164,9 @@ Sequences are FIFO queues for single-consumer scenarios. Values are consumed in 
 const taskQueue = new Sequence<Task>();
 
 // Producer adds tasks
-taskQueue(task1);
-taskQueue(task2);
-taskQueue(task3);
+taskQueue.emit(task1);
+taskQueue.emit(task2);
+taskQueue.emit(task3);
 
 // Single consumer processes in order
 for await (const task of taskQueue) {
@@ -180,7 +186,7 @@ for await (const task of taskQueue) {
 | **Consumers** | Multiple persistent listeners | Multiple one-time receivers | Single consumer |
 | **Delivery** | All listeners called | All waiting get same value | Each value consumed once |
 | **Pattern** | Pub/Sub | Broadcast coordination | Queue/Stream |
-| **Persistence** | Listeners stay registered | Resolves once per `next()` | Values queued until consumed |
+| **Persistence** | Listeners stay registered | Resolves once per `receive()` | Values queued until consumed |
 
 ## Motivation
 
@@ -254,7 +260,7 @@ userEvent.on(user => updateUI(user));
 userEvent.on(user => saveToCache(user));
 
 // Emit - all listeners are called
-userEvent({ id: 1, name: 'Alice' });
+userEvent.emit({ id: 1, name: 'Alice' });
 
 // One-time listener
 userEvent.once(user => console.log('First user only:', user));
@@ -274,12 +280,12 @@ const dataSignal = new Signal<Buffer>();
 
 // Multiple operations wait for the same data
 async function processA() {
-  const data = await dataSignal.next();
+  const data = await dataSignal.receive();
   // Process data in way A
 }
 
 async function processB() {
-  const data = await dataSignal.next();
+  const data = await dataSignal.receive();
   // Process data in way B
 }
 
@@ -287,7 +293,7 @@ async function processB() {
 Promise.all([processA(), processB()]);
 
 // Both receive the same data when it arrives
-dataSignal(Buffer.from('shared data'));
+dataSignal.emit(Buffer.from('shared data'));
 ```
 
 ### Sequence - Task Queue
@@ -306,13 +312,13 @@ const taskQueue = new Sequence<() => Promise<void>>();
 })();
 
 // Multiple producers add tasks
-taskQueue(async () => fetchData());
-taskQueue(async () => processData());
-taskQueue(async () => saveResults());
+taskQueue.emit(async () => fetchData());
+taskQueue.emit(async () => processData());
+taskQueue.emit(async () => saveResults());
 
 // Backpressure control
 await taskQueue.reserve(10); // Wait until queue has ≤10 items
-taskQueue(async () => nonUrgentTask());
+taskQueue.emit(async () => nonUrgentTask());
 ```
 
 ### Combining Primitives
@@ -323,14 +329,14 @@ const responseSignal = new Signal<Response>();
 
 requestEvent.on(async (req) => {
   const response = await handleRequest(req);
-  responseSignal(response);
+  responseSignal.emit(response);
 });
 
 // Event + Sequence for buffered processing
 const dataEvent = createEvent<Data>();
 const processQueue = new Sequence<Data>();
 
-dataEvent.on(data => processQueue(data));
+dataEvent.on(data => processQueue.emit(data));
 
 // Process with controlled concurrency
 for await (const data of processQueue) {
@@ -346,6 +352,7 @@ for await (const data of processQueue) {
  Returned by `Broadcast.join()` and used to consume values.
  Implements Disposable for automatic cleanup via `using` keyword.
 
+- @example
  ```typescript
  const broadcast = new Broadcast<number>();
  using handle = broadcast.join();
@@ -381,6 +388,7 @@ for await (const data of processQueue) {
 
 - @template T - The type of values in the broadcast
 
+- @example
  ```typescript
  const broadcast = new Broadcast<number>();
 
@@ -396,10 +404,6 @@ for await (const data of processQueue) {
  ```
  
 
-#### `Broadcast.disposed: boolean`
-
- Checks if the broadcast has been disposed.
-   
 #### `Broadcast.sink: Fn`
 
  Returns a bound emit function for use as a callback.
@@ -417,14 +421,14 @@ for await (const data of processQueue) {
  Emits a value to all consumers. The value is buffered for consumption.
 
 - @param value - The value to emit.
-- @returns `{boolean}` `true` if there were waiters for the signal, `false` otherwise.
+- @returns `true` if the value was emitted.
    
 #### `Broadcast.receive(): Promise`
 
  Waits for the next emitted value without joining as a consumer.
  Does not buffer - only receives values emitted after calling.
 
-- @returns `{Promise<T>}` A promise that resolves with the next emitted value.
+- @returns A promise that resolves with the next emitted value.
    
 #### `Broadcast.then(onfulfilled?: Fn | null, onrejected?: Fn | null): Promise`
 #### `Broadcast.catch(onrejected?: Fn | null): Promise`
@@ -435,8 +439,7 @@ for await (const data of processQueue) {
  The consumer starts at the current buffer position and will only see
  values emitted after joining.
 
-- @returns `{ConsumerHandle<T>}` A handle for consuming values.
-
+- @example
  ```typescript
  const handle = broadcast.join();
  // Use handle with consume(), readable(), leave()
@@ -447,8 +450,8 @@ for await (const data of processQueue) {
  Gets the current cursor position for a consumer handle.
 
 - @param handle - The consumer handle.
-- @returns `{number}` The cursor position.
-- @throws `{Error}` If the handle is invalid (already left or never joined).
+- @returns The cursor position.
+- @throws If the handle is invalid (already left or never joined).
    
 #### `Broadcast.leave(handle: ConsumerHandle): void`
 
@@ -463,21 +466,30 @@ for await (const data of processQueue) {
  Advances the consumer's cursor position.
 
 - @param handle - The consumer handle.
-- @returns `{T}` The next value in the buffer for this consumer.
-- @throws `{Error}` If the handle is invalid.
+- @throws If no value is available or the handle is invalid.
 
+- @example
  ```typescript
  if (broadcast.readable(handle)) {
    const value = broadcast.consume(handle);
  }
  ```
    
+#### `Broadcast.tryConsume(handle: ConsumerHandle): IteratorResult`
+
+ Attempts to consume the next value for a consumer.
+ Returns `{ done: true }` when no value is currently available.
+
+- @param handle - The consumer handle.
+- @returns The next value, or `{ done: true }` when nothing is available.
+- @throws If the handle is invalid.
+   
 #### `Broadcast.readable(handle: ConsumerHandle): boolean`
 
  Checks if there are values available for a consumer to read.
 
 - @param handle - The consumer handle.
-- @returns `{boolean}` `true` if there are unread values, `false` otherwise.
+- @returns `true` if there are unread values, `false` otherwise.
    
 #### `Broadcast[Symbol.asyncIterator](): AsyncIterator`
 #### `Broadcast.dispose(): void`
@@ -490,44 +502,35 @@ for await (const data of processQueue) {
  
 
 #### `DispatchResult.then(onfulfilled?: Fn | null, onrejected?: Fn | null): PromiseLike`
-#### `DispatchResult.all(): Promise`
+#### `DispatchResult.all(): T[] | Promise`
 
  Resolves all listener results, rejecting if any promise rejects or any ResultError exists.
    
-#### `DispatchResult.settled(): Promise`
+#### `DispatchResult.settled(): PromiseSettledResult[] | Promise`
 
  Waits for all listener results to settle, regardless of fulfillment or rejection.
    
 ### `Event`
 
- A class representing a multi-listener event emitter with async support.
- Events allow multiple listeners to react to emitted values, with each listener
- potentially returning a result. All listeners are called for each emission.
-
- Key characteristics:
- - Multiple listeners - all are called for each emission
- - Listeners can return values collected in EventResult
- - Supports async listeners and async iteration
- - Provides lifecycle hooks for listener management
- - Memory efficient using RingBuffer for storage
+ Multi-listener event emitter with async support.
+ All registered listeners are called for each emission, and their return
+ values are collected in a DispatchResult. Supports async iteration and
+ an `onDispose` callback for cleanup.
 
  Differs from:
- - Signal: Events have multiple persistent listeners vs Signal's one-time resolution per consumer
- - Sequence: Events broadcast to all listeners vs Sequence's single consumer queue
+ - Signal: Event has persistent listeners; Signal is promise-based (receive per round)
+ - Sequence: Event broadcasts to all listeners; Sequence is a single-consumer queue
 
 - @template T - The type of value emitted to listeners (event payload)
 - @template R - The return type of listener functions
  
 
-#### `Event.disposed: boolean`
-
- Checks if the event has been disposed.
-   
 #### `Event.sink: Fn`
 
  Returns a bound emit function for use as a callback.
  Useful for passing to other APIs that expect a function.
 
+- @example
  ```typescript
  const event = new Event<string>();
  someApi.onMessage(event.sink);
@@ -541,9 +544,6 @@ for await (const data of processQueue) {
 #### `Event.size: number`
 
  The number of listeners for the event.
-
-- @readonly
-- @type `{number}`
    
 #### `Event.emit(value: T): DispatchResult`
 
@@ -551,8 +551,9 @@ for await (const data of processQueue) {
  Each listener is called with the value and their return values are collected.
 
 - @param value - The value to emit to all listeners.
-- @returns `{DispatchResult<void | R>}` A result object containing all listener return values.
+- @returns A DispatchResult containing all listener return values.
 
+- @example
  ```typescript
  const event = new Event<string, number>();
  event.on(str => str.length);
@@ -565,8 +566,9 @@ for await (const data of processQueue) {
  Checks if the given listener is NOT registered for this event.
 
 - @param listener - The listener function to check against the registered listeners.
-- @returns `{boolean}` `true` if the listener is not already registered; otherwise, `false`.
+- @returns `true` if the listener is not already registered; otherwise, `false`.
 
+- @example
  ```typescript
  // Check if a listener is not already added
  if (event.lacks(myListener)) {
@@ -579,8 +581,9 @@ for await (const data of processQueue) {
  Checks if the given listener is registered for this event.
 
 - @param listener - The listener function to check.
-- @returns `{boolean}` `true` if the listener is currently registered; otherwise, `false`.
+- @returns `true` if the listener is currently registered; otherwise, `false`.
 
+- @example
  ```typescript
  // Verify if a listener is registered
  if (event.has(myListener)) {
@@ -593,8 +596,9 @@ for await (const data of processQueue) {
  Removes a specific listener from this event.
 
 - @param listener - The listener to remove.
-- @returns `{this}` The event instance, allowing for method chaining.
+- @returns The event instance for chaining.
 
+- @example
  ```typescript
  // Remove a listener
  event.off(myListener);
@@ -602,14 +606,13 @@ for await (const data of processQueue) {
    
 #### `Event.on(listener: Listener): Unsubscribe`
 
- Registers a listener that gets triggered whenever the event is emitted.
- This is the primary method for adding event handlers that will react to the event being triggered.
+ Registers a listener that is called on every emission.
 
 - @param listener - The function to call when the event occurs.
-- @returns `{Unsubscribe}` An object that can be used to unsubscribe the listener, ensuring easy cleanup.
+- @returns A function that removes this listener when called.
 
+- @example
  ```typescript
- // Add a listener to an event
  const unsubscribe = event.on((data) => {
    console.log('Event data:', data);
  });
@@ -617,56 +620,48 @@ for await (const data of processQueue) {
    
 #### `Event.once(listener: Listener): Unsubscribe`
 
- Adds a listener that will be called only once the next time the event is emitted.
- This method is useful for one-time notifications or single-trigger scenarios.
+ Registers a listener that is called only once on the next emission, then auto-removed.
 
 - @param listener - The listener to trigger once.
-- @returns `{Unsubscribe}` An object that can be used to remove the listener if the event has not yet occurred.
+- @returns A function that removes this listener when called (if it hasn't fired yet).
 
+- @example
  ```typescript
- // Register a one-time listener
- const onceUnsubscribe = event.once((data) => {
+ const cancel = event.once((data) => {
    console.log('Received data once:', data);
  });
  ```
    
 #### `Event.clear(): this`
 
- Removes all listeners from the event, effectively resetting it. This is useful when you need to
- cleanly dispose of all event handlers to prevent memory leaks or unwanted triggers after certain conditions.
+ Removes all listeners from the event.
+ Does not dispose the event - new listeners can still be added after clearing.
 
-- @returns `{this}` The instance of the event, allowing for method chaining.
-
- ```typescript
- const myEvent = new Event();
- myEvent.on(data => console.log(data));
- myEvent.clear(); // Clears all listeners
- ```
+- @returns The event instance for chaining.
    
 #### `Event.receive(): Promise`
 
- Waits for the next event emission and returns the emitted value.
- This method allows the event to be used as a promise that resolves with the next emitted value.
+ Waits for the next emission and returns the emitted value.
 
-- @returns `{Promise<T>}` A promise that resolves with the next emitted event value.
+- @returns A promise that resolves with the next emitted value.
    
 #### `Event.then(onfulfilled?: Fn | null, onrejected?: Fn | null): Promise`
 #### `Event.catch(onrejected?: Fn | null): Promise`
 #### `Event.finally(onfinally?: Action | null): Promise`
 #### `Event.settle(): Promise`
 
- Waits for the event to settle, returning a `PromiseSettledResult`.
- Resolves even when the next listener rejects.
+ Waits for the next emission via `receive()` and wraps the outcome in a
+ `PromiseSettledResult` - always resolves, never rejects.
 
-- @returns `{Promise<PromiseSettledResult<T>>}` A promise that resolves with the settled result.
+- @returns A promise that resolves with the settled result.
 
 - @example
  ```typescript
  const result = await event.settle();
  if (result.status === 'fulfilled') {
-   console.log('Event fulfilled with value:', result.value);
+   console.log('Value:', result.value);
  } else {
-   console.error('Event rejected with reason:', result.reason);
+   console.error('Reason:', result.reason);
  }
  ```
    
@@ -675,18 +670,14 @@ for await (const data of processQueue) {
 #### `Event[Symbol.dispose](): void`
 ### `merge(...events: Events): Event`
 
- Merges multiple events into a single event. This function takes any number of `Event` instances
- and returns a new `Event` that triggers whenever any of the input events trigger. The parameters
- and results of the merged event are derived from the input events, providing a flexible way to
- handle multiple sources of events in a unified manner.
+ Merges multiple events into a single event that triggers whenever any source triggers.
+ Disposing the merged event unsubscribes from all sources.
 
-- @template Events - An array of `Event` instances.
-- @param events - A rest parameter that takes multiple events to be merged.
-- @returns `{Event<AllEventsParameters<Events>, AllEventsResults<Events>>}` Returns a new `Event` instance
-           that triggers with the parameters and results of any of the merged input events.
+- @param events - The events to merge.
+- @returns A new Event that forwards emissions from all sources.
 
+- @example
  ```typescript
- // Merging mouse and keyboard events into a single event
  const mouseEvent = createEvent<MouseEvent>();
  const keyboardEvent = createEvent<KeyboardEvent>();
  const inputEvent = merge(mouseEvent, keyboardEvent);
@@ -695,18 +686,14 @@ for await (const data of processQueue) {
  
 ### `createInterval(interval: number): Event`
 
- Creates a periodic event that triggers at a specified interval. The event will automatically emit
- an incrementing counter value each time it triggers, starting from zero. This function is useful
- for creating time-based triggers within an application, such as updating UI elements, polling,
- or any other timed operation.
+ Creates a periodic event that emits an incrementing counter (starting from 0) at a fixed interval.
+ Disposing the event clears the interval.
 
-- @template R - The return type of the event handler function, defaulting to `void`.
-- @param interval - The interval in milliseconds at which the event should trigger.
-- @returns `{Event<number, R>}` An `Event` instance that triggers at the specified interval,
-           emitting an incrementing counter value.
+- @param interval - The interval in milliseconds.
+- @returns An Event that triggers at the specified interval.
 
+- @example
  ```typescript
- // Creating an interval event that logs a message every second
  const tickEvent = createInterval(1000);
  tickEvent.on(tickNumber => console.log('Tick:', tickNumber));
  ```
@@ -714,23 +701,18 @@ for await (const data of processQueue) {
 ### `createEvent(): Event`
 
  Creates a new Event instance for multi-listener event handling.
- This is the primary way to create events in the library.
 
-- @template T - The type of value emitted to listeners (event payload)
-- @template R - The return type of listener functions (collected in EventResult)
-- @returns `{Event<T, R>}` A new Event instance ready for listener registration
-
+- @example
  ```typescript
- // Create an event that accepts a string payload
  const messageEvent = createEvent<string>();
  messageEvent.on(msg => console.log('Received:', msg));
- messageEvent('Hello'); // All listeners receive 'Hello'
+ messageEvent.emit('Hello'); // All listeners receive 'Hello'
 
- // Create an event where listeners return values
+ // Listeners can return values, collected via DispatchResult
  const validateEvent = createEvent<string, boolean>();
  validateEvent.on(str => str.length > 0);
  validateEvent.on(str => str.length < 100);
- const results = await validateEvent('test'); // EventResult with [true, true]
+ const results = await validateEvent.emit('test').all(); // [true, true]
  ```
  
 ### `AsyncIteratorObject`
@@ -743,11 +725,13 @@ for await (const data of processQueue) {
  - Chainable - all transformation methods return new AsyncIteratorObject instances
  - Supports both sync and async transformation functions
  - Memory efficient - processes values one at a time
+ - Operation fusion - chains execute in optimized passes
 
 - @template T The type of values yielded by the iterator
 - @template TReturn The return type of the iterator
 - @template TNext The type of value that can be passed to next()
 
+- @example
  ```typescript
  // Create from an async generator
  async function* numbers() {
@@ -774,11 +758,13 @@ for await (const data of processQueue) {
  - Chainable - all transformation methods return new AsyncIteratorObject instances
  - Supports both sync and async transformation functions
  - Memory efficient - processes values one at a time
+ - Operation fusion - chains execute in optimized passes
 
 - @template T The type of values yielded by the iterator
 - @template TReturn The return type of the iterator
 - @template TNext The type of value that can be passed to next()
 
+- @example
  ```typescript
  // Create from an async generator
  async function* numbers() {
@@ -800,6 +786,7 @@ for await (const data of processQueue) {
 - @param iterable A synchronous iterable to convert
 - @returns A new AsyncIteratorObject wrapping the converted iterable
 
+- @example
  ```typescript
  const syncArray = [1, 2, 3, 4, 5];
  const asyncIterator = AsyncIteratorObject.from(syncArray);
@@ -818,6 +805,7 @@ for await (const data of processQueue) {
 - @param iterables The async iterables to merge
 - @returns A new AsyncIteratorObject yielding values from all sources
 
+- @example
  ```typescript
  async function* source1() { yield 1; yield 3; }
  async function* source2() { yield 2; yield 4; }
@@ -831,9 +819,8 @@ for await (const data of processQueue) {
    
 #### `AsyncIteratorObject.pipe(generatorFactory, signal?: AbortSignal): AsyncIteratorObject`
 
- Low-level transformation method using generator functions.
- Allows custom async transformations by providing a generator factory.
- Used internally by other transformation methods.
+ Escape hatch for custom transformations not covered by the built-in operators.
+ Materializes the fused operation chain, then applies a generator function to each value.
 
 - @param generatorFactory A function that returns a generator function for transforming values
 - @param signal Optional AbortSignal to cancel the operation
@@ -854,6 +841,7 @@ for await (const data of processQueue) {
 - @param callbackfn Function to transform each value
 - @returns A new AsyncIteratorObject yielding transformed values
 
+- @example
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3]);
  const doubled = numbers.map(x => x 2);
@@ -874,6 +862,7 @@ for await (const data of processQueue) {
 - @param predicate Function to test each value
 - @returns A new AsyncIteratorObject yielding only values that pass the test
 
+- @example
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
  const evens = numbers.filter(x => x % 2 === 0);
@@ -885,15 +874,106 @@ for await (const data of processQueue) {
    
 
 
+#### `AsyncIteratorObject.filterMap(callbackfn): AsyncIteratorObject`
+
+ Combined filter and map operation. Returns undefined to skip a value.
+ The callback result is awaited to check for undefined.
+
+- @param callbackfn Function that returns a transformed value or undefined to skip
+- @returns A new AsyncIteratorObject yielding non-undefined transformed values
+
+- @example
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
+ const doubledEvens = numbers.filterMap(x => x % 2 === 0 ? x 2 : undefined);
+
+ for await (const value of doubledEvens) {
+   console.log(value); // 4, 8
+ }
+ ```
+   
+#### `AsyncIteratorObject.inspect(callbackfn): AsyncIteratorObject`
+
+ Executes a side-effect function for each value without modifying the stream.
+ Useful for debugging or logging. The callback is awaited for proper sequencing.
+
+- @param callbackfn Function to execute for each value
+- @returns A new AsyncIteratorObject yielding the same values
+
+- @example
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3]);
+ const logged = numbers.inspect(x => console.log('value:', x)).map(x => x 2);
+ ```
+   
+#### `AsyncIteratorObject.enumerate(start: number = 0): AsyncIteratorObject`
+
+ Wraps each value with its index as a tuple.
+ Useful after filtering when original indices are lost.
+
+- @param start Starting index (default: 0)
+- @returns A new AsyncIteratorObject yielding [index, value] tuples
+
+- @example
+ ```typescript
+ const letters = AsyncIteratorObject.from(['a', 'b', 'c']);
+ const enumerated = letters.enumerate();
+
+ for await (const [i, v] of enumerated) {
+   console.log(i, v); // 0 'a', 1 'b', 2 'c'
+ }
+ ```
+   
 #### `AsyncIteratorObject.take(limit: number): AsyncIteratorObject`
 
  Creates an iterator whose values are the values from this iterator, stopping once the provided limit is reached.
 - @param limit The maximum number of values to yield.
    
+#### `AsyncIteratorObject.takeWhile(predicate): AsyncIteratorObject`
+#### `AsyncIteratorObject.takeWhile(predicate): AsyncIteratorObject`
+#### `AsyncIteratorObject.takeWhile(predicate): AsyncIteratorObject`
+
+ Takes values while the predicate returns truthy.
+ Stops immediately when predicate returns falsy.
+ Supports type guard predicates for type narrowing.
+
+- @param predicate Function to test each value
+- @returns A new AsyncIteratorObject yielding values until predicate fails
+
+- @example
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
+ const small = numbers.takeWhile(x => x < 4);
+
+ for await (const value of small) {
+   console.log(value); // 1, 2, 3
+ }
+ ```
+   
+
+
 #### `AsyncIteratorObject.drop(count: number): AsyncIteratorObject`
 
  Creates an iterator whose values are the values from this iterator after skipping the provided count.
 - @param count The number of values to drop.
+   
+#### `AsyncIteratorObject.dropWhile(predicate): AsyncIteratorObject`
+
+ Skips values while the predicate returns truthy.
+ Yields all remaining values once predicate returns falsy.
+
+- @param predicate Function to test each value
+- @returns A new AsyncIteratorObject skipping values until predicate fails
+
+- @example
+ ```typescript
+ const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
+ const afterSmall = numbers.dropWhile(x => x < 3);
+
+ for await (const value of afterSmall) {
+   console.log(value); // 3, 4, 5
+ }
+ ```
    
 #### `AsyncIteratorObject.flatMap(callback): AsyncIteratorObject`
 
@@ -912,6 +992,7 @@ for await (const data of processQueue) {
 - @param initialValue Optional initial value for the accumulation
 - @returns A new AsyncIteratorObject yielding accumulated values at each step
 
+- @example
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3, 4]);
  const sums = numbers.reduce((sum, x) => sum + x, 0);
@@ -927,11 +1008,12 @@ for await (const data of processQueue) {
 
  Transforms each value into multiple values using an expander function.
  Each input value is expanded into zero or more output values.
- Similar to flatMap but for expanding to multiple values rather than flattening iterables.
+ Like `flatMap` but takes sync Iterables (or Promises of Iterables) instead of AsyncIterables.
 
 - @param callbackfn Function that returns an iterable of values for each input
 - @returns A new AsyncIteratorObject yielding all expanded values
 
+- @example
  ```typescript
  const numbers = AsyncIteratorObject.from([1, 2, 3]);
  const expanded = numbers.expand(x => [x, x 10]);
@@ -941,13 +1023,13 @@ for await (const data of processQueue) {
  }
  ```
    
-#### `AsyncIteratorObject[Symbol.asyncIterator]()`
+#### `AsyncIteratorObject[Symbol.asyncIterator](): AsyncIterator`
 ### `Sequence`
 
  A sequence is a FIFO (First-In-First-Out) queue for async consumption.
  Designed for single consumer with multiple producers pattern.
  Values are queued and consumed in order, with backpressure support.
- Respects an optional AbortSignal: enqueue returns false when aborted; waits reject.
+ Respects an optional AbortSignal: emit() returns false when aborted; waits reject.
 
  Key characteristics:
  - Single consumer - values are consumed once, in order
@@ -958,14 +1040,15 @@ for await (const data of processQueue) {
 
 - @template T The type of values in the sequence.
 
+- @example
  ```typescript
  // Create a sequence for processing tasks
  const tasks = new Sequence<string>();
 
  // Producer: Add tasks to the queue
- tasks('task1');
- tasks('task2');
- tasks('task3');
+ tasks.emit('task1');
+ tasks.emit('task2');
+ tasks.emit('task3');
 
  // Consumer: Process tasks in order
  const task1 = await tasks.receive(); // 'task1'
@@ -983,6 +1066,7 @@ for await (const data of processQueue) {
 - @param target The sequence that will receive values from all sources
 - @param sequences The source sequences to merge from
 
+- @example
  ```typescript
  // Create target and source sequences
  const target = new Sequence<number>();
@@ -993,9 +1077,9 @@ for await (const data of processQueue) {
  Sequence.merge(target, source1, source2);
 
  // Values from both sources appear in target
- source1(1);
- source2(2);
- source1(3);
+ source1.emit(1);
+ source2.emit(2);
+ source1.emit(3);
 
  // Consumer gets values as they arrive
  await target.receive(); // Could be 1, 2, or 3 depending on timing
@@ -1015,24 +1099,33 @@ for await (const data of processQueue) {
 - @param capacity The maximum queue size to wait for
 - @returns A promise that resolves when the queue size is at or below capacity
 
+- @example
  ```typescript
  // Producer with backpressure control
  const sequence = new Sequence<string>();
 
  // Wait if queue has more than 10 items
  await sequence.reserve(10);
- sequence('new item'); // Safe to add, queue has space
+ sequence.emit('new item'); // Safe to add, queue has space
  ```
    
 #### `Sequence.emit(value: T): boolean`
+
+ Pushes a value onto the queue. Wakes any pending `receive()` waiter.
+
+- @param value - The value to enqueue.
+- @returns `true` if the sequence is still active.
+   
 #### `Sequence.receive(): Promise`
 
  Consumes and returns the next value from the queue.
  If the queue is empty, waits for a value to be added.
  Values are consumed in FIFO order.
+ If the sequence has been aborted or disposed, this method rejects with Error('Disposed').
 
 - @returns A promise that resolves with the next value
 
+- @example
  ```typescript
  const sequence = new Sequence<number>();
 
@@ -1040,7 +1133,7 @@ for await (const data of processQueue) {
  const valuePromise = sequence.receive();
 
  // Producer adds value
- sequence(42);
+ sequence.emit(42);
 
  // Consumer receives it
  const value = await valuePromise; // 42
@@ -1048,51 +1141,41 @@ for await (const data of processQueue) {
    
 #### `Sequence.dispose(): void`
 
- Disposes of the sequence, signaling any waiting consumers.
- Called automatically when used with `using` declaration.
+ Disposes of the sequence, rejecting any pending `receive()` waiters.
+ Called by `[Symbol.dispose]()` (inherited from Async) when using the `using` declaration.
    
 ### `Signal`
 
- A signal is a broadcast async primitive for coordinating between producers and consumers.
- When a value is sent, ALL waiting consumers receive the same value (broadcast pattern).
- Signals can be reused - each call to next() creates a new promise for the next value.
-
- Key characteristics:
- - Multiple consumers can wait simultaneously
- - All waiting consumers receive the same value when sent
- - Reusable - can send multiple values over time
- - Supports async iteration for continuous value streaming
+ Promise-based async coordination primitive.
+ `emit()` resolves the pending `receive()` promise (shared across callers).
+ Reusable - after each emission a new round of `receive()` calls can be made.
+ Disposable via `[Symbol.dispose]()` or an optional AbortSignal.
 
 - @template T The type of value that this signal carries.
 
+- @example
  ```typescript
- // Create a signal for string values
  const signal = new Signal<string>();
 
- // Multiple consumers wait for the same value
- const promise1 = signal.receive();
- const promise2 = signal.receive();
-
- // Send a value - both consumers receive it
- signal('Hello World');
-
- const [value1, value2] = await Promise.all([promise1, promise2]);
- console.log(value1 === value2); // true - both got 'Hello World'
+ const promise = signal.receive();
+ signal.emit('hello');
+ await promise; // 'hello'
  ```
  
 
 #### `Signal.merge(target: Signal, ...signals: Signal[]): void`
 
  Merges multiple source signals into a target signal.
- Values from any source signal are forwarded to the target signal.
- The merge continues until the target signal is aborted.
+ Values from any source signal are emitted to the target signal.
+ The merge continues until the target signal is disposed.
 
- Note: When the target is aborted, iteration stops after the next value
- from each source. For immediate cleanup, abort source signals directly.
+ Note: When the target is disposed, iteration stops after the next value
+ from each source. For immediate cleanup, dispose source signals directly.
 
 - @param target The signal that will receive values from all sources
 - @param signals The source signals to merge from
 
+- @example
  ```typescript
  // Create a target signal and source signals
  const target = new Signal<string>();
@@ -1103,19 +1186,26 @@ for await (const data of processQueue) {
  Signal.merge(target, source1, source2);
 
  // Values from any source appear in target
- source1('Hello');
- const value = await target; // 'Hello'
+ const promise = target.receive();
+ source1.emit('Hello');
+ const value = await promise; // 'Hello'
  ```
    
 #### `Signal.emit(value: T): boolean`
+
+ Sends a value to the waiting receiver, if any.
+
+- @param value - The value to send.
+- @returns `true` if the value was emitted.
    
 #### `Signal.receive(): Promise`
 
- Waits for the next value to be sent to this signal. If the signal has been aborted,
- this method will reject with the abort reason.
+ Waits for the next value to be sent to this signal. If the signal has been aborted
+ or disposed, this method rejects with Error('Disposed').
 
 - @returns A promise that resolves with the next value sent to the signal.
 
+- @example
  ```typescript
  const signal = new Signal<string>();
 
@@ -1123,7 +1213,7 @@ for await (const data of processQueue) {
  const valuePromise = signal.receive();
 
  // Send a value from elsewhere
- signal('Hello');
+ signal.emit('Hello');
 
  const value = await valuePromise; // 'Hello'
  ```
@@ -1133,7 +1223,7 @@ for await (const data of processQueue) {
 
  Wraps an async iterable with abort signal support.
  Each iteration creates a fresh iterator with scoped abort handling.
- Listener is added at iteration start and removed on completion/abort/return/throw.
+ Listener is added at iteration start and removed on completion/abort/return.
 
 - @template T - The yielded value type
 - @template TReturn - The return value type

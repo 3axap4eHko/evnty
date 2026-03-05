@@ -121,7 +121,7 @@ export class ListenerRegistry<P extends unknown[], R> {
   /**
    * Dispatches to all listeners in snapshot order.
    * One-time listeners are removed before invocation.
-   * Exceptions are captured as rejected promises so dispatch continues.
+   * Exceptions are captured as ResultError so dispatch continues (unwrap to surface rejections).
    *
    * @param values Arguments forwarded to each listener.
    * @returns Array of listener results or promises, one per listener.

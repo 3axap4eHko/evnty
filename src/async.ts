@@ -4,34 +4,37 @@ import { Action, Fn, Emitter, MaybePromise, Promiseable } from './types.js';
  * @internal
  */
 export class Disposer {
-  #disposed?: true;
-  #disposable: Disposable;
+  #target?: Disposable;
   #abortSignal?: AbortSignal;
 
-  constructor(disposable: Disposable, abortSignal?: AbortSignal) {
-    this.#disposable = disposable;
+  constructor(target: Disposable, abortSignal?: AbortSignal) {
+    if (abortSignal?.aborted) return;
+    this.#target = target;
     if (abortSignal) {
-      if (abortSignal.aborted) {
-        this.#disposed = true;
-      } else {
-        this.#abortSignal = abortSignal;
-        abortSignal.addEventListener('abort', this);
-      }
+      this.#abortSignal = abortSignal;
+      abortSignal.addEventListener('abort', this);
     }
   }
 
-  get disposed() {
-    return this.#disposed === true;
+  get disposed(): boolean {
+    return !this.#target;
   }
 
-  handleEvent(event?: Event): void {
-    if (this.#disposed) return;
-    this.#disposed = true;
-
-    this.#abortSignal?.removeEventListener('abort', this);
-    if (event?.type === 'abort') {
-      this.#disposable[Symbol.dispose]();
+  [Symbol.dispose](): boolean {
+    if (!this.#target) return false;
+    this.#target = undefined;
+    // Stryker disable all: cleanup is memory optimization, no observable behavior after disposal
+    if (this.#abortSignal) {
+      this.#abortSignal.removeEventListener('abort', this);
+      this.#abortSignal = undefined;
     }
+    // Stryker restore all
+    return true;
+  }
+
+  handleEvent(): void {
+    // Stryker disable next-line OptionalChaining: #target is always set when abort listener fires (synchronous code)
+    this.#target?.[Symbol.dispose]();
   }
 }
 
@@ -48,7 +51,7 @@ export abstract class Async<T, R> implements Emitter<T, R>, Promiseable<T>, Prom
   abstract emit(value: T): R;
   abstract receive(): Promise<T>;
 
-  dispose?(): MaybePromise<void>;
+  dispose?(): void;
 
   #sink?: Fn<[T], R>;
   #disposer: Disposer;
@@ -57,11 +60,6 @@ export abstract class Async<T, R> implements Emitter<T, R>, Promiseable<T>, Prom
     this.#disposer = new Disposer(this, abortSignal);
   }
 
-  /**
-   * Checks if the event has been disposed.
-   *
-   * @returns {boolean} `true` if the event has been disposed; otherwise, `false`.
-   */
   get disposed(): boolean {
     return this.#disposer.disposed;
   }
@@ -96,7 +94,8 @@ export abstract class Async<T, R> implements Emitter<T, R>, Promiseable<T>, Prom
   }
 
   async return(): Promise<IteratorResult<T, void>> {
-    await this.dispose?.();
+    // Stryker disable next-line OptionalChaining: all subclasses define dispose()
+    this.dispose?.();
     return { value: undefined, done: true };
   }
 
@@ -105,7 +104,9 @@ export abstract class Async<T, R> implements Emitter<T, R>, Promiseable<T>, Prom
   }
 
   [Symbol.dispose](): void {
-    this.#disposer.handleEvent();
-    void this.dispose?.();
+    if (this.#disposer[Symbol.dispose]()) {
+      // Stryker disable next-line OptionalChaining: all subclasses define dispose()
+      this.dispose?.();
+    }
   }
 }

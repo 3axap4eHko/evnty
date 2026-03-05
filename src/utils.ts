@@ -3,6 +3,13 @@ import { AnyIterator, AnyIterable, MaybePromise } from './types.js';
 
 /**
  * @internal
+ */
+export function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return value !== null && typeof value === 'object' && typeof (value as PromiseLike<unknown>).then === 'function';
+}
+
+/**
+ * @internal
  * A no-operation function. Useful as a default callback or placeholder.
  */
 export const noop = () => {};
@@ -84,7 +91,7 @@ export const mapIterator = <U, T, TReturn, TNext>(iterator: AnyIterator<T, TRetu
 /**
  * Wraps an async iterable with abort signal support.
  * Each iteration creates a fresh iterator with scoped abort handling.
- * Listener is added at iteration start and removed on completion/abort/return/throw.
+ * Listener is added at iteration start and removed on completion/abort/return.
  *
  * @template T - The yielded value type
  * @template TReturn - The return value type
@@ -110,6 +117,16 @@ export function abortableIterable<T, TReturn, TNext>(iterable: AsyncIterable<T, 
       const iterator = iterable[Symbol.asyncIterator]();
       const { promise, resolve } = Promise.withResolvers<void>();
       const onAbort = () => resolve();
+      let closed = false;
+
+      const finish = (value?: TReturn): Promise<IteratorResult<T, TReturn>> => {
+        if (closed) {
+          return Promise.resolve({ done: true, value: value as TReturn });
+        }
+        closed = true;
+        signal.removeEventListener('abort', onAbort);
+        return iterator.return?.(value) ?? Promise.resolve({ done: true, value: value as TReturn });
+      };
 
       if (signal.aborted) {
         onAbort();
@@ -124,15 +141,17 @@ export function abortableIterable<T, TReturn, TNext>(iterable: AsyncIterable<T, 
           race[1] = iterator.next(...args);
           const result = await Promise.race(race);
           if (result === undefined) {
-            signal.removeEventListener('abort', onAbort);
+            void finish();
             return { done: true, value: undefined as TReturn };
           }
-          if (result.done) signal.removeEventListener('abort', onAbort);
+          if (result.done) {
+            closed = true;
+            signal.removeEventListener('abort', onAbort);
+          }
           return result;
         },
         async return(value?: TReturn): Promise<IteratorResult<T, TReturn>> {
-          signal.removeEventListener('abort', onAbort);
-          return iterator.return?.(value) ?? { done: true, value: value as TReturn };
+          return finish(value);
         },
       };
     },

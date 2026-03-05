@@ -6,3 +6,4 @@ export * from './sequence.js';
 export * from './broadcast.js';
 export * from './event.js';
 export * from './listener-registry.js';
+export * from './dispatch-result.js';

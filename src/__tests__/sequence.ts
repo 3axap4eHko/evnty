@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { test as fcTest, fc } from '@fast-check/vitest';
 import { setTimeout } from 'node:timers/promises';
 import { Sequence } from '../sequence';
 
@@ -46,6 +47,7 @@ describe('Sequence test suite', () => {
   });
 
   it('Should merge sequences', async () => {
+    expect.assertions(7);
     const values = [0, 1, 2, 3, 4, 5];
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
@@ -76,12 +78,12 @@ describe('Sequence test suite', () => {
     expect(result.sort()).toEqual(values);
   });
 
-  it('Should change disposed state', async () => {
+  it('Should dispose on abort', async () => {
     const ctrl = new AbortController();
     const sequence = new Sequence(ctrl.signal);
-    expect(sequence.disposed).toBe(false);
+    expect(sequence.emit('test')).toBe(true);
     ctrl.abort();
-    expect(sequence.disposed).toBe(true);
+    expect(sequence.emit('test')).toBe(false);
   });
 
   it('Should implement Promise', async () => {
@@ -121,7 +123,6 @@ describe('Sequence test suite', () => {
     ctrl.abort();
     const sequence = new Sequence<number>(ctrl.signal);
 
-    expect(sequence.disposed).toBe(true);
     expect(sequence.emit(42)).toBe(false);
     expect(sequence.size).toBe(0);
     await expect(sequence.receive()).rejects.toThrow('Disposed');
@@ -140,6 +141,7 @@ describe('Sequence test suite', () => {
   });
 
   it('Should iterate a sequence late', async () => {
+    expect.assertions(7);
     const values = [0, 1, 2, 3, 4, 5];
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
@@ -169,6 +171,7 @@ describe('Sequence test suite', () => {
   });
 
   it('Should abort a sequence iteration and kill sequence', async () => {
+    expect.assertions(6);
     const values = [0, 1, 2, 3, 4, 5];
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
@@ -187,6 +190,7 @@ describe('Sequence test suite', () => {
   });
 
   it('Should break a sequence iteration and keep sequence alive', async () => {
+    expect.assertions(7);
     const values = [0, 1, 2, 3, 4, 5];
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
@@ -241,16 +245,15 @@ describe('Sequence test suite', () => {
     Sequence.merge(target, source);
     source.emit(1);
 
-    // Give microtasks a turn; nothing should be enqueued
     await setTimeout(0);
     expect(target.size).toBe(0);
+    expect(source.size).toBe(1);
   });
 
   it('Should stop merging when target disposed during iteration', async () => {
     const targetCtrl = new AbortController();
     const target = new Sequence<number>(targetCtrl.signal);
-    const sourceCtrl = new AbortController();
-    const source = new Sequence<number>(sourceCtrl.signal);
+    const source = new Sequence<number>();
 
     Sequence.merge(target, source);
 
@@ -261,13 +264,41 @@ describe('Sequence test suite', () => {
 
     targetCtrl.abort();
     source.emit(2);
+    source.emit(3);
     await setTimeout(0);
+    await setTimeout(0);
+
     expect(target.size).toBe(1);
-    sourceCtrl.abort();
+    expect(source.size).toBe(1);
   });
 
-  it('Should dispose sequence signals', () => {
+  it('Should dispose sequence signals on manual dispose', async () => {
     const sequence = new Sequence<number>();
-    expect(() => sequence[Symbol.dispose]()).not.toThrow();
+    sequence[Symbol.dispose]();
+    await expect(sequence.receive()).rejects.toThrow('Disposed');
+  });
+
+  fcTest.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 50 })])('FIFO order is preserved for any values', async (values) => {
+    const sequence = new Sequence<unknown>();
+    for (const v of values) sequence.emit(v);
+    for (const v of values) {
+      await expect(sequence.receive()).resolves.toBe(v);
+    }
+    expect(sequence.size).toBe(0);
+  });
+
+  fcTest.prop([fc.array(fc.integer(), { minLength: 1, maxLength: 30 })])('size tracks queue length correctly', (values) => {
+    const sequence = new Sequence<number>();
+    for (let i = 0; i < values.length; i++) {
+      sequence.emit(values[i]);
+      expect(sequence.size).toBe(i + 1);
+    }
+  });
+
+  fcTest.prop([fc.array(fc.integer(), { minLength: 1, maxLength: 30 })])('emit returns false after dispose', (values) => {
+    const sequence = new Sequence<number>();
+    for (const v of values) expect(sequence.emit(v)).toBe(true);
+    sequence[Symbol.dispose]();
+    for (const v of values) expect(sequence.emit(v)).toBe(false);
   });
 });

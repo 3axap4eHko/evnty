@@ -1,6 +1,7 @@
 import { Fn, MaybePromise } from './types.js';
+import { isThenable, noop } from './utils.js';
 
-const ERR_BRAND = Symbol.for('nalloc.ResultError');
+const ERR_BRAND = Symbol.for('evnty.ResultError');
 
 /**
  * @internal
@@ -26,14 +27,14 @@ export function err<E>(error: E): ResultError<E> {
  * @internal
  */
 export function isErr(result: unknown): result is ResultError<unknown> {
-  return (result as ResultError<unknown>)?.[ERR_BRAND] === true;
+  return typeof result === 'object' && result !== null && (result as Record<symbol, boolean>)[ERR_BRAND] === true;
 }
 
 /**
  * @internal
  */
 export function isOk(result: unknown): boolean {
-  return !(result as Record<symbol, unknown>)?.[ERR_BRAND];
+  return typeof result !== 'object' || result === null || !(result as Record<symbol, boolean>)[ERR_BRAND];
 }
 
 /**
@@ -54,6 +55,78 @@ export function unwrap<T>(results: DispatchResultItem<T>[]): MaybePromise<T>[] {
   return unwrapped;
 }
 
+async function resolveMaybePromises<T>(items: MaybePromise<T>[], asyncIndices: number[]): Promise<T[]> {
+  const pending = new Array<PromiseLike<T>>(asyncIndices.length);
+  for (let j = 0; j < asyncIndices.length; j++) {
+    pending[j] = items[asyncIndices[j]] as PromiseLike<T>;
+  }
+  const resolved = await Promise.all(pending);
+  for (let j = 0; j < asyncIndices.length; j++) {
+    items[asyncIndices[j]] = resolved[j];
+  }
+  return items as T[];
+}
+
+function resolveAll<T>(results: DispatchResultItem<T>[]): T[] | Promise<T[]> {
+  const len = results.length;
+  if (len === 0) return results as T[];
+
+  let firstError: unknown;
+  let hasError = false;
+  let asyncIndices: number[] | null = null;
+
+  for (let i = 0; i < len; i++) {
+    const r = results[i];
+    if (isErr(r)) {
+      if (!hasError) {
+        hasError = true;
+        firstError = r.error;
+      }
+    } else if (isThenable(r)) {
+      (asyncIndices ??= []).push(i);
+    }
+  }
+
+  if (hasError) {
+    if (asyncIndices !== null) {
+      for (let j = 0; j < asyncIndices.length; j++) {
+        (results[asyncIndices[j]] as PromiseLike<T>).then(noop, noop);
+      }
+    }
+    return Promise.reject(firstError);
+  }
+  if (asyncIndices === null) return results as T[];
+
+  return resolveMaybePromises(results as MaybePromise<T>[], asyncIndices);
+}
+
+function settleAll<T>(results: DispatchResultItem<T>[]): PromiseSettledResult<T>[] | Promise<PromiseSettledResult<T>[]> {
+  const len = results.length;
+  if (len === 0) return [] as PromiseSettledResult<T>[];
+
+  let asyncIndices: number[] | null = null;
+  const settled = new Array<MaybePromise<PromiseSettledResult<T>>>(len);
+
+  for (let i = 0; i < len; i++) {
+    const r = results[i];
+    if (isErr(r)) {
+      settled[i] = { status: 'rejected', reason: r.error };
+    } else if (isThenable(r)) {
+      (asyncIndices ??= []).push(i);
+      settled[i] = r.then(
+        (value): PromiseFulfilledResult<T> => ({ status: 'fulfilled', value }),
+        (reason: unknown): PromiseRejectedResult => ({ status: 'rejected', reason }),
+      );
+    } else {
+      settled[i] = { status: 'fulfilled', value: r };
+    }
+  }
+
+  if (asyncIndices === null) return settled as PromiseSettledResult<T>[];
+
+  return resolveMaybePromises(settled, asyncIndices);
+}
+
 /**
  * Wraps an array of values or promises (typically listener results) and provides batch resolution.
  *
@@ -61,7 +134,6 @@ export function unwrap<T>(results: DispatchResultItem<T>[]): MaybePromise<T>[] {
  */
 export class DispatchResult<T> implements PromiseLike<T[]> {
   #results: DispatchResultItem<T>[];
-  #unwrapped: MaybePromise<T>[] | undefined;
 
   readonly [Symbol.toStringTag] = 'DispatchResult';
 
@@ -73,20 +145,22 @@ export class DispatchResult<T> implements PromiseLike<T[]> {
     onfulfilled?: Fn<[T[]], MaybePromise<TResult1>> | null,
     onrejected?: Fn<[any], MaybePromise<TResult2>> | null,
   ): PromiseLike<TResult1 | TResult2> {
-    return this.all().then(onfulfilled, onrejected);
+    const resolved = this.all();
+    if (resolved instanceof Promise) return resolved.then(onfulfilled, onrejected);
+    return Promise.resolve(resolved).then(onfulfilled, onrejected);
   }
 
   /**
    * Resolves all listener results, rejecting if any promise rejects or any ResultError exists.
    */
-  all(): Promise<T[]> {
-    return Promise.all((this.#unwrapped ??= unwrap(this.#results)));
+  all(): T[] | Promise<T[]> {
+    return resolveAll(this.#results);
   }
 
   /**
    * Waits for all listener results to settle, regardless of fulfillment or rejection.
    */
-  settled(): Promise<PromiseSettledResult<T>[]> {
-    return Promise.allSettled((this.#unwrapped ??= unwrap(this.#results)));
+  settled(): PromiseSettledResult<T>[] | Promise<PromiseSettledResult<T>[]> {
+    return settleAll(this.#results);
   }
 }

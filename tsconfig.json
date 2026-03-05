@@ -10,14 +10,16 @@
     "moduleResolution": "NodeNext",
     "lib": ["ESNext", "DOM"],
     "rootDir": "src",
-    "outDir": "build"
+    "outDir": "build",
+    "types": [
+      "node",
+      "vitest/globals"
+    ]
   },
   "include": [
     "src/**/*.ts"
   ],
   "exclude": [
-    "**/__tests__",
-    "**/__bench__",
     "node_modules",
     "**/*.tmp.ts",
     "build"

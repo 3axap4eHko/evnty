@@ -1,6 +1,7 @@
+import { test as fcTest, fc } from '@fast-check/vitest';
 import { Broadcast, ConsumerHandle } from '../broadcast';
 
-declare const gc: () => void;
+const noGC = typeof globalThis.gc !== 'function';
 
 describe('Broadcast', () => {
   it('should create a broadcast', () => {
@@ -109,7 +110,7 @@ describe('Broadcast', () => {
     expect(handle.cursor).toBe(1);
   });
 
-  it('should clean up via FinalizationRegistry when handle is garbage collected', async () => {
+  it.skipIf(noGC)('should clean up via FinalizationRegistry when handle is garbage collected', async () => {
     const broadcast = new Broadcast<number>();
 
     let handle: ConsumerHandle | null = broadcast.join();
@@ -145,18 +146,16 @@ describe('Broadcast', () => {
     expect(value).toBe(42);
   });
 
-  it('should return true from emit when there are waiters', async () => {
+  it('should return true from emit when active', () => {
     const broadcast = new Broadcast<number>();
 
-    const promise = broadcast.receive();
     const result = broadcast.emit(42);
-
     expect(result).toBe(true);
-    await promise;
   });
 
-  it('should return false from emit when there are no waiters', () => {
+  it('should return false from emit when disposed', () => {
     const broadcast = new Broadcast<number>();
+    broadcast[Symbol.dispose]();
 
     const result = broadcast.emit(42);
     expect(result).toBe(false);
@@ -205,8 +204,13 @@ describe('Broadcast', () => {
 
   it('should dispose via Symbol.dispose', () => {
     const broadcast = new Broadcast<number>();
+    expect(() => broadcast[Symbol.dispose]()).not.toThrow();
+  });
+
+  it('should be idempotent on double dispose', () => {
+    const broadcast = new Broadcast<number>();
     broadcast[Symbol.dispose]();
-    expect(broadcast.disposed).toBe(true);
+    expect(() => broadcast[Symbol.dispose]()).not.toThrow();
   });
 
   it('should update min cursor when non-min consumer leaves', () => {
@@ -246,7 +250,7 @@ describe('Broadcast', () => {
     expect(broadcast.readable(handle2)).toBe(true);
   });
 
-  it('should handle GC cleanup for multiple handles', async () => {
+  it.skipIf(noGC)('should handle GC cleanup for multiple handles', async () => {
     const broadcast = new Broadcast<number>();
 
     let handle1: ConsumerHandle | null = broadcast.join();
@@ -268,7 +272,7 @@ describe('Broadcast', () => {
     expect(broadcast.size).toBe(0);
   });
 
-  it('should handle mixed manual and GC release', async () => {
+  it.skipIf(noGC)('should handle mixed manual and GC release', async () => {
     const broadcast = new Broadcast<number>();
 
     const handle1 = broadcast.join();
@@ -374,7 +378,7 @@ describe('Broadcast', () => {
     expect(broadcast.readable(handle1)).toBe(true);
   });
 
-  it('should not compact via GC when non-min consumer is collected', async () => {
+  it.skipIf(noGC)('should not compact via GC when non-min consumer is collected', async () => {
     const broadcast = new Broadcast<number>();
 
     const handle1 = broadcast.join();
@@ -419,7 +423,7 @@ describe('Broadcast', () => {
   it('should reject receive() when disposed', async () => {
     const broadcast = new Broadcast<number>();
     broadcast[Symbol.dispose]();
-    await expect(broadcast.receive()).rejects.toThrow('Broadcast disposed');
+    await expect(broadcast.receive()).rejects.toThrow('Disposed');
   });
 
   it('should support then() Promise method', async () => {
@@ -467,4 +471,200 @@ describe('Broadcast', () => {
     expect(() => broadcast.getCursor(handle)).toThrow('Invalid handle');
   });
 
+  it('should throw on getCursor when handle mapping exists but cursor entry is gone', () => {
+    const broadcast = new Broadcast<number>();
+    const handle = broadcast.join();
+    broadcast[Symbol.dispose]();
+    expect(() => broadcast.getCursor(handle)).toThrow('Invalid handle');
+  });
+
+  it('should not lose data when consume() is called on empty buffer', () => {
+    const broadcast = new Broadcast<number>();
+    const handle = broadcast.join();
+
+    expect(broadcast.readable(handle)).toBe(false);
+    const cursorBefore = handle.cursor;
+
+    expect(() => broadcast.consume(handle)).toThrow('No value available');
+
+    expect(handle.cursor).toBe(cursorBefore);
+
+    broadcast.emit(42);
+
+    expect(broadcast.readable(handle)).toBe(true);
+    expect(broadcast.consume(handle)).toBe(42);
+  });
+
+  it('should return done from tryConsume() without moving cursor when empty', () => {
+    const broadcast = new Broadcast<number>();
+    const handle = broadcast.join();
+    const cursorBefore = handle.cursor;
+
+    const result = broadcast.tryConsume(handle);
+
+    expect(result).toEqual({ value: undefined, done: true });
+    expect(handle.cursor).toBe(cursorBefore);
+  });
+
+  it('should allow consuming undefined payload with tryConsume()', () => {
+    const broadcast = new Broadcast<number | undefined>();
+    const handle = broadcast.join();
+
+    broadcast.emit(undefined);
+
+    const result = broadcast.tryConsume(handle);
+    expect(result).toEqual({ value: undefined, done: false });
+  });
+
+  it('should throw from tryConsume() for invalid handle', () => {
+    const broadcast = new Broadcast<number>();
+    const handle = broadcast.join();
+    broadcast.leave(handle);
+    expect(() => broadcast.tryConsume(handle)).toThrow('Invalid handle');
+  });
+
+  it('should throw from tryConsume() when handle mapping exists but cursor entry is gone', () => {
+    const broadcast = new Broadcast<number>();
+    const handle = broadcast.join();
+    broadcast[Symbol.dispose]();
+    expect(() => broadcast.tryConsume(handle)).toThrow('Invalid handle');
+  });
+
+  it('should dispose via dispose() method', async () => {
+    const broadcast = new Broadcast<number>();
+    broadcast.dispose();
+    await expect(broadcast.receive()).rejects.toThrow('Disposed');
+  });
+
+  it('should return done result from iterator return()', async () => {
+    const broadcast = new Broadcast<number>();
+    const iterator = broadcast[Symbol.asyncIterator]();
+    const result = await iterator.return!();
+    expect(result).toEqual({ value: undefined, done: true });
+  });
+
+  it('should read values correctly after repeated compaction', () => {
+    const broadcast = new Broadcast<number>();
+    const slow = broadcast.join();
+    const fast = broadcast.join();
+
+    for (let i = 0; i < 10; i++) broadcast.emit(i);
+
+    for (let i = 0; i < 10; i++) {
+      expect(broadcast.consume(fast)).toBe(i);
+    }
+
+    for (let i = 0; i < 10; i++) {
+      expect(broadcast.consume(slow)).toBe(i);
+    }
+  });
+
+  it('should read values correctly after leave triggers compaction', () => {
+    const broadcast = new Broadcast<number>();
+    const slow = broadcast.join();
+    const fast = broadcast.join();
+
+    for (let i = 0; i < 10; i++) broadcast.emit(i);
+
+    for (let i = 0; i < 5; i++) broadcast.consume(fast);
+    for (let i = 0; i < 3; i++) broadcast.consume(slow);
+
+    broadcast.leave(slow);
+
+    for (let i = 5; i < 10; i++) {
+      expect(broadcast.consume(fast)).toBe(i);
+    }
+  });
+
+  fcTest.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 50 })])('single consumer sees all values in FIFO order', (values) => {
+    const broadcast = new Broadcast<unknown>();
+    const handle = broadcast.join();
+    for (const v of values) broadcast.emit(v);
+    for (const v of values) {
+      expect(broadcast.consume(handle)).toBe(v);
+    }
+    expect(broadcast.readable(handle)).toBe(false);
+  });
+
+  fcTest.prop([fc.array(fc.integer(), { minLength: 1, maxLength: 50 })])('two consumers each see all values independently', (values) => {
+    const broadcast = new Broadcast<number>();
+    const h1 = broadcast.join();
+    const h2 = broadcast.join();
+    for (const v of values) broadcast.emit(v);
+
+    for (const v of values) expect(broadcast.consume(h1)).toBe(v);
+    for (const v of values) expect(broadcast.consume(h2)).toBe(v);
+
+    expect(broadcast.readable(h1)).toBe(false);
+    expect(broadcast.readable(h2)).toBe(false);
+  });
+
+  fcTest.prop([
+    fc.array(fc.integer(), { minLength: 2, maxLength: 50 }),
+    fc.integer({ min: 1 }),
+  ])('late joiner only sees values after join', (values, splitRaw) => {
+    const split = (splitRaw % (values.length - 1)) + 1;
+    const broadcast = new Broadcast<number>();
+
+    for (let i = 0; i < split; i++) broadcast.emit(values[i]);
+    const handle = broadcast.join();
+    for (let i = split; i < values.length; i++) broadcast.emit(values[i]);
+
+    for (let i = split; i < values.length; i++) {
+      expect(broadcast.consume(handle)).toBe(values[i]);
+    }
+    expect(broadcast.readable(handle)).toBe(false);
+  });
+
+  fcTest.prop([
+    fc.array(fc.integer(), { minLength: 1, maxLength: 30 }),
+    fc.integer({ min: 0 }),
+  ])('interleaved consume preserves FIFO per consumer', (values, seedRaw) => {
+    const broadcast = new Broadcast<number>();
+    const h1 = broadcast.join();
+    const h2 = broadcast.join();
+    for (const v of values) broadcast.emit(v);
+
+    let i1 = 0;
+    let i2 = 0;
+    let seed = Math.abs(seedRaw);
+    while (i1 < values.length || i2 < values.length) {
+      if (i1 < values.length && (i2 >= values.length || seed % 2 === 0)) {
+        expect(broadcast.consume(h1)).toBe(values[i1]);
+        i1++;
+      } else if (i2 < values.length) {
+        expect(broadcast.consume(h2)).toBe(values[i2]);
+        i2++;
+      }
+      seed = (seed >>> 1) | 1;
+    }
+  });
+
+  fcTest.prop([
+    fc.array(fc.integer(), { minLength: 1, maxLength: 30 }),
+  ])('leave during consumption does not corrupt other consumer', (values) => {
+    const broadcast = new Broadcast<number>();
+    const keeper = broadcast.join();
+    const leaver = broadcast.join();
+    for (const v of values) broadcast.emit(v);
+
+    const mid = Math.floor(values.length / 2);
+    for (let i = 0; i < mid; i++) broadcast.consume(leaver);
+    broadcast.leave(leaver);
+
+    for (const v of values) {
+      expect(broadcast.consume(keeper)).toBe(v);
+    }
+  });
+
+  fcTest.prop([fc.array(fc.integer(), { minLength: 0, maxLength: 20 })])('size reflects active consumers', (values) => {
+    const broadcast = new Broadcast<number>();
+    const handles = values.map(() => broadcast.join());
+    expect(broadcast.size).toBe(handles.length);
+
+    for (let i = 0; i < handles.length; i++) {
+      broadcast.leave(handles[i]);
+      expect(broadcast.size).toBe(handles.length - i - 1);
+    }
+  });
 });

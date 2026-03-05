@@ -19,11 +19,11 @@ current.measure('instantiation', ({ Event, gc }) => {
 });
 
 current.measure('invoke', ({ event, gc }) => {
-  gc.push(event());
+  gc.push(event.emit());
 });
 
 current.measure('invokes', ({ events, gc }) => {
-  gc.push(events());
+  gc.push(events.emit());
 });
 
 const release = suite.target('release Event', async () => {
@@ -43,10 +43,9 @@ release.measure('instantiation', ({ Event, gc }) => {
 });
 
 release.measure('invoke', ({ event, gc }) => {
-  gc.push(event());
+  gc.push(event.emit());
 });
 
 release.measure('invokes', ({ events, gc }) => {
-  gc.push(events());
+  gc.push(events.emit());
 });
-

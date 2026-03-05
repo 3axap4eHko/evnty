@@ -351,6 +351,94 @@ describe('Utils test suite', () => {
       expect(returnFn).toHaveBeenCalledWith('foo');
       expect(result).toEqual({ done: true, value: 'returned' });
     });
+
+    it('calls inner return when aborted during pending next()', async () => {
+      const ctrl = new AbortController();
+      const nextPromise = Promise.withResolvers<IteratorResult<number, void>>();
+      const returnFn = vi.fn().mockResolvedValue({ done: true, value: undefined });
+
+      const source: AsyncIterable<number, void, unknown> = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: vi.fn(() => nextPromise.promise),
+            return: returnFn,
+          };
+        },
+      };
+
+      const iterator = abortableIterable(source, ctrl.signal)[Symbol.asyncIterator]();
+      const pending = iterator.next();
+      ctrl.abort();
+
+      await expect(pending).resolves.toEqual({ done: true, value: undefined });
+      expect(returnFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call inner return twice when return() called after abort', async () => {
+      const ctrl = new AbortController();
+      const nextPromise = Promise.withResolvers<IteratorResult<number, void>>();
+      const returnFn = vi.fn().mockResolvedValue({ done: true, value: undefined });
+
+      const source: AsyncIterable<number, void, unknown> = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: vi.fn(() => nextPromise.promise),
+            return: returnFn,
+          };
+        },
+      };
+
+      const iterator = abortableIterable(source, ctrl.signal)[Symbol.asyncIterator]();
+      const pending = iterator.next();
+      ctrl.abort();
+      await pending;
+
+      const result = await iterator.return?.();
+      expect(result).toEqual({ done: true, value: undefined });
+      expect(returnFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('cleans up abort listener on abort path', async () => {
+      const ctrl = new AbortController();
+      const signal = ctrl.signal;
+      let listenerCount = 0;
+      const originalAdd = signal.addEventListener.bind(signal);
+      const originalRemove = signal.removeEventListener.bind(signal);
+
+      signal.addEventListener = (...args: Parameters<typeof originalAdd>) => {
+        listenerCount++;
+        return originalAdd(...args);
+      };
+      signal.removeEventListener = (...args: Parameters<typeof originalRemove>) => {
+        listenerCount--;
+        return originalRemove(...args);
+      };
+
+      try {
+        const source: AsyncIterable<number, void, unknown> = {
+          [Symbol.asyncIterator]() {
+            return {
+              next: vi
+                .fn()
+                .mockResolvedValueOnce({ value: 1, done: false })
+                .mockImplementationOnce(() => new Promise<IteratorResult<number, void>>(() => {})),
+              return: vi.fn().mockResolvedValue({ done: true, value: undefined }),
+            };
+          },
+        };
+
+        const iterator = abortableIterable(source, signal)[Symbol.asyncIterator]();
+        await iterator.next();
+        const pending = iterator.next();
+        ctrl.abort();
+        await pending;
+
+        expect(listenerCount).toBe(0);
+      } finally {
+        signal.addEventListener = originalAdd;
+        signal.removeEventListener = originalRemove;
+      }
+    });
   });
 
   it('noop returns undefined', () => {

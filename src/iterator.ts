@@ -1,4 +1,4 @@
-import { mergeIterables, toAsyncIterable, pipe } from './utils.js';
+import { mergeIterables, toAsyncIterable, pipe, isThenable } from './utils.js';
 import { AnyIterable } from './types.js';
 
 const enum OpKind {
@@ -35,10 +35,6 @@ type FusedOp =
   | { kind: OpKind.REDUCE; fn: (acc: unknown, value: unknown, index: number) => unknown; init: unknown; hasInit: boolean }
   | { kind: OpKind.FLAT_MAP; fn: (value: unknown, index: number) => AsyncIterable<unknown, void, unknown> }
   | { kind: OpKind.EXPAND; fn: (value: unknown, index: number) => Iterable<unknown> | Promise<Iterable<unknown>> };
-
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return value !== null && typeof value === 'object' && typeof (value as PromiseLike<unknown>).then === 'function';
-}
 
 class OpState {
   initialized = false;
@@ -527,6 +523,7 @@ function createFusedIterable(iter: AsyncIteratorObject<unknown, unknown, unknown
  * @template TReturn The return type of the iterator
  * @template TNext The type of value that can be passed to next()
  *
+ * @example
  * ```typescript
  * // Create from an async generator
  * async function* numbers() {
@@ -550,6 +547,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param iterable A synchronous iterable to convert
    * @returns A new AsyncIteratorObject wrapping the converted iterable
    *
+   * @example
    * ```typescript
    * const syncArray = [1, 2, 3, 4, 5];
    * const asyncIterator = AsyncIteratorObject.from(syncArray);
@@ -572,6 +570,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param iterables The async iterables to merge
    * @returns A new AsyncIteratorObject yielding values from all sources
    *
+   * @example
    * ```typescript
    * async function* source1() { yield 1; yield 3; }
    * async function* source2() { yield 2; yield 4; }
@@ -605,9 +604,8 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   }
 
   /**
-   * Low-level transformation method using generator functions.
-   * Allows custom async transformations by providing a generator factory.
-   * Used internally by other transformation methods.
+   * Escape hatch for custom transformations not covered by the built-in operators.
+   * Materializes the fused operation chain, then applies a generator function to each value.
    *
    * @param generatorFactory A function that returns a generator function for transforming values
    * @param signal Optional AbortSignal to cancel the operation
@@ -640,6 +638,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param callbackfn Function to transform each value
    * @returns A new AsyncIteratorObject yielding transformed values
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3]);
    * const doubled = numbers.map(x => x * 2);
@@ -664,6 +663,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param predicate Function to test each value
    * @returns A new AsyncIteratorObject yielding only values that pass the test
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
    * const evens = numbers.filter(x => x % 2 === 0);
@@ -689,6 +689,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param callbackfn Function that returns a transformed value or undefined to skip
    * @returns A new AsyncIteratorObject yielding non-undefined transformed values
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
    * const doubledEvens = numbers.filterMap(x => x % 2 === 0 ? x * 2 : undefined);
@@ -713,6 +714,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param callbackfn Function to execute for each value
    * @returns A new AsyncIteratorObject yielding the same values
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3]);
    * const logged = numbers.inspect(x => console.log('value:', x)).map(x => x * 2);
@@ -733,6 +735,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param start Starting index (default: 0)
    * @returns A new AsyncIteratorObject yielding [index, value] tuples
    *
+   * @example
    * ```typescript
    * const letters = AsyncIteratorObject.from(['a', 'b', 'c']);
    * const enumerated = letters.enumerate();
@@ -769,6 +772,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param predicate Function to test each value
    * @returns A new AsyncIteratorObject yielding values until predicate fails
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
    * const small = numbers.takeWhile(x => x < 4);
@@ -805,6 +809,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param predicate Function to test each value
    * @returns A new AsyncIteratorObject skipping values until predicate fails
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3, 4, 5]);
    * const afterSmall = numbers.dropWhile(x => x < 3);
@@ -841,6 +846,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param initialValue Optional initial value for the accumulation
    * @returns A new AsyncIteratorObject yielding accumulated values at each step
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3, 4]);
    * const sums = numbers.reduce((sum, x) => sum + x, 0);
@@ -865,11 +871,12 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   /**
    * Transforms each value into multiple values using an expander function.
    * Each input value is expanded into zero or more output values.
-   * Similar to flatMap but for expanding to multiple values rather than flattening iterables.
+   * Like `flatMap` but takes sync Iterables (or Promises of Iterables) instead of AsyncIterables.
    *
    * @param callbackfn Function that returns an iterable of values for each input
    * @returns A new AsyncIteratorObject yielding all expanded values
    *
+   * @example
    * ```typescript
    * const numbers = AsyncIteratorObject.from([1, 2, 3]);
    * const expanded = numbers.expand(x => [x, x * 10]);

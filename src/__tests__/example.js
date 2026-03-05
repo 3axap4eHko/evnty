@@ -1,4 +1,4 @@
-const { createEvent, merge } = require('evnty');
+import { createEvent, merge } from 'evnty';
 
 // Creates a click event
 const clickEvent = createEvent();
@@ -23,20 +23,18 @@ clickEvent.once(({ button }) => {
 });
 
 // Emit some events
-keyPressEvent({ key: 'W' });
-keyPressEvent({ key: 'A' });
-keyPressEvent({ key: 'S' });
-keyPressEvent({ key: 'D' });
+keyPressEvent.emit({ key: 'W' });
+keyPressEvent.emit({ key: 'A' });
+keyPressEvent.emit({ key: 'S' });
+keyPressEvent.emit({ key: 'D' });
 
-clickEvent({ button: 'right' });
-clickEvent({ button: 'left' });
-clickEvent({ button: 'middle' });
+clickEvent.emit({ button: 'right' });
+clickEvent.emit({ button: 'left' });
+clickEvent.emit({ button: 'middle' });
 
 // Unsubscribe click listener
 unsubscribeClick();
 
-// Unsubscribe with a post callback
-const cleanupUnsubscribe = unsubscribeKeyPress.post(() => {
-  console.log('Key press listener has been removed');
-});
-cleanupUnsubscribe();
+// Unsubscribe with a follow-up action
+unsubscribeKeyPress();
+console.log('Key press listener has been removed');
