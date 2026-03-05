@@ -26,7 +26,7 @@
     "docs:dev": "vuepress dev docs",
     "docs:gen": "node ./scripts/docgen.ts src/*.ts",
     "docs:update-package": "pnpm dlx vp-update",
-    "bench": "overtake src/__bench__/event.ts",
+    "bench": "overtake src/__bench__/event.ts --progress",
     "prepare": "git config core.hooksPath .githooks"
   },
   "repository": {
@@ -77,7 +77,7 @@
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
-    "evnty": "^5.1.0",
+    "evnty-release": "npm:evnty@latest",
     "inop": "^0.9.0",
     "overtake": "1.4.0",
     "prettier": "^3.8.1",

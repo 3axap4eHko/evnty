@@ -10,42 +10,41 @@ const current = suite.target('current Event', async () => {
   while (i--) {
     events.on(() => {});
   }
-  const gc: unknown[] = [];
-  return { Event, gc, event, events };
+  return { Event, event, events };
 });
 
-current.measure('instantiation', ({ Event, gc }) => {
-  gc.push(new Event());
+current.measure('instantiation', ({ Event }) => {
+  new Event();
 });
 
-current.measure('invoke', ({ event, gc }) => {
-  gc.push(event.emit());
+current.measure('invoke', ({ event }) => {
+  event.emit();
 });
 
-current.measure('invokes', ({ events, gc }) => {
-  gc.push(events.emit());
+current.measure('invokes', ({ events }) => {
+  events.emit();
 });
 
 const release = suite.target('release Event', async () => {
-  const { Event } = await import('evnty');
+  const { Event } = await import('evnty-release');
   const event = new Event<void>();
   const events = new Event<void>();
-  let i = 10000;
+  let i = 1000;
   while (i--) {
     events.on(() => {});
   }
-  const gc: unknown[] = [];
-  return { Event, gc, event, events };
+  return { Event, event, events };
 });
 
-release.measure('instantiation', ({ Event, gc }) => {
-  gc.push(new Event());
+release.measure('instantiation', ({ Event }) => {
+  new Event();
 });
 
-release.measure('invoke', ({ event, gc }) => {
-  gc.push(event.emit());
+release.measure('invoke', ({ event }) => {
+  event.emit();
 });
 
-release.measure('invokes', ({ events, gc }) => {
-  gc.push(events.emit());
+release.measure('invokes', ({ events }) => {
+  events.emit();
 });
+
