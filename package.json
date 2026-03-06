@@ -67,13 +67,13 @@
     "@stryker-mutator/core": "^9.6.0",
     "@stryker-mutator/typescript-checker": "^9.6.0",
     "@stryker-mutator/vitest-runner": "^9.6.0",
-    "@types/node": "^25.3.3",
+    "@types/node": "^25.3.4",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "@typescript-eslint/typescript-estree": "^8.56.1",
     "@vitest/coverage-v8": "^4.0.18",
-    "@vuepress/bundler-vite": "2.0.0-rc.23",
-    "@vuepress/theme-default": "2.0.0-rc.105",
+    "@vuepress/bundler-vite": "2.0.0-rc.26",
+    "@vuepress/theme-default": "2.0.0-rc.124",
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
@@ -87,7 +87,7 @@
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18",
     "vue": "^3.5.29",
-    "vuepress": "2.0.0-rc.23"
+    "vuepress": "2.0.0-rc.26"
   },
   "packageManager": "pnpm@10.30.3+sha512.c961d1e0a2d8e354ecaa5166b822516668b7f44cb5bd95122d590dd81922f606f5473b6d23ec4a5be05e7fcd18e8488d47d978bbe981872f1145d06e9a740017"
 }
