@@ -1,9 +1,9 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import { globalIgnores } from 'eslint/config';
+import { globalIgnores, defineConfig } from 'eslint/config';
 import prettier from 'eslint-plugin-prettier';
 
-export default tseslint.config(
+export default defineConfig(
   globalIgnores(['**/docs', '**/build', '**/coverage', '**/node_modules', '**/scripts', '**/*.tmp.ts', '**/__tests__/*', '**/__bench__/*', '**/*.js', '**/*.cjs', '**/*.mjs']),
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
