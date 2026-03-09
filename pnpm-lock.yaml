@@ -12,8 +12,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.3)
       '@fast-check/vitest':
-        specifier: ^0.2.4
-        version: 0.2.4(vitest@4.0.18(@types/node@25.3.5)(sass-embedded@1.97.3)(sass@1.97.3))
+        specifier: ^0.3.0
+        version: 0.3.0(vitest@4.0.18(@types/node@25.3.5)(sass-embedded@1.97.3)(sass@1.97.3))
       '@stryker-mutator/core':
         specifier: ^9.6.0
         version: 9.6.0(@types/node@25.3.5)
@@ -600,8 +600,8 @@ packages:
     resolution: {integrity: sha512-iH1B076HoAshH1mLpHMgwdGeTs0CYwL0SPMkGuSebZrwBp16v415e9NZXg2jtrqPVQjf6IANe2Vtlr5KswtcZQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@fast-check/vitest@0.2.4':
-    resolution: {integrity: sha512-Ilcr+JAIPhb1s6FRm4qoglQYSGXXrS+zAupZeNuWAA3qHVGDA1d1Gb84Hb/+otL3GzVZjFJESg5/1SfIvrgssA==}
+  '@fast-check/vitest@0.3.0':
+    resolution: {integrity: sha512-mXxAu7DJtzwSUeOMecZibq/403b8uX1/dWWXXCBgb+j9ERWuN9Hvr6usId+9ivdQ+tJl8H6o+CMv71BmjaENRQ==}
     peerDependencies:
       vitest: ^1 || ^2 || ^3 || ^4
 
@@ -3559,7 +3559,7 @@ snapshots:
       '@eslint/core': 1.1.1
       levn: 0.4.1
 
-  '@fast-check/vitest@0.2.4(vitest@4.0.18(@types/node@25.3.5)(sass-embedded@1.97.3)(sass@1.97.3))':
+  '@fast-check/vitest@0.3.0(vitest@4.0.18(@types/node@25.3.5)(sass-embedded@1.97.3)(sass@1.97.3))':
     dependencies:
       fast-check: 4.5.3
       vitest: 4.0.18(@types/node@25.3.5)(sass-embedded@1.97.3)(sass@1.97.3)
