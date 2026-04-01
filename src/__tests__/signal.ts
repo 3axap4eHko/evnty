@@ -1,6 +1,6 @@
 import { vi, describe, expect, it } from 'vitest';
 import { test as fcTest, fc } from '@fast-check/vitest';
-import { Signal } from '../signal';
+import { Signal } from '../signal.js';
 
 const scheduleSignal = <T>(signal: Signal<T>, value: T, expected: boolean) => {
   process.nextTick((value: T) => {
@@ -142,7 +142,7 @@ describe('Signal test suite', () => {
         yield 1;
         throw new Error('test error');
       },
-    } as Signal<number>;
+    } as unknown as Signal<number>;
 
     Signal.merge(target, source);
 

@@ -856,9 +856,15 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * }
    * ```
    */
-  reduce(callbackfn: (previousValue: T, currentValue: T, currentIndex: number) => T): AsyncIteratorObject<T, void, unknown>;
-  reduce<R>(callbackfn: (previousValue: R, currentValue: T, currentIndex: number) => R, initialValue: R): AsyncIteratorObject<R, void, unknown>;
-  reduce<R>(callbackfn: (previousValue: R, currentValue: T, currentIndex: number) => R, ...args: unknown[]): AsyncIteratorObject<R, void, unknown> {
+  reduce(callbackfn: (previousValue: T, currentValue: T, currentIndex: number) => T | PromiseLike<T>): AsyncIteratorObject<T, void, unknown>;
+  reduce<R>(
+    callbackfn: (previousValue: R, currentValue: T, currentIndex: number) => R | PromiseLike<R>,
+    initialValue: R,
+  ): AsyncIteratorObject<R, void, unknown>;
+  reduce<R>(
+    callbackfn: (previousValue: R, currentValue: T, currentIndex: number) => R | PromiseLike<R>,
+    ...args: unknown[]
+  ): AsyncIteratorObject<R, void, unknown> {
     const hasInit = args.length > 0;
     return new AsyncIteratorObject<R, void, unknown>(this.iterable as AsyncIterable<R, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
       kind: OpKind.REDUCE,

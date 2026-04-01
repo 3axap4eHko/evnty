@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { AsyncIteratorObject } from '../iterator';
+import { AsyncIteratorObject } from '../iterator.js';
 
 describe('AsyncIteratorObject', () => {
   describe('from', () => {

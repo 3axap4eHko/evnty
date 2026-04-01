@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { iterate, setTimeoutAsync, toAsyncIterable, pipe, mapIterator, noop, mergeIterables, abortableIterable } from '../utils';
+import { iterate, setTimeoutAsync, toAsyncIterable, pipe, mapIterator, noop, mergeIterables, abortableIterable } from '../utils.js';
 
 describe('Utils test suite', () => {
 
@@ -125,12 +125,12 @@ describe('Utils test suite', () => {
     it('awaits a promise passed to return()', async () => {
       const array = [1, 2, 3];
       const asyncIt = toAsyncIterable(array)[Symbol.asyncIterator]();
-      const result = await asyncIt.return?.(Promise.resolve('foo'));
+      const result = await asyncIt.return?.(Promise.resolve('foo') as never);
       expect(result).toEqual({ value: 'foo', done: true });
     });
     it('awaits a promise passed to return()', async () => {
       const asyncIt = toAsyncIterable(staticIterable)[Symbol.asyncIterator]();
-      const result = await asyncIt.return?.(Promise.resolve('foo'));
+      const result = await asyncIt.return?.(Promise.resolve('foo') as never);
       expect(result).toEqual({ value: 1, done: true });
     });
     it('passed an error to throw()', async () => {
@@ -203,7 +203,7 @@ describe('Utils test suite', () => {
         return: vi.fn().mockResolvedValue({ value: 2, done: true }),
         throw: vi.fn().mockResolvedValue({ value: 3, done: true }),
       };
-      const mapper = vi.fn((result) => result as IteratorResult<string, string>);
+      const mapper = vi.fn((result) => result as IteratorResult<string, number>);
 
       const mapped = mapIterator<string, number, number, void>(base, mapper);
 
@@ -494,7 +494,7 @@ describe('Utils test suite', () => {
           return {
             next: () => {
               queueMicrotask(() => ctrl?.abort('stop'));
-              return Promise.resolve({ value: 1, done: false });
+              return Promise.resolve({ value: 1, done: false as const });
             },
           };
         },

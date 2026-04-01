@@ -1,8 +1,8 @@
 import { vi } from 'vitest';
 import { test as fcTest, fc } from '@fast-check/vitest';
-import createEventDefault, { createEvent, merge, createInterval, Event, EventHandler } from '../event';
-import { DispatchResult, err } from '../dispatch-result';
-import { Sequence } from '../sequence';
+import createEventDefault, { createEvent, merge, createInterval, Event, EventHandler } from '../event.js';
+import { DispatchResult, err } from '../dispatch-result.js';
+import { Sequence } from '../sequence.js';
 
 const processTick = () => new Promise(resolve => process.nextTick(resolve));
 

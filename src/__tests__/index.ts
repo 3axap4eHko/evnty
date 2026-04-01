@@ -1,4 +1,4 @@
-import * as evnty from '../index';
+import * as evnty from '../index.js';
 
 describe('evnty export test suite', () => {
   it('exports functions and classes', () => {

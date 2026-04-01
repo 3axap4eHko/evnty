@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import { test as fcTest, fc } from '@fast-check/vitest';
 import { setTimeout } from 'node:timers/promises';
-import { Sequence } from '../sequence';
+import { Sequence } from '../sequence.js';
 
 describe('Sequence test suite', () => {
   it('Should create a sequence', async () => {
@@ -176,12 +176,12 @@ describe('Sequence test suite', () => {
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
     const iterator = values.values();
-    expect(sequence.emit(iterator.next().value)).toEqual(true);
+    expect(sequence.emit(iterator.next().value!)).toEqual(true);
     for await (const value of sequence) {
       if (value === 3) {
         ctrl.abort('done');
       } else {
-        expect(sequence.emit(iterator.next().value)).toEqual(true);
+        expect(sequence.emit(iterator.next().value!)).toEqual(true);
       }
     }
     expect(iterator.next().value).toEqual(4);
@@ -195,12 +195,12 @@ describe('Sequence test suite', () => {
     const ctrl = new AbortController();
     const sequence = new Sequence<number>(ctrl.signal);
     const iterator = values.values();
-    expect(sequence.emit(iterator.next().value)).toEqual(true);
+    expect(sequence.emit(iterator.next().value!)).toEqual(true);
     for await (const value of sequence) {
       if (value === 3) {
         break;
       } else {
-        expect(sequence.emit(iterator.next().value)).toEqual(true);
+        expect(sequence.emit(iterator.next().value!)).toEqual(true);
       }
     }
     expect(iterator.next().value).toEqual(4);
@@ -228,7 +228,7 @@ describe('Sequence test suite', () => {
         yield 1;
         throw new Error('test error');
       },
-    } as Sequence<number>;
+    } as unknown as Sequence<number>;
 
     Sequence.merge(target, source);
 

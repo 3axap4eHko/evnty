@@ -1,5 +1,5 @@
 import { test as fcTest, fc } from '@fast-check/vitest';
-import { Broadcast, ConsumerHandle } from '../broadcast';
+import { Broadcast, ConsumerHandle } from '../broadcast.js';
 
 const noGC = typeof globalThis.gc !== 'function';
 
@@ -113,12 +113,12 @@ describe('Broadcast', () => {
   it.skipIf(noGC)('should clean up via FinalizationRegistry when handle is garbage collected', async () => {
     const broadcast = new Broadcast<number>();
 
-    let handle: ConsumerHandle | null = broadcast.join();
+    let handle: ConsumerHandle<number> | null = broadcast.join();
     broadcast.emit(1);
     expect(broadcast.size).toBe(1);
 
     handle = null;
-    gc();
+    gc!();
 
     await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -253,20 +253,20 @@ describe('Broadcast', () => {
   it.skipIf(noGC)('should handle GC cleanup for multiple handles', async () => {
     const broadcast = new Broadcast<number>();
 
-    let handle1: ConsumerHandle | null = broadcast.join();
-    let handle2: ConsumerHandle | null = broadcast.join();
+    let handle1: ConsumerHandle<number> | null = broadcast.join();
+    let handle2: ConsumerHandle<number> | null = broadcast.join();
     broadcast.emit(1);
 
     expect(broadcast.size).toBe(2);
 
     handle1 = null;
-    gc();
+    gc!();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(broadcast.size).toBe(1);
 
     handle2 = null;
-    gc();
+    gc!();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(broadcast.size).toBe(0);
@@ -276,14 +276,14 @@ describe('Broadcast', () => {
     const broadcast = new Broadcast<number>();
 
     const handle1 = broadcast.join();
-    let handle2: ConsumerHandle | null = broadcast.join();
+    let handle2: ConsumerHandle<number> | null = broadcast.join();
     expect(broadcast.size).toBe(2);
 
     broadcast.leave(handle1);
     expect(broadcast.size).toBe(1);
 
     handle2 = null;
-    gc();
+    gc!();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(broadcast.size).toBe(0);
@@ -382,7 +382,7 @@ describe('Broadcast', () => {
     const broadcast = new Broadcast<number>();
 
     const handle1 = broadcast.join();
-    let handle2: ConsumerHandle | null = broadcast.join();
+    let handle2: ConsumerHandle<number> | null = broadcast.join();
 
     broadcast.emit(1);
     broadcast.emit(2);
@@ -393,7 +393,7 @@ describe('Broadcast', () => {
     expect(broadcast.size).toBe(2);
 
     handle2 = null;
-    gc();
+    gc!();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(broadcast.size).toBe(1);
