@@ -54,8 +54,8 @@ importers:
         specifier: ^5.5.5
         version: 5.5.5(eslint-config-prettier@10.1.8(eslint@10.2.0))(eslint@10.2.0)(prettier@3.8.1)
       evnty-release:
-        specifier: npm:evnty@^5.2.17
-        version: evnty@5.2.17
+        specifier: npm:evnty@^5.2.18
+        version: evnty@5.2.18
       inop:
         specifier: ^0.9.0
         version: 0.9.0
@@ -1784,8 +1784,8 @@ packages:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
 
-  evnty@5.2.17:
-    resolution: {integrity: sha512-+rNHxmBWu3SU/bC2oQs37O2Z/mxrrbzlaQxfKDJzYfsRBwzhlPMhmb4PAlnGC8fv6jb0NEYZi7Z2OGuEjqIVYw==}
+  evnty@5.2.18:
+    resolution: {integrity: sha512-Eb3mOdU1Wds9rxL0MP7c/4mLhBiyzNHKKMeEGutWxht8SnL+repisi7x6z802JmrO4i2/uJkwR7n6mPjxiKqDg==}
 
   execa@9.6.1:
     resolution: {integrity: sha512-9Be3ZoN4LmYR90tUoVu2te2BsbzHfhJyfEiAVfz7N5/zv+jduIfLrV2xdQXOHbaD6KgpGdO9PRPM1Y4Q9QkPkA==}
@@ -5015,7 +5015,7 @@ snapshots:
 
   esutils@2.0.3: {}
 
-  evnty@5.2.17: {}
+  evnty@5.2.18: {}
 
   execa@9.6.1:
     dependencies:
