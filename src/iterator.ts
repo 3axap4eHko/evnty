@@ -75,16 +75,8 @@ class ProcessResult {
     readonly flatMapOpIndex: number,
   ) {}
 
-  static continue(): ProcessResult {
-    return new ProcessResult(undefined, false, false, null, -1, null, -1);
-  }
-
   static yield(value: unknown): ProcessResult {
     return new ProcessResult(value, true, false, null, -1, null, -1);
-  }
-
-  static done(): ProcessResult {
-    return new ProcessResult(undefined, false, true, null, -1, null, -1);
   }
 
   static expand(iterator: Iterator<unknown>, opIndex: number): ProcessResult {
@@ -95,6 +87,9 @@ class ProcessResult {
     return new ProcessResult(undefined, false, false, null, -1, iterator, opIndex);
   }
 }
+
+const CONTINUE = Object.freeze(new ProcessResult(undefined, false, false, null, -1, null, -1));
+const DONE = Object.freeze(new ProcessResult(undefined, false, true, null, -1, null, -1));
 
 function findTakeStates(ops: FusedOp[], opStates: OpState[]): OpState[] {
   const takeStates: OpState[] = [];
@@ -134,14 +129,14 @@ async function processOps(inputValue: unknown, ops: FusedOp[], opStates: OpState
       case OpKind.FILTER: {
         const result = op.fn(value, state.index++);
         const passed = isThenable(result) ? await result : result;
-        if (!passed) return ProcessResult.continue();
+        if (!passed) return CONTINUE;
         break;
       }
 
       case OpKind.FILTER_MAP: {
         const result = op.fn(value, state.index++);
         const resolved = isThenable(result) ? await result : result;
-        if (resolved === undefined) return ProcessResult.continue();
+        if (resolved === undefined) return CONTINUE;
         value = resolved;
         break;
       }
@@ -161,21 +156,21 @@ async function processOps(inputValue: unknown, ops: FusedOp[], opStates: OpState
         break;
 
       case OpKind.TAKE:
-        if (state.remaining <= 0) return ProcessResult.done();
+        if (state.remaining <= 0) return DONE;
         state.remaining--;
         break;
 
       case OpKind.TAKE_WHILE: {
         const result = op.fn(value, state.index++);
         const passed = isThenable(result) ? await result : result;
-        if (!passed) return ProcessResult.done();
+        if (!passed) return DONE;
         break;
       }
 
       case OpKind.DROP:
         if (state.remaining > 0) {
           state.remaining--;
-          return ProcessResult.continue();
+          return CONTINUE;
         }
         break;
 
@@ -183,7 +178,7 @@ async function processOps(inputValue: unknown, ops: FusedOp[], opStates: OpState
         if (state.dropping) {
           const result = op.fn(value, state.index++);
           const passed = isThenable(result) ? await result : result;
-          if (passed) return ProcessResult.continue();
+          if (passed) return CONTINUE;
           state.dropping = false;
         }
         break;
@@ -197,7 +192,7 @@ async function processOps(inputValue: unknown, ops: FusedOp[], opStates: OpState
             value = state.value;
           } else {
             state.value = value;
-            return ProcessResult.continue();
+            return CONTINUE;
           }
         } else {
           const result = op.fn(state.value, value, state.index++);
