@@ -1,4 +1,5 @@
 import { mergeIterables, toAsyncIterable, pipe, isThenable } from './utils.js';
+import { ITERATOR_DONE } from './async.js';
 import { AnyIterable } from './types.js';
 
 const enum OpKind {
@@ -344,30 +345,30 @@ function createSimpleIterable(source: AsyncIterable<unknown, unknown, unknown>, 
             if (checkTakeExhausted(takeStates)) {
               done = true;
               await iterator.return?.();
-              return { value: undefined, done: true };
+              return ITERATOR_DONE;
             }
 
             const sourceResult = await iterator.next();
             if (sourceResult.done) {
               done = true;
-              return { value: undefined, done: true };
+              return ITERATOR_DONE;
             }
 
             const result = await processOpsSimple(sourceResult.value, ops, opStates);
             if (result.done) {
               done = true;
               await iterator.return?.();
-              return { value: undefined, done: true };
+              return ITERATOR_DONE;
             }
             if (result.shouldYield) return { value: result.value, done: false };
           }
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
 
         async return(returnValue?: unknown): Promise<IteratorResult<unknown, void>> {
           done = true;
           await iterator.return?.(returnValue);
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
 
         async throw(error?: unknown): Promise<IteratorResult<unknown, void>> {
@@ -408,7 +409,7 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
           done = true;
           await closeInnerIterators();
           await iterator.return?.();
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         }
         if (result.expandIterator) {
           innerStack.push({ type: 'expand', iterator: result.expandIterator, opIndex: result.expandOpIndex });
@@ -455,13 +456,13 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
             if (checkTakeExhausted(takeStates)) {
               done = true;
               await iterator.return?.();
-              return { value: undefined, done: true };
+              return ITERATOR_DONE;
             }
 
             const sourceResult = await iterator.next();
             if (sourceResult.done) {
               done = true;
-              return { value: undefined, done: true };
+              return ITERATOR_DONE;
             }
 
             const result = await processOps(sourceResult.value, ops, opStates, 0);
@@ -469,14 +470,14 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
             if (handled) return handled;
           }
 
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
 
         async return(returnValue?: unknown): Promise<IteratorResult<unknown, void>> {
           done = true;
           await closeInnerIterators();
           await iterator.return?.(returnValue);
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
 
         async throw(error?: unknown): Promise<IteratorResult<unknown, void>> {

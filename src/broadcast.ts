@@ -1,6 +1,6 @@
 import { RingBuffer } from './ring-buffer.js';
 import { Signal } from './signal.js';
-import { Disposer } from './async.js';
+import { Disposer, ITERATOR_DONE, ITERATOR_DONE_PROMISE } from './async.js';
 import { min } from './utils.js';
 import { Action, Fn, Emitter, MaybePromise, Promiseable } from './types.js';
 
@@ -63,13 +63,13 @@ export class BroadcastIterator<T> implements AsyncIterator<T, void, void> {
         await this.#signal.receive();
       }
     } catch {
-      return { value: undefined, done: true };
+      return ITERATOR_DONE;
     }
   }
 
-  async return(): Promise<IteratorResult<T, void>> {
+  return(): Promise<IteratorResult<T, void>> {
     this.#broadcast.leave(this.#handle);
-    return { value: undefined, done: true };
+    return ITERATOR_DONE_PROMISE;
   }
 }
 
@@ -302,7 +302,7 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
     const cursor = this.#cursors.get(id);
     if (cursor === undefined) throw new Error('Invalid handle');
     if (cursor >= this.#buffer.right) {
-      return { value: undefined, done: true };
+      return ITERATOR_DONE;
     }
 
     const value = this.#buffer.peekAt(cursor)!;

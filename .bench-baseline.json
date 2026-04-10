@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "timestamp": "2026-04-10T17:26:48.360Z",
+  "results": {
+    "current Event/instantiation/evnty benchmark": {
+      "ops": 29102761,
+      "heapUsedKB": 1744,
+      "dceWarning": false
+    },
+    "current Event/invoke/evnty benchmark": {
+      "ops": 215053763,
+      "heapUsedKB": 0,
+      "dceWarning": false
+    },
+    "current Event/invokes/evnty benchmark": {
+      "ops": 206136,
+      "heapUsedKB": 466,
+      "dceWarning": false
+    }
+  }
+}

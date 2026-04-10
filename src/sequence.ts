@@ -122,10 +122,9 @@ export class Sequence<T> extends Async<T, boolean> {
    * sequence.emit('new item'); // Safe to add, queue has space
    * ```
    */
-  async reserve(capacity: number): Promise<void> {
-    while (this.#queue.length > capacity) {
-      await this.#sendSignal;
-    }
+  reserve(capacity: number): Promise<void> {
+    if (this.#queue.length <= capacity) return Promise.resolve();
+    return this.#sendSignal.receive().then(() => this.reserve(capacity));
   }
 
   /**
@@ -165,12 +164,12 @@ export class Sequence<T> extends Async<T, boolean> {
    * const value = await valuePromise; // 42
    * ```
    */
-  async receive(): Promise<T> {
-    while (!this.#queue.length) {
-      await this.#nextSignal;
+  receive(): Promise<T> {
+    if (this.#queue.length) {
+      this.#sendSignal.emit();
+      return Promise.resolve(this.#queue.shift()!);
     }
-    this.#sendSignal.emit();
-    return this.#queue.shift()!;
+    return this.#nextSignal.receive().then(() => this.receive());
   }
 
   /**

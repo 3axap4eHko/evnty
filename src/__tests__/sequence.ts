@@ -220,6 +220,33 @@ describe('Sequence test suite', () => {
     expect(values).toEqual([1, 2]);
   });
 
+  it('Should receive value emitted from a microtask inside for-await body', async () => {
+    const seq = new Sequence<number>();
+    const received: number[] = [];
+
+    const loop = (async () => {
+      for await (const val of seq) {
+        received.push(val);
+        if (val >= 3) return;
+        Promise.resolve().then(() => {
+          seq.emit(val + 1);
+        });
+      }
+    })();
+
+    await setTimeout(10);
+    seq.emit(0);
+
+    await Promise.race([
+      loop,
+      setTimeout(3000).then(() => {
+        throw new Error('Sequence stuck: for-await never received value');
+      }),
+    ]);
+
+    expect(received).toEqual([0, 1, 2, 3]);
+  });
+
   it('Should handle merge with throwing source iterator', async () => {
     const ctrl = new AbortController();
     const target = new Sequence<number>(ctrl.signal);

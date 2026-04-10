@@ -1,5 +1,5 @@
 import { Callback, Listener, FilterFunction, Predicate, Mapper, Reducer, Action, Fn, Emitter, MaybePromise, Promiseable } from './types.js';
-import { Disposer } from './async.js';
+import { Disposer, ITERATOR_DONE, ITERATOR_DONE_PROMISE } from './async.js';
 import { Signal } from './signal.js';
 import { ListenerRegistry } from './listener-registry.js';
 import { DispatchResult } from './dispatch-result.js';
@@ -16,17 +16,15 @@ export class EventIterator<T> implements AsyncIterator<T, void, void> {
     this.#signal = signal;
   }
 
-  async next(): Promise<IteratorResult<T, void>> {
-    try {
-      const value = await this.#signal.receive();
-      return { value, done: false };
-    } catch {
-      return { value: undefined, done: true };
-    }
+  next(): Promise<IteratorResult<T, void>> {
+    return this.#signal.receive().then(
+      (value): IteratorResult<T, void> => ({ value, done: false }),
+      (): IteratorResult<T, void> => ITERATOR_DONE,
+    );
   }
 
-  async return(): Promise<IteratorResult<T, void>> {
-    return { value: undefined, done: true };
+  return(): Promise<IteratorResult<T, void>> {
+    return ITERATOR_DONE_PROMISE;
   }
 }
 

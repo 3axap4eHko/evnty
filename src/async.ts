@@ -41,6 +41,16 @@ export class Disposer {
 /**
  * @internal
  */
+export const ITERATOR_DONE: IteratorResult<never, void> = Object.freeze({ value: undefined, done: true });
+
+/**
+ * @internal
+ */
+export const ITERATOR_DONE_PROMISE: Promise<IteratorResult<never, void>> = Promise.resolve(ITERATOR_DONE);
+
+/**
+ * @internal
+ */
 export interface Async<T, R> extends Emitter<T, R>, Disposable {}
 
 /**
@@ -84,19 +94,17 @@ export abstract class Async<T, R> implements Emitter<T, R>, Promiseable<T>, Prom
     return this.receive().then(onfulfilled, onrejected);
   }
 
-  async next(): Promise<IteratorResult<T, void>> {
-    try {
-      const value = await this.receive();
-      return { value, done: false };
-    } catch {
-      return { value: undefined, done: true };
-    }
+  next(): Promise<IteratorResult<T, void>> {
+    return this.receive().then(
+      (value) => ({ value, done: false }),
+      () => ITERATOR_DONE,
+    );
   }
 
-  async return(): Promise<IteratorResult<T, void>> {
+  return(): Promise<IteratorResult<T, void>> {
     // Stryker disable next-line OptionalChaining: all subclasses define dispose()
     this.dispose?.();
-    return { value: undefined, done: true };
+    return ITERATOR_DONE_PROMISE;
   }
 
   [Symbol.asyncIterator](): AsyncIterator<T, void, void> {

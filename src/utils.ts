@@ -1,4 +1,5 @@
 import { Sequence } from './sequence.js';
+import { ITERATOR_DONE } from './async.js';
 import { AnyIterator, AnyIterable, MaybePromise } from './types.js';
 
 /**
@@ -137,20 +138,21 @@ export function abortableIterable<T, TReturn, TNext>(iterable: AsyncIterable<T, 
       const race = [promise, undefined] as unknown as [Promise<void>, Promise<IteratorResult<T, TReturn>>];
 
       return {
-        async next(...args: [] | [TNext]): Promise<IteratorResult<T, TReturn>> {
+        next(...args: [] | [TNext]): Promise<IteratorResult<T, TReturn>> {
           race[1] = iterator.next(...args);
-          const result = await Promise.race(race);
-          if (result === undefined) {
-            void finish();
-            return { done: true, value: undefined as TReturn };
-          }
-          if (result.done) {
-            closed = true;
-            signal.removeEventListener('abort', onAbort);
-          }
-          return result;
+          return Promise.race(race).then((result) => {
+            if (result === undefined) {
+              void finish();
+              return { done: true, value: undefined as TReturn } as IteratorResult<T, TReturn>;
+            }
+            if (result.done) {
+              closed = true;
+              signal.removeEventListener('abort', onAbort);
+            }
+            return result;
+          });
         },
-        async return(value?: TReturn): Promise<IteratorResult<T, TReturn>> {
+        return(value?: TReturn): Promise<IteratorResult<T, TReturn>> {
           return finish(value);
         },
       };
@@ -212,7 +214,7 @@ export const iterate: Iterate = (startOrCount?: number, countWhenTwoArgs?: numbe
             idx++;
             return { value, done: false };
           }
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
         return(value) {
           idx = count;
@@ -284,18 +286,17 @@ export const toAsyncIterable = <T, TReturn, TNext>(iterable: Iterable<T, TReturn
     [Symbol.asyncIterator]() {
       const iterator = iterable[Symbol.iterator]();
       return {
-        async next(...args: [TNext] | []) {
-          return iterator.next(...args);
+        next(...args: [TNext] | []) {
+          return Promise.resolve(iterator.next(...args));
         },
-        async return(maybeValue) {
-          const value = await maybeValue;
-          return iterator.return?.(value) ?? ({ value, done: true } as IteratorResult<T, TReturn>);
+        return(maybeValue) {
+          return Promise.resolve(maybeValue).then((value) => iterator.return?.(value) ?? ({ value, done: true } as IteratorResult<T, TReturn>));
         },
-        async throw(error) {
+        throw(error) {
           if (iterator.throw) {
-            return iterator.throw(error);
+            return Promise.resolve(iterator.throw(error));
           }
-          throw error;
+          return Promise.reject(error);
         },
       } satisfies AsyncIterator<T, TReturn, TNext>;
     },
@@ -370,7 +371,7 @@ export const mergeIterables = <T>(...iterables: AsyncIterable<T, void, unknown>[
     [Symbol.asyncIterator]() {
       if (iterables.length === 0) {
         return {
-          next: async () => ({ value: undefined, done: true }),
+          next: () => Promise.resolve(ITERATOR_DONE),
         };
       }
 
@@ -407,18 +408,18 @@ export const mergeIterables = <T>(...iterables: AsyncIterable<T, void, unknown>[
             return { value, done: false };
           } catch {
             if (ctrl.signal.aborted && ctrl.signal.reason === exit) {
-              return { value: undefined, done: true };
+              return ITERATOR_DONE;
             }
             throw ctrl.signal.reason;
           }
         },
         return: async () => {
           ctrl.abort(exit);
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
         throw: async (error?: unknown) => {
           ctrl.abort(error);
-          return { value: undefined, done: true };
+          return ITERATOR_DONE;
         },
       };
     },
