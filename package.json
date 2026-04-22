@@ -73,7 +73,7 @@
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
     "@typescript-eslint/typescript-estree": "^8.59.0",
-    "@vitest/coverage-v8": "^4.1.4",
+    "@vitest/coverage-v8": "^4.1.5",
     "@vuepress/bundler-vite": "2.0.0-rc.28",
     "@vuepress/theme-default": "2.0.0-rc.128",
     "eslint": "^10.2.1",
@@ -86,7 +86,7 @@
     "sass-embedded": "^1.99.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
-    "vitest": "^4.1.4",
+    "vitest": "^4.1.5",
     "vue": "^3.5.32",
     "vuepress": "2.0.0-rc.28"
   },
