@@ -90,5 +90,5 @@
     "vue": "^3.5.33",
     "vuepress": "2.0.0-rc.28"
   },
-  "packageManager": "pnpm@10.33.1"
+  "packageManager": "pnpm@10.33.2"
 }
