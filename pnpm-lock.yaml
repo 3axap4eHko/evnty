@@ -12,8 +12,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.2.1)
       '@fast-check/vitest':
-        specifier: ^0.4.0
-        version: 0.4.0(vitest@4.1.5)
+        specifier: ^0.4.1
+        version: 0.4.1(vitest@4.1.5)
       '@stryker-mutator/core':
         specifier: ^9.6.1
         version: 9.6.1(@types/node@25.6.0)
@@ -450,8 +450,8 @@ packages:
     resolution: {integrity: sha512-rZAP3aVgB9ds9KOeUSL+zZ21hPmo8dh6fnIFwRQj5EAZl9gzR7wxYbYXYysAM8CTqGmUGyp2S4kUdV17MnGuWQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@fast-check/vitest@0.4.0':
-    resolution: {integrity: sha512-uv/x7EyT9/fRM0oxNP2myhxHtB1pZyHYMMLVoBGFff57cyINSGftPf3ZhqNzww7ajn/ufr/Bx6OPXX/TUFezmQ==}
+  '@fast-check/vitest@0.4.1':
+    resolution: {integrity: sha512-OX6TecB+ZzRfPc49jcPChcV1cf5aDu77CdDU8liecWVam7eD7mPvJNP50b9bBSTxVoGN5wzxrX9PIcCnqgC8bg==}
     peerDependencies:
       vitest: ^4.1.0
 
@@ -3447,7 +3447,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@fast-check/vitest@0.4.0(vitest@4.1.5)':
+  '@fast-check/vitest@0.4.1(vitest@4.1.5)':
     dependencies:
       fast-check: 4.6.0
       vitest: 4.1.5(@types/node@25.6.0)(@vitest/coverage-v8@4.1.5)(vite@8.0.8(@types/node@25.6.0)(esbuild@0.27.7)(sass-embedded@1.99.0)(sass@1.99.0)(yaml@2.8.3))
