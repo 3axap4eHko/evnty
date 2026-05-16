@@ -76,7 +76,7 @@
     "@vitest/coverage-v8": "^4.1.6",
     "@vuepress/bundler-vite": "2.0.0-rc.30",
     "@vuepress/theme-default": "2.0.0-rc.130",
-    "eslint": "^10.3.0",
+    "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "inop": "^0.9.0",
