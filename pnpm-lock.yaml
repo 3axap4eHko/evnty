@@ -63,8 +63,8 @@ importers:
         specifier: ^3.9.6
         version: 3.9.6
       recast:
-        specifier: ^0.23.16
-        version: 0.23.16
+        specifier: ^0.23.19
+        version: 0.23.19
       sass-embedded:
         specifier: ^1.100.0
         version: 1.100.0
@@ -2738,8 +2738,8 @@ packages:
     resolution: {integrity: sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==}
     engines: {node: '>= 20.19.0'}
 
-  recast@0.23.16:
-    resolution: {integrity: sha512-qIQstR1qb/hoVsHtsAsHDuwN/VLMxAYdDjH2yVcZ1lyz/wDJvclyoxNdilAHcHdodPL3ikWcA3Wzqhy2NqLUsA==}
+  recast@0.23.19:
+    resolution: {integrity: sha512-T98lym7kH+pnZmRaD8yDRdaNqyUbwnbEBx0MuchrzMFOEMray4AO3ZJoTUZ5r78Ao78X/OhzW0DL8GB85w/I2w==}
     engines: {node: '>= 4'}
 
   rehype-parse@9.0.1:
@@ -6177,7 +6177,7 @@ snapshots:
 
   readdirp@5.0.0: {}
 
-  recast@0.23.16:
+  recast@0.23.19:
     dependencies:
       ast-types: 0.16.1
       esprima: 4.0.1
