@@ -75,7 +75,7 @@
     "@typescript-eslint/typescript-estree": "^8.69.0",
     "@vitest/coverage-v8": "^4.1.11",
     "@vuepress/bundler-vite": "2.0.0-rc.31",
-    "@vuepress/theme-default": "2.0.0-rc.132",
+    "@vuepress/theme-default": "2.0.0-rc.134",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
