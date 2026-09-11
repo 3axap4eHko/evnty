@@ -115,7 +115,13 @@ function checkTakeExhausted(takeStates: OpState[]): boolean {
   return false;
 }
 
-async function processOps(inputValue: unknown, ops: FusedOp[], opStates: OpState[], startIndex: number): Promise<ProcessResult> {
+async function processOps(
+  inputValue: unknown,
+  ops: FusedOp[],
+  opStates: OpState[],
+  startIndex: number,
+  takeState: { exhaustedIndex: number },
+): Promise<ProcessResult> {
   let value = inputValue;
 
   for (let i = startIndex; i < ops.length; i++) {
@@ -158,7 +164,7 @@ async function processOps(inputValue: unknown, ops: FusedOp[], opStates: OpState
 
       case OpKind.TAKE:
         if (state.remaining <= 0) return DONE;
-        state.remaining--;
+        if (--state.remaining <= 0) takeState.exhaustedIndex = Math.max(takeState.exhaustedIndex, i);
         break;
 
       case OpKind.TAKE_WHILE: {
@@ -390,7 +396,10 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
     [Symbol.asyncIterator]: () => {
       const iterator = source[Symbol.asyncIterator]();
       const opStates = ops.map(OpState.from);
-      const takeStates = findTakeStates(ops, opStates);
+      const takeState = { exhaustedIndex: -1 };
+      for (let i = 0; i < ops.length; i++) {
+        if (ops[i].kind === OpKind.TAKE && opStates[i].remaining <= 0) takeState.exhaustedIndex = i;
+      }
 
       let done = false;
       const innerStack: InnerFrame[] = [];
@@ -430,10 +439,14 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
           while (!done) {
             if (innerStack.length > 0) {
               const frame = innerStack[innerStack.length - 1];
+              if (takeState.exhaustedIndex > frame.opIndex) {
+                await handleResult(DONE);
+                return ITERATOR_DONE;
+              }
               if (frame.type === 'expand') {
                 const expandResult = frame.iterator.next();
                 if (!expandResult.done) {
-                  const result = await processOps(expandResult.value, ops, opStates, frame.opIndex + 1);
+                  const result = await processOps(expandResult.value, ops, opStates, frame.opIndex + 1, takeState);
                   const handled = await handleResult(result);
                   if (handled) return handled;
                   continue;
@@ -443,7 +456,7 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
               } else {
                 const flatMapResult = await frame.iterator.next();
                 if (!flatMapResult.done) {
-                  const result = await processOps(flatMapResult.value, ops, opStates, frame.opIndex + 1);
+                  const result = await processOps(flatMapResult.value, ops, opStates, frame.opIndex + 1, takeState);
                   const handled = await handleResult(result);
                   if (handled) return handled;
                   continue;
@@ -453,7 +466,7 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
               }
             }
 
-            if (checkTakeExhausted(takeStates)) {
+            if (takeState.exhaustedIndex >= 0) {
               done = true;
               await iterator.return?.();
               return ITERATOR_DONE;
@@ -465,7 +478,7 @@ function createExpandingIterable(source: AsyncIterable<unknown, unknown, unknown
               return ITERATOR_DONE;
             }
 
-            const result = await processOps(sourceResult.value, ops, opStates, 0);
+            const result = await processOps(sourceResult.value, ops, opStates, 0, takeState);
             const handled = await handleResult(result);
             if (handled) return handled;
           }
@@ -594,7 +607,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   readonly [Symbol.toStringTag] = 'AsyncIteratorObject';
 
   constructor(iterable: AsyncIterable<T, TReturn, TNext>, parent: AsyncIteratorObject<unknown, unknown, unknown> | null = null, op: FusedOp | null = null) {
-    this.iterable = iterable as AsyncIterable<unknown, unknown, unknown>;
+    this.iterable = iterable;
     this.parent = parent;
     this.op = op;
   }
@@ -608,7 +621,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @returns A new AsyncIteratorObject with transformed values
    */
   pipe<U>(generatorFactory: () => (value: T) => AnyIterable<U, void, unknown>, signal?: AbortSignal): AsyncIteratorObject<U, void, unknown> {
-    const materialized = createFusedIterable(this as AsyncIteratorObject<unknown, unknown, unknown>);
+    const materialized = createFusedIterable(this);
     const generator = pipe(materialized as AsyncIterable<T>, generatorFactory, signal);
     return new AsyncIteratorObject<U, void, unknown>(generator);
   }
@@ -620,11 +633,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @returns A new AsyncIteratorObject yielding awaited values
    */
   awaited(): AsyncIteratorObject<Awaited<T>, void, unknown> {
-    return new AsyncIteratorObject<Awaited<T>, void, unknown>(
-      this.iterable as AsyncIterable<Awaited<T>, void, unknown>,
-      this as AsyncIteratorObject<unknown, unknown, unknown>,
-      { kind: OpKind.AWAITED },
-    );
+    return new AsyncIteratorObject<Awaited<T>, void, unknown>(this.iterable as AsyncIterable<Awaited<T>, void, unknown>, this, { kind: OpKind.AWAITED });
   }
 
   /**
@@ -645,7 +654,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * ```
    */
   map<U>(callbackfn: (value: T, index: number) => U): AsyncIteratorObject<U, void, unknown> {
-    return new AsyncIteratorObject<U, void, unknown>(this.iterable as AsyncIterable<U, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<U, void, unknown>(this.iterable as AsyncIterable<U, void, unknown>, this, {
       kind: OpKind.MAP,
       fn: callbackfn as (value: unknown, index: number) => unknown,
     });
@@ -672,7 +681,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   filter(predicate: (value: T, index: number) => unknown): AsyncIteratorObject<T, void, unknown>;
   filter<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown>;
   filter<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown> {
-    return new AsyncIteratorObject<S, void, unknown>(this.iterable as AsyncIterable<S, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<S, void, unknown>(this.iterable as AsyncIterable<S, void, unknown>, this, {
       kind: OpKind.FILTER,
       fn: predicate as (value: unknown, index: number) => unknown,
     });
@@ -698,7 +707,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   filterMap<U>(callbackfn: (value: T, index: number) => U): AsyncIteratorObject<Exclude<Awaited<U>, undefined>, void, unknown> {
     return new AsyncIteratorObject<Exclude<Awaited<U>, undefined>, void, unknown>(
       this.iterable as AsyncIterable<Exclude<Awaited<U>, undefined>, void, unknown>,
-      this as AsyncIteratorObject<unknown, unknown, unknown>,
+      this,
       { kind: OpKind.FILTER_MAP, fn: callbackfn as (value: unknown, index: number) => unknown },
     );
   }
@@ -717,11 +726,10 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * ```
    */
   inspect(callbackfn: (value: T, index: number) => unknown): AsyncIteratorObject<T, TReturn, TNext> {
-    return new AsyncIteratorObject<T, TReturn, TNext>(
-      this.iterable as AsyncIterable<T, TReturn, TNext>,
-      this as AsyncIteratorObject<unknown, unknown, unknown>,
-      { kind: OpKind.INSPECT, fn: callbackfn as (value: unknown, index: number) => unknown },
-    );
+    return new AsyncIteratorObject<T, TReturn, TNext>(this.iterable as AsyncIterable<T, TReturn, TNext>, this, {
+      kind: OpKind.INSPECT,
+      fn: callbackfn as (value: unknown, index: number) => unknown,
+    });
   }
 
   /**
@@ -742,11 +750,10 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * ```
    */
   enumerate(start: number = 0): AsyncIteratorObject<[number, T], void, unknown> {
-    return new AsyncIteratorObject<[number, T], void, unknown>(
-      this.iterable as AsyncIterable<[number, T], void, unknown>,
-      this as AsyncIteratorObject<unknown, unknown, unknown>,
-      { kind: OpKind.ENUMERATE, start },
-    );
+    return new AsyncIteratorObject<[number, T], void, unknown>(this.iterable as AsyncIterable<[number, T], void, unknown>, this, {
+      kind: OpKind.ENUMERATE,
+      start,
+    });
   }
 
   /**
@@ -754,7 +761,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param limit The maximum number of values to yield.
    */
   take(limit: number): AsyncIteratorObject<T, void, unknown> {
-    return new AsyncIteratorObject<T, void, unknown>(this.iterable as AsyncIterable<T, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<T, void, unknown>(this.iterable as AsyncIterable<T, void, unknown>, this, {
       kind: OpKind.TAKE,
       limit,
     });
@@ -781,7 +788,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
   takeWhile(predicate: (value: T, index: number) => unknown): AsyncIteratorObject<T, void, unknown>;
   takeWhile<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown>;
   takeWhile<S extends T>(predicate: (value: T, index: number) => value is S): AsyncIteratorObject<S, void, unknown> {
-    return new AsyncIteratorObject<S, void, unknown>(this.iterable as AsyncIterable<S, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<S, void, unknown>(this.iterable as AsyncIterable<S, void, unknown>, this, {
       kind: OpKind.TAKE_WHILE,
       fn: predicate as (value: unknown, index: number) => unknown,
     });
@@ -792,7 +799,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param count The number of values to drop.
    */
   drop(count: number): AsyncIteratorObject<T, void, unknown> {
-    return new AsyncIteratorObject<T, void, unknown>(this.iterable as AsyncIterable<T, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<T, void, unknown>(this.iterable as AsyncIterable<T, void, unknown>, this, {
       kind: OpKind.DROP,
       count,
     });
@@ -816,7 +823,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * ```
    */
   dropWhile(predicate: (value: T, index: number) => unknown): AsyncIteratorObject<T, void, unknown> {
-    return new AsyncIteratorObject<T, void, unknown>(this.iterable as AsyncIterable<T, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<T, void, unknown>(this.iterable as AsyncIterable<T, void, unknown>, this, {
       kind: OpKind.DROP_WHILE,
       fn: predicate as (value: unknown, index: number) => unknown,
     });
@@ -827,7 +834,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * @param callback A function that accepts up to two arguments to be used to transform values from the underlying iterator into new iterators or iterables to be flattened into the result.
    */
   flatMap<U>(callback: (value: T, index: number) => AsyncIterable<U, void, unknown>): AsyncIteratorObject<U, void, unknown> {
-    return new AsyncIteratorObject<U, void, unknown>(this.iterable as AsyncIterable<U, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<U, void, unknown>(this.iterable as AsyncIterable<U, void, unknown>, this, {
       kind: OpKind.FLAT_MAP,
       fn: callback as (value: unknown, index: number) => AsyncIterable<unknown, void, unknown>,
     });
@@ -862,7 +869,7 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
     ...args: unknown[]
   ): AsyncIteratorObject<R, void, unknown> {
     const hasInit = args.length > 0;
-    return new AsyncIteratorObject<R, void, unknown>(this.iterable as AsyncIterable<R, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<R, void, unknown>(this.iterable as AsyncIterable<R, void, unknown>, this, {
       kind: OpKind.REDUCE,
       fn: callbackfn as (acc: unknown, value: unknown, index: number) => unknown,
       init: args[0],
@@ -889,13 +896,13 @@ export class AsyncIteratorObject<T, TReturn, TNext> {
    * ```
    */
   expand<U>(callbackfn: (value: T, index: number) => Promise<Iterable<U>> | Iterable<U>): AsyncIteratorObject<U, void, unknown> {
-    return new AsyncIteratorObject<U, void, unknown>(this.iterable as AsyncIterable<U, void, unknown>, this as AsyncIteratorObject<unknown, unknown, unknown>, {
+    return new AsyncIteratorObject<U, void, unknown>(this.iterable as AsyncIterable<U, void, unknown>, this, {
       kind: OpKind.EXPAND,
       fn: callbackfn as (value: unknown, index: number) => Iterable<unknown> | Promise<Iterable<unknown>>,
     });
   }
 
   [Symbol.asyncIterator](): AsyncIterator<T, TReturn, TNext> {
-    return createFusedIterable(this as AsyncIteratorObject<unknown, unknown, unknown>)[Symbol.asyncIterator]() as AsyncIterator<T, TReturn, TNext>;
+    return createFusedIterable(this)[Symbol.asyncIterator]() as AsyncIterator<T, TReturn, TNext>;
   }
 }

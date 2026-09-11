@@ -143,7 +143,7 @@ export function abortableIterable<T, TReturn, TNext>(iterable: AsyncIterable<T, 
           return Promise.race(race).then((result) => {
             if (result === undefined) {
               void finish();
-              return { done: true, value: undefined as TReturn } as IteratorResult<T, TReturn>;
+              return { done: true, value: undefined as TReturn };
             }
             if (result.done) {
               closed = true;

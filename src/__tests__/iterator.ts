@@ -601,6 +601,69 @@ describe('AsyncIteratorObject', () => {
       expect(innerFinallyCalled).toBe(true);
     });
 
+    it.each([1, 0.5])('should stop before a pending inner read after take(%s)', async (limit) => {
+      const pending = Promise.withResolvers<void>();
+      let pulls = 0;
+      let closed = false;
+      async function* inner() {
+        try {
+          pulls++;
+          yield 1;
+          pulls++;
+          await pending.promise;
+        } finally {
+          closed = true;
+        }
+      }
+
+      const iterator = AsyncIteratorObject.from([1]).flatMap(() => inner()).take(limit)[Symbol.asyncIterator]();
+      await expect(iterator.next()).resolves.toEqual({ value: 1, done: false });
+      const completion = iterator.next();
+      try {
+        expect(pulls).toBe(1);
+        await expect(completion).resolves.toEqual({ value: undefined, done: true });
+        expect(closed).toBe(true);
+      } finally {
+        pending.resolve();
+        await completion;
+        await iterator.return?.();
+      }
+    });
+
+    it('should stop before an extra expand read after take', async () => {
+      const pulls = vi.fn();
+      function* inner() {
+        pulls();
+        yield 1;
+        pulls();
+        yield 2;
+      }
+      const iterator = AsyncIteratorObject.from([1]).expand(() => inner()).take(1)[Symbol.asyncIterator]();
+      await expect(iterator.next()).resolves.toEqual({ value: 1, done: false });
+      await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+      expect(pulls).toHaveBeenCalledTimes(1);
+    });
+
+    it('should drain flatMap after an upstream take is exhausted on each iteration', async () => {
+      const iterable = AsyncIteratorObject.from([1, 2]).take(1).flatMap((value) => AsyncIteratorObject.from([value, value * 10]));
+      for (let iteration = 0; iteration < 2; iteration++) {
+        const result: number[] = [];
+        for await (const value of iterable) result.push(value);
+        expect(result).toEqual([1, 10]);
+      }
+    });
+
+    it('should drain an expansion after take while respecting a later take', async () => {
+      const iterable = AsyncIteratorObject.from([1])
+        .flatMap((value) => AsyncIteratorObject.from([value, value + 1, value + 2]))
+        .take(2)
+        .expand((value) => [value, value * 10])
+        .take(3);
+      const result: number[] = [];
+      for await (const value of iterable) result.push(value);
+      expect(result).toEqual([1, 10, 2]);
+    });
+
     it('should close expand iterator when take limit reached during expand', async () => {
       const result: string[] = [];
       const asyncIterator = AsyncIteratorObject.from(['abc', 'def'])
