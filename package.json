@@ -81,13 +81,13 @@
     "eslint-plugin-prettier": "^5.5.6",
     "inop": "^0.9.4",
     "overtake": "2.1.1",
-    "prettier": "^3.9.7",
+    "prettier": "^3.9.8",
     "recast": "^0.24.0",
     "sass-embedded": "^1.104.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
     "vitest": "^4.1.11",
-    "vue": "^3.5.42",
+    "vue": "^3.5.43",
     "vuepress": "2.0.0-rc.31"
   },
   "packageManager": "pnpm@10.34.5"
