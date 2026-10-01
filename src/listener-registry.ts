@@ -26,8 +26,10 @@ import { err, DispatchResultItem } from './dispatch-result.js';
  * registry.dispatch(2);            // no listeners called
  * ```
  */
-interface ListenerEntry {
+interface ListenerEntry<P extends unknown[], R> {
+  listener: Fn<P, R>;
   once: boolean;
+  consumed: boolean;
   onRemove?: Action;
 }
 
@@ -35,8 +37,8 @@ interface ListenerEntry {
  * @internal
  */
 export class ListenerRegistry<P extends unknown[], R> {
-  #listeners = new Map<Fn<P, R>, ListenerEntry>();
-  #snapshot: Fn<P, R>[] | null = null;
+  #listeners = new Map<Fn<P, R>, ListenerEntry<P, R>>();
+  #snapshot: ListenerEntry<P, R>[] | null = null;
 
   readonly [Symbol.toStringTag] = 'ListenerRegistry';
 
@@ -87,7 +89,7 @@ export class ListenerRegistry<P extends unknown[], R> {
     if (this.has(listener)) {
       return false;
     }
-    this.#listeners.set(listener, { once: false, onRemove });
+    this.#listeners.set(listener, { listener, once: false, consumed: false, onRemove });
     this.#snapshot = null;
     return true;
   }
@@ -102,7 +104,7 @@ export class ListenerRegistry<P extends unknown[], R> {
     if (this.has(listener)) {
       return false;
     }
-    this.#listeners.set(listener, { once: true, onRemove });
+    this.#listeners.set(listener, { listener, once: true, consumed: false, onRemove });
     this.#snapshot = null;
     return true;
   }
@@ -133,10 +135,10 @@ export class ListenerRegistry<P extends unknown[], R> {
     }
     let ordered = this.#snapshot;
     if (!ordered) {
-      const snapshot = new Array<Fn<P, R>>(listeners.size);
+      const snapshot = new Array<ListenerEntry<P, R>>(listeners.size);
       let index = 0;
-      for (const fn of listeners.keys()) {
-        snapshot[index++] = fn;
+      for (const entry of listeners.values()) {
+        snapshot[index++] = entry;
       }
       snapshot.length = index;
       ordered = snapshot;
@@ -147,32 +149,37 @@ export class ListenerRegistry<P extends unknown[], R> {
     }
     const results = new Array<DispatchResultItem<R | void>>(ordered.length);
     const argCount = values.length;
+    let resultCount = 0;
     for (let index = 0; index < ordered.length; index++) {
-      const fn = ordered[index];
-      if (listeners.get(fn)?.once) {
-        this.off(fn);
+      const entry = ordered[index];
+      const fn = entry.listener;
+      if (entry.once) {
+        if (entry.consumed) continue;
+        entry.consumed = true;
+        if (listeners.get(fn) === entry) this.off(fn);
       }
       const invoke = fn as (...args: unknown[]) => MaybePromise<R | void>;
       try {
         switch (argCount) {
           case 0:
-            results[index] = invoke();
+            results[resultCount] = invoke();
             break;
           case 1:
-            results[index] = invoke(values[0]);
+            results[resultCount] = invoke(values[0]);
             break;
           case 2:
-            results[index] = invoke(values[0], values[1]);
+            results[resultCount] = invoke(values[0], values[1]);
             break;
           default:
-            results[index] = invoke(...values);
+            results[resultCount] = invoke(...values);
             break;
         }
       } catch (error) {
-        results[index] = err(error);
+        results[resultCount] = err(error);
       }
+      resultCount++;
     }
-
+    results.length = resultCount;
     return results;
   }
 }

@@ -38,6 +38,84 @@ describe('ListenerRegistry', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it('consumes once listeners across nested dispatches and returns only invoked results', () => {
+    const registry = new ListenerRegistry<[string], string>();
+    const listener = vi.fn((value: string) => `once:${value}`);
+    registry.on((value) => {
+      if (value === 'outer') {
+        expect(registry.dispatch('inner')).toEqual(['first:inner', 'once:inner', 'last:inner']);
+      }
+      return `first:${value}`;
+    });
+    registry.once(listener);
+    registry.on((value) => `last:${value}`);
+
+    expect(registry.dispatch('outer')).toEqual(['first:outer', 'last:outer']);
+    expect(listener).toHaveBeenCalledExactlyOnceWith('inner');
+  });
+
+  it('keeps a new once registration when a consumed callback registers itself again', () => {
+    const registry = new ListenerRegistry<[string], string>();
+    const listener = vi.fn((value: string): string => {
+      if (value === 'inner') registry.once(listener);
+      return value;
+    });
+    registry.on((value) => {
+      if (value === 'outer') registry.dispatch('inner');
+      return `first:${value}`;
+    });
+    registry.once(listener);
+
+    expect(registry.dispatch('outer')).toEqual(['first:outer']);
+    expect(listener).toHaveBeenCalledExactlyOnceWith('inner');
+    expect(registry.has(listener)).toBe(true);
+    expect(registry.dispatch('later')).toEqual(['first:later', 'later']);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(registry.has(listener)).toBe(false);
+  });
+
+  it('does not remove a replacement registration when invoking an old snapshot entry', () => {
+    const registry = new ListenerRegistry<[string], string>();
+    const listener = vi.fn((value: string) => value);
+    registry.on((value) => {
+      if (value === 'outer') {
+        registry.off(listener);
+        registry.once(listener);
+      }
+      return `first:${value}`;
+    });
+    registry.once(listener);
+
+    expect(registry.dispatch('outer')).toEqual(['first:outer', 'outer']);
+    expect(registry.has(listener)).toBe(true);
+    expect(registry.dispatch('later')).toEqual(['first:later', 'later']);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('consumes once listeners during recursive onRemove callbacks', () => {
+    const registry = new ListenerRegistry<[string], string>();
+    const listener = vi.fn((value: string) => value);
+    registry.once(() => 'first', () => { registry.dispatch('inner'); });
+    registry.once(listener);
+
+    expect(registry.dispatch('outer')).toEqual(['first']);
+    expect(listener).toHaveBeenCalledExactlyOnceWith('inner');
+  });
+
+  it('still invokes ordinary listeners removed during the current dispatch', () => {
+    const registry = new ListenerRegistry<[], string>();
+    const listener = vi.fn(() => 'second');
+    registry.on(() => {
+      registry.off(listener);
+      return 'first';
+    });
+    registry.on(listener);
+
+    expect(registry.dispatch()).toEqual(['first', 'second']);
+    expect(registry.dispatch()).toEqual(['first']);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it('allows off() with original listener after once()', () => {
     const registry = new ListenerRegistry<[number], number>();
     const listener = vi.fn((v: number) => v * 2);
@@ -194,9 +272,9 @@ describe('ListenerRegistry', () => {
     const registry = new ListenerRegistry<[], void>();
     const listener = () => {};
 
-    // Capture the registry's internal Map to force an empty iterator for keys()
+    // Capture the registry's internal Map to force an empty iterator for values()
     const originalSet = Map.prototype.set;
-    const originalKeys = Map.prototype.keys;
+    const originalValues = Map.prototype.values;
     let capturedMap: Map<unknown, unknown> | undefined;
     try {
       Map.prototype.set = function set(this: Map<unknown, unknown>, key, value) {
@@ -206,18 +284,18 @@ describe('ListenerRegistry', () => {
 
       registry.on(listener);
 
-      Map.prototype.keys = function keys(this: Map<unknown, unknown>) {
+      Map.prototype.values = function values(this: Map<unknown, unknown>) {
         if (this === capturedMap) {
           return [][Symbol.iterator]();
         }
-        return originalKeys.call(this);
+        return originalValues.call(this);
       };
 
       const results = registry.dispatch();
       expect(results).toEqual([]);
     } finally {
       Map.prototype.set = originalSet;
-      Map.prototype.keys = originalKeys;
+      Map.prototype.values = originalValues;
     }
   });
 });
