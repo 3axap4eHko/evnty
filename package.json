@@ -83,7 +83,7 @@
     "overtake": "2.1.1",
     "prettier": "^3.9.10",
     "recast": "^0.24.0",
-    "sass-embedded": "^1.106.1",
+    "sass-embedded": "^1.107.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^4.1.12",
