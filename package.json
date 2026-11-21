@@ -87,7 +87,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.73.0",
     "vitest": "^4.1.12",
-    "vue": "^3.5.45",
+    "vue": "^3.5.46",
     "vuepress": "2.0.0-rc.32"
   },
   "packageManager": "pnpm@10.34.9"
