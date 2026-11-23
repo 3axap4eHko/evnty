@@ -134,12 +134,10 @@ export class Sequence<T> extends Async<T, boolean> {
    * @returns `true` if the sequence is still active.
    */
   emit(value: T): boolean {
-    const ok = !this.disposed;
-    if (ok) {
-      this.#queue.push(value);
-    }
+    if (this.disposed) return false;
+    this.#queue.push(value);
     this.#nextSignal.emit();
-    return ok;
+    return true;
   }
 
   /**

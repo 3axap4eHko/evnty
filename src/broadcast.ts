@@ -118,7 +118,8 @@ export class Broadcast<T> implements Emitter<T, boolean>, Promiseable<T>, Promis
 
   // Stryker disable all: FinalizationRegistry callback only testable via GC, excluded from mutation testing
   #registry = new FinalizationRegistry<number>((id) => {
-    const cursor = this.#cursors.get(id)!;
+    const cursor = this.#cursors.get(id);
+    if (cursor === undefined) return;
     this.#cursors.delete(id);
 
     if (cursor === this.#minCursor) {
